@@ -93,7 +93,6 @@ void WowFatesLoadConfig()
     c.reduceMana = Share("WowFates.Synced.Reduce.Mana", 1.0f);
     c.damageLevelExponent = Positive("WowFates.Synced.DamageLevelExponent", 1.0f);
     c.poolBonus = std::max(sConfigMgr->GetOption<float>("WowFates.Synced.PoolBonus", 1.15f), 0.1f);
-    c.syncAnnounce = sConfigMgr->GetOption<bool>("WowFates.Synced.Announce", true);
 
     c.primaryWeight = Positive("WowFates.Score.PrimaryWeight", 1.0f);
     c.secondaryWeight = Positive("WowFates.Score.SecondaryWeight", 0.5f);
@@ -108,7 +107,6 @@ void WowFatesLoadConfig()
     c.spawnInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.SpawnInterval", 60), 1) * IN_MILLISECONDS;
     c.cooldown = sConfigMgr->GetOption<uint32>("WowFates.Expedition.Cooldown", 600);
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
-    c.announce = sConfigMgr->GetOption<bool>("WowFates.Expedition.Announce", true);
     c.participantScaling = Positive("WowFates.Expedition.ParticipantScaling", 0.6f);
     c.adaptiveSpawn = sConfigMgr->GetOption<bool>("WowFates.Expedition.AdaptiveSpawn", true);
     c.adaptiveWindow = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AdaptiveWindow", 15), 5) * IN_MILLISECONDS;

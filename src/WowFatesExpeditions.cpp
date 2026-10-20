@@ -47,16 +47,6 @@ namespace
     // How long a monster of an Expedition stays dead, to be looted.
     constexpr uint32 SUMMON_CORPSE_MS = 60000;
 
-    template<typename... Args>
-    void Tell(Player* player, uint32 id, Args&&... args)
-    {
-        WorldSession* session = player->GetSession();
-        std::string const text = WowFatesText(session, id);
-        if (text.empty())
-            return;
-        ChatHandler(session).SendSysMessage("|cffffd000" + Acore::StringFormat(text, std::forward<Args>(args)...) + "|r");
-    }
-
     bool IsFromPlayer(Unit const* unit)
     {
         return unit && unit->GetCharmerOrOwnerPlayerOrPlayerItself();
@@ -303,9 +293,6 @@ void WowFatesExpeditionMgr::StartLocked(WowFatesExpeditionDef const* def, WowFat
         def->id, def->name, spawn->id, spawn->map, active.zone);
 
     BroadcastSet(active, true);
-
-    if (WowFatesConf().announce)
-        AnnounceZone(active, WOW_FATES_STR_STARTED);
 }
 
 bool WowFatesExpeditionMgr::Stop(uint32 id)
@@ -366,8 +353,8 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
         if (!player)
             continue;
 
-        std::string const name = Name(active.def, player->GetSession());
-        Tell(player, success ? WOW_FATES_STR_SUCCESS : WOW_FATES_STR_FAILED, name);
+        // No chat: the client's banner, then, on success, its window of what
+        // was won ("won", empty when nothing).
         SendAddon(player, Acore::StringFormat("end\t{}\t{}", active.def->id, success ? 1 : 0));
         if (!success)
             continue;
@@ -377,7 +364,7 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
         if (part != WOW_FATES_PART_NONE && inRange)
             Reward(active, player, part);
         else
-            Tell(player, WOW_FATES_STR_NOT_ELIGIBLE, name);
+            SendAddon(player, Acore::StringFormat("won\t{}\t0\t0\t", active.def->id));
     }
 
     // Its living monsters go with it, in a fight or far away; the corpses go
@@ -472,19 +459,26 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 
     WorldSession* session = player->GetSession();
     std::string const name = Name(active.def, session);
-    if (!rows.empty())
-        Tell(player, WOW_FATES_STR_REWARD, name);
+
+    // What was won, for the client's window: "won", id, money, xp, items as
+    // "entry,count" separated by ";", the hidden ones shown now.
+    uint32 wonMoney = 0, wonXp = 0;
+    std::map<uint32, uint32> wonItems;
 
     for (WowFatesReward const* reward : rows)
     {
         if (uint32 const money = Share(reward->money, pct))
         {
             player->ModifyMoney(int32(money));
-            Tell(player, WOW_FATES_STR_REWARD_MONEY, money / GOLD, (money % GOLD) / SILVER, money % SILVER);
+            wonMoney += money;
         }
 
         if (uint32 const xp = Share(reward->xp, pct))
-            player->GiveXP(xp, nullptr);
+            if (player->GetLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            {
+                player->GiveXP(xp, nullptr);
+                wonXp += xp;
+            }
 
         // A single item goes to a strong participation only.
         if (!reward->item || (reward->itemCount == 1 && part != WOW_FATES_PART_STRONG))
@@ -494,6 +488,7 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
         uint32 count = Share(reward->itemCount, pct);
         if (!count)
             continue;
+        wonItems[reward->item] += count;
         uint32 noSpace = 0;
         ItemPosCountVec dest;
         InventoryResult const msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, reward->item, count, &noSpace);
@@ -501,7 +496,7 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
         if (stored)
             if (Item* item = player->StoreNewItem(dest, reward->item, true, Item::GenerateItemRandomPropertyId(reward->item)))
             {
-                player->SendNewItem(item, stored, true, false);
+                player->SendNewItem(item, stored, true, false, false, false);
                 count -= stored;
             }
 
@@ -528,39 +523,12 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
         }
         draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
         CharacterDatabase.CommitTransaction(trans);
-        Tell(player, WOW_FATES_STR_REWARD_MAILED);
     }
-}
 
-// ---------------------------------------------------------------------------
-// Announcements
-
-void WowFatesExpeditionMgr::AnnounceZone(WowFatesActiveExpedition const& active, uint32 text)
-{
-    Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
-    if (!map)
-        return;
-
-    uint32 const minutes = uint32((active.remaining + MINUTE * IN_MILLISECONDS - 1) / (MINUTE * IN_MILLISECONDS));
-    for (auto const& ref : map->GetPlayers())
-    {
-        Player* player = ref.GetSource();
-        if (!player || player->GetZoneId() != active.zone)
-            continue;
-        WorldSession* session = player->GetSession();
-        Tell(player, text, Name(active.def, session), uint32(active.def->level), Objective(active, session), minutes);
-    }
-}
-
-void WowFatesExpeditionMgr::AnnounceParticipants(WowFatesActiveExpedition const& active, uint32 text, uint32 a, uint32 b)
-{
-    std::unordered_set<ObjectGuid> concerned(active.inside.begin(), active.inside.end());
-    for (auto const& [guid, contribution] : active.contributors)
-        concerned.insert(guid);
-
-    for (ObjectGuid const& guid : concerned)
-        if (Player* player = ObjectAccessor::FindPlayer(guid))
-            Tell(player, text, Name(active.def, player->GetSession()), a, b);
+    std::string items;
+    for (auto const& [entry, count] : wonItems)
+        items += Acore::StringFormat("{}{},{}", items.empty() ? "" : ";", entry, count);
+    SendAddon(player, Acore::StringFormat("won\t{}\t{}\t{}\t{}", active.def->id, wonMoney, wonXp, items));
 }
 
 // ---------------------------------------------------------------------------
@@ -774,15 +742,6 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             SendStatus(active);
         }
 
-        uint32 const pct = std::min<uint32>(uint32(active.progressPct), 100);
-        uint8 const quarter = uint8(pct / 25);
-        if (quarter > active.announcedQuarter)
-        {
-            active.announcedQuarter = quarter;
-            if (quarter < 4)
-                AnnounceParticipants(active, WOW_FATES_STR_PROGRESS, pct);
-        }
-
         if (active.progressPct >= 100.0)
             ended.emplace_back(id, true);
         else if (active.remaining <= 0)
@@ -854,8 +813,6 @@ void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* ma
                 _synced[guid] = SyncState();
                 _synced[guid].expedition = active.def->id;
                 _pendingUnsync.erase(guid);
-                Tell(player, WOW_FATES_STR_ENTERED, Name(active.def, player->GetSession()), uint32(active.def->level),
-                    Objective(active, player->GetSession()), uint32(active.progressPct));
                 // the banner and the tracker of the client
                 SendAddon(player, MapLine(active, player->GetSession()));
                 SendAddon(player, RewardLine(active, player));
@@ -877,13 +834,12 @@ void WowFatesExpeditionMgr::LeaveArea(WowFatesActiveExpedition const& active, Ob
 {
     if (Player* player = ObjectAccessor::FindPlayer(guid))
     {
-        Tell(player, WOW_FATES_STR_LEFT, Name(active.def, player->GetSession()));
         SendAddon(player, Acore::StringFormat("leave\t{}", active.def->id));
     }
     Leave(guid, true);
 }
 
-void WowFatesExpeditionMgr::Leave(ObjectGuid guid, bool announce)
+void WowFatesExpeditionMgr::Leave(ObjectGuid guid, bool /*announce*/)
 {
     _synced.erase(guid);
 
@@ -897,8 +853,6 @@ void WowFatesExpeditionMgr::Leave(ObjectGuid guid, bool announce)
     if (sWowFatesSync->IsSynced(player))
     {
         sWowFatesSync->Remove(player);
-        if (announce && WowFatesConf().syncAnnounce)
-            Tell(player, WOW_FATES_STR_UNSYNCED);
     }
     SendAddon(player, "sync\t0\t100");
 }
@@ -938,11 +892,8 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
             continue;
         }
 
-        bool const was = sWowFatesSync->IsSynced(player);
         float const ratio = sWowFatesSync->Apply(player, active->second.def->level);
         state.ratio = ratio;
-        if (!was && ratio < 1.0f && c.syncAnnounce)
-            Tell(player, WOW_FATES_STR_SYNCED, uint32(active->second.def->level), uint32(std::lround(ratio * 100.0f)));
 
         // The debuff's tooltip on the client: the level and the share kept.
         int32 const pct = int32(std::lround(ratio * 100.0f));

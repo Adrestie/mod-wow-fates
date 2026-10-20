@@ -63,9 +63,6 @@ WowFates.Enable                         = 1
 #        The target health and mana, times this. 1.15: a level 80 in a level 7
 #        Expedition keeps about 245 health, 15 % above a level 7 of his class.
 #
-#    WowFates.Synced.Announce
-#        1 = a message when a player gets synced, and when he no longer is.
-#
 
 WowFates.Synced.Enable                  = 1
 WowFates.Synced.Interval                = 5
@@ -79,7 +76,6 @@ WowFates.Synced.Reduce.Damage           = 1.0
 WowFates.Synced.Reduce.Healing          = 1.0
 WowFates.Synced.DamageLevelExponent     = 1.0
 WowFates.Synced.PoolBonus               = 1.15
-WowFates.Synced.Announce                = 1
 
 ###############################################################################
 #
@@ -141,15 +137,11 @@ WowFates.Reference.Factor               = 1.0
 #        Milliseconds between two looks at who is in each area (entering,
 #        leaving, monsters to bring back). 200 at least.
 #
-#    WowFates.Expedition.Announce
-#        1 = the players of the zone are told when an Expedition begins.
-#
 
 WowFates.Expedition.MaxActive           = 3
 WowFates.Expedition.SpawnInterval       = 60
 WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000
-WowFates.Expedition.Announce            = 1
 
 #
 #    WowFates.Expedition.ParticipantScaling

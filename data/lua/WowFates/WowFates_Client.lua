@@ -92,35 +92,35 @@ local TRACKER_TEXTS = {
         title = "%s - Level %d", banner = "Expedition: %s", bannerLevel = "Level %d",
         leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
         part0 = "Participation: none", part1 = "Participation: light", part2 = "Participation: medium", part3 = "Participation: strong",
-        expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards (strong participation):", needStrong = "Strong participation required", xp = "%d XP",
+        expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards:", bravo = "Well done!", earned = "You earned:", done = "Expedition complete", xp = "%d XP",
         kills = "Your kills: %d", synced = "Synced to level %d: you keep %d%% of your power.",
     },
     frFR = {
         title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
         leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
         part0 = "Participation : aucune", part1 = "Participation : légère", part2 = "Participation : moyenne", part3 = "Participation : forte",
-        expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses (participation forte) :", needStrong = "Participation forte requise", xp = "%d XP",
+        expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses :", bravo = "Bravo !", earned = "Vous avez gagné :", done = "Expédition terminée", xp = "%d XP",
         kills = "Vos victimes : %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
     },
     deDE = {
         title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
         leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
         part0 = "Teilnahme: keine", part1 = "Teilnahme: gering", part2 = "Teilnahme: mittel", part3 = "Teilnahme: stark",
-        expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen (starke Teilnahme):", needStrong = "Starke Teilnahme erforderlich", xp = "%d EP",
+        expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen:", bravo = "Gut gemacht!", earned = "Ihr habt erhalten:", done = "Expedition abgeschlossen", xp = "%d EP",
         kills = "Eure Siege: %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
     },
     esES = {
         title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
         leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
         part0 = "Participación: ninguna", part1 = "Participación: leve", part2 = "Participación: media", part3 = "Participación: fuerte",
-        expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas (participación fuerte):", needStrong = "Se requiere participación fuerte", xp = "%d de experiencia",
+        expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas:", bravo = "¡Bien hecho!", earned = "Has ganado:", done = "Expedición terminada", xp = "%d de experiencia",
         kills = "Tus víctimas: %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
     },
     ruRU = {
         title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
         leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
         part0 = "Участие: нет", part1 = "Участие: слабое", part2 = "Участие: среднее", part3 = "Участие: сильное",
-        expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды (сильное участие):", needStrong = "Требуется сильное участие", xp = "%d ед. опыта",
+        expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды:", bravo = "Отлично!", earned = "Вы получили:", done = "Экспедиция завершена", xp = "%d ед. опыта",
         kills = "Ваши победы: %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
     },
 }
@@ -181,6 +181,12 @@ local function onMessage(message)
                                   single = single == "1" }
         end
         rewards[id] = { money = tonumber(f[3]) or 0, xp = tonumber(f[4]) or 0, items = items }
+    elseif command == "won" and id then
+        local items = {}
+        for entry, count in string.gmatch(f[5] or "", "(%d+),(%d+)") do
+            items[#items + 1] = { entry = tonumber(entry), count = tonumber(count) }
+        end
+        track.won(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0, items)
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -749,7 +755,6 @@ local function itemButton(b, i)
         else
             GameTooltip:SetHyperlink("item:" .. self.entry .. ":0:0:0:0:0:0:0")
         end
-        if not self.granted then GameTooltip:AddLine(L.needStrong, 1, 0.13, 0.13) end
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -988,8 +993,9 @@ function track.finish(id, success)
         track.copy.frozen = math.max(0, (track.copy.ends or 0) - GetTime())
         if success then track.copy.progress = track.copy.count end
     end
-    showBanner(success and L.success or L.failed, track.copy and track.copy.name or "",
-        success and "Sound\\Interface\\iQuestComplete.wav" or "Sound\\Interface\\iQuestLogCloseA.wav")
+    if not success then
+        showBanner(L.failed, track.copy and track.copy.name or "", "Sound\\Interface\\iQuestLogCloseA.wav")
+    end
     relayout()
 end
 
@@ -1014,6 +1020,130 @@ trackerClock:SetScript("OnUpdate", function()
         relayout()
     end
 end)
+
+
+-- ---------------------------------------------------------------------------
+-- WHAT WAS WON: a window at the top of the screen, as the modern client's
+-- "challenge complete" banner; it fades in, stays 5 seconds, fades out
+-- ---------------------------------------------------------------------------
+
+local WON_HOLD, WON_FADE = 5, 0.5
+local WON_ICON, WON_GAP = 36, 8
+local wonFrame
+
+local function buildWon()
+    if wonFrame then return wonFrame end
+    local f = CreateFrame("Frame", "WowFatesWonFrame", UIParent)
+    f:SetWidth(380)
+    f:SetHeight(150)
+    f:SetPoint("TOP", UIParent, "TOP", 0, -130)
+    f:SetFrameStrata("HIGH")
+    f:Hide()
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(f)
+    bg:SetTexture(0, 0, 0, 0.55)
+    local top = f:CreateTexture(nil, "BORDER")
+    top:SetTexture(1, 0.55, 0.1, 0.9)
+    top:SetHeight(2)
+    top:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    top:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    local bottom = f:CreateTexture(nil, "BORDER")
+    bottom:SetTexture(1, 0.55, 0.1, 0.9)
+    bottom:SetHeight(2)
+    bottom:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+    bottom:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    local title = f:CreateFontString(nil, "OVERLAY")
+    title:SetFont("Fonts\\MORPHEUS.TTF", 30, "OUTLINE")
+    title:SetPoint("TOP", f, "TOP", 0, -10)
+    title:SetTextColor(1, 0.55, 0.1)
+    local name = f:CreateFontString(nil, "OVERLAY")
+    name:SetFont(FONT, 15, "OUTLINE")
+    name:SetPoint("TOP", title, "BOTTOM", 0, -4)
+    name:SetTextColor(1, 0.82, 0)
+    local earned = f:CreateFontString(nil, "OVERLAY")
+    earned:SetFont(FONT, 13)
+    earned:SetPoint("TOP", name, "BOTTOM", 0, -8)
+    earned:SetTextColor(1, 1, 1)
+    local amounts = f:CreateFontString(nil, "OVERLAY")
+    amounts:SetFont(FONT, 13)
+    amounts:SetTextColor(1, 1, 1)
+    f.title, f.name, f.earned, f.amounts, f.icons, f.t = title, name, earned, amounts, {}, 0
+    f:SetScript("OnUpdate", function(self, elapsed)
+        self.t = self.t + elapsed
+        local t = self.t
+        if t < WON_FADE then
+            self:SetAlpha(t / WON_FADE)
+        elseif t < WON_FADE + WON_HOLD then
+            self:SetAlpha(1)
+        elseif t < 2 * WON_FADE + WON_HOLD then
+            self:SetAlpha(1 - (t - WON_FADE - WON_HOLD) / WON_FADE)
+        else
+            self:Hide()
+        end
+    end)
+    wonFrame = f
+    return f
+end
+
+local function wonIcon(f, i)
+    local b = f.icons[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, f)
+    b:SetWidth(WON_ICON)
+    b:SetHeight(WON_ICON)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints(b)
+    b.count = b:CreateFontString(nil, "OVERLAY")
+    b.count:SetFont(FONT, 12, "OUTLINE")
+    b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. self.entry .. ":0:0:0:0:0:0:0")
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.icons[i] = b
+    return b
+end
+
+function track.won(id, money, xp, items)
+    local f = buildWon()
+    if banner then banner:Hide() end           -- the window takes the banner's place
+    local e = expeditions[id] or (track.copy and track.copy.id == id and track.copy)
+    f.name:SetText(e and e.name or "")
+    local amounts = {}
+    if money > 0 then amounts[#amounts + 1] = coins(money) end
+    if xp > 0 then amounts[#amounts + 1] = string.format(L.xp, xp) end
+    local nothing = #amounts == 0 and #items == 0
+    f.title:SetText(nothing and L.done or L.bravo)
+    f.earned:SetText(nothing and "" or L.earned)
+    f.amounts:SetText(table.concat(amounts, "   "))
+
+    local height = 75
+    local rowWidth = #items * WON_ICON + math.max(#items - 1, 0) * WON_GAP
+    for i, it in ipairs(items) do
+        local b = wonIcon(f, i)
+        local _, icon = itemInfo(it.entry)
+        b.entry = it.entry
+        b.icon:SetTexture(icon)
+        b.count:SetText(it.count > 1 and it.count or "")
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", f, "TOP", -rowWidth / 2 + (i - 1) * (WON_ICON + WON_GAP), -height - 22)
+        b:Show()
+    end
+    for i = #items + 1, #f.icons do f.icons[i]:Hide() end
+    if not nothing then height = height + 22 end
+    if #items > 0 then height = height + WON_ICON + 8 end
+    f.amounts:ClearAllPoints()
+    f.amounts:SetPoint("TOP", f, "TOP", 0, -height - 4)
+    if #amounts > 0 then height = height + 20 end
+    f:SetHeight(height + 12)
+
+    f.t = 0
+    f:SetAlpha(0)
+    f:Show()
+    play(nothing and "Sound\\Interface\\iQuestLogCloseA.wav" or "Sound\\Interface\\iQuestComplete.wav")
+end
 
 -- ---------------------------------------------------------------------------
 -- THE SYNCED DEBUFF'S TOOLTIP

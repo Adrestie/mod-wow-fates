@@ -188,8 +188,6 @@ private:
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void Finish(WowFatesActiveExpedition& active, bool success);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
-    void AnnounceZone(WowFatesActiveExpedition const& active, uint32 text);
-    void AnnounceParticipants(WowFatesActiveExpedition const& active, uint32 text, uint32 a = 0, uint32 b = 0);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
     void Leave(ObjectGuid guid, bool announce);
     std::string MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const;
