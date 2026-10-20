@@ -128,6 +128,7 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 |---|---|---|
 | `WowFates.Enable` | 1 | the whole module |
 | `WowFates.Rotation.MaxPerZone` | 3 | Expeditions at once in a zone with players |
+| `WowFates.Rotation.CountBots` | 0 | whether bots make a zone "with players" (they may take part either way) |
 | `WowFates.Rotation.IdleExpire` | 900 | seconds without activity before an Expedition goes (never while players are at it) |
 | `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |

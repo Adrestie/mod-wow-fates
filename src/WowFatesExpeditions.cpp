@@ -859,10 +859,13 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
     {
         _areaTimer = c.areaInterval;
 
-        // The zones with players, those of the continents only.
+        // The zones with players, those of the continents only. A bot (a
+        // session with no client behind it) does not count, unless CountBots:
+        // it may still take part, and its activity keeps an Expedition alive.
         _populated.clear();
         for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
-            if (player && player->IsInWorld() && player->GetInstanceId() == 0)
+            if (player && player->IsInWorld() && player->GetInstanceId() == 0
+                && (c.countBots || !player->GetSession()->IsSocketClosed()))
                 _populated.insert(player->GetZoneId());
     }
 

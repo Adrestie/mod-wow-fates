@@ -104,6 +104,7 @@ void WowFatesLoadConfig()
         c.referenceCurve = ParseCurve(DEFAULT_CURVE);
 
     c.maxPerZone = sConfigMgr->GetOption<uint32>("WowFates.Rotation.MaxPerZone", 3);
+    c.countBots = sConfigMgr->GetOption<bool>("WowFates.Rotation.CountBots", false);
     c.idleExpire = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Rotation.IdleExpire", 900), 60);
     c.spawnInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.SpawnInterval", 60), 1) * IN_MILLISECONDS;
     c.cooldown = sConfigMgr->GetOption<uint32>("WowFates.Expedition.Cooldown", 600);

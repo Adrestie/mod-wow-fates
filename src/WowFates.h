@@ -126,6 +126,7 @@ struct WowFatesConfig
 
     // Expeditions
     uint32 maxPerZone = 3;           // Expeditions at once in a zone with players
+    bool countBots = false;          // bots make a zone "with players"
     uint32 idleExpire = 900;         // s without activity before one goes, when its own duration is 0
     uint32 spawnInterval = 60000;    // ms between two more in a zone with players
     uint32 cooldown = 600;           // s, when the Expedition's own is 0

@@ -131,6 +131,12 @@ WowFates.Reference.Factor               = 1.0
 #        Expeditions at once in a zone with players. 0 = none but those
 #        started by `.fates start`.
 #
+#    WowFates.Rotation.CountBots
+#        1 = bots (sessions with no game client, such as mod-playerbots')
+#        make a zone "with players"; 0 = only real players do. Bots may take
+#        part in Expeditions and be rewarded either way, and their activity
+#        keeps an Expedition alive.
+#
 #    WowFates.Rotation.IdleExpire
 #        Seconds an Expedition waits for players: with no activity for that
 #        long (no kill, damage, healing, object, channel), it goes and another
@@ -152,6 +158,7 @@ WowFates.Reference.Factor               = 1.0
 #
 
 WowFates.Rotation.MaxPerZone            = 3
+WowFates.Rotation.CountBots             = 0
 WowFates.Rotation.IdleExpire            = 900
 WowFates.Expedition.SpawnInterval       = 60
 WowFates.Expedition.Cooldown            = 600
