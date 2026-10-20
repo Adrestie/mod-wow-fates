@@ -151,6 +151,28 @@ WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000
 WowFates.Expedition.Announce            = 1
 
+#
+#    WowFates.Expedition.AdaptiveSpawn
+#        1 = the monsters an Expedition brings come back faster, and more of
+#        them, when its area is cleared fast; when the pace drops, back to the
+#        Expedition's own delay (summon_respawn) and number (summon_count).
+#        The monsters of the game in the area keep their own respawn.
+#
+#    WowFates.Expedition.AdaptiveWindow
+#        Seconds of kills the pace is read on.
+#
+#    WowFates.Expedition.MinRespawn
+#        Seconds, the shortest delay between two waves.
+#
+#    WowFates.Expedition.MaxPopulation
+#        Times summon_count, the most monsters alive at once.
+#
+
+WowFates.Expedition.AdaptiveSpawn       = 1
+WowFates.Expedition.AdaptiveWindow      = 30
+WowFates.Expedition.MinRespawn          = 5
+WowFates.Expedition.MaxPopulation       = 2.0
+
 ###############################################################################
 #
 #    PARTICIPATION

@@ -971,11 +971,27 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
         return creature && creature->IsAlive();
     }));
 
+    // The pace of the area: kills per second over the last AdaptiveWindow. The
+    // faster it is cleared, the shorter the delay (MinRespawn at least) and
+    // the more monsters at once (MaxPopulation times summon_count at most);
+    // when the pace drops, both go back to the Expedition's own.
+    WowFatesConfig const& c = WowFatesConf();
+    int64 const now = int64(def->duration) * IN_MILLISECONDS - active.remaining;
+    while (!active.killTimes.empty() && active.killTimes.front() < now - int64(c.adaptiveWindow))
+        active.killTimes.pop_front();
+    float const pace = c.adaptiveSpawn ? float(active.killTimes.size()) * IN_MILLISECONDS / float(c.adaptiveWindow) : 0.0f;
+    float const respawn = float(def->summonRespawn);
+    uint32 const population = std::clamp<uint32>(def->summonCount + uint32(std::lround(pace * respawn)),
+        def->summonCount, uint32(std::lround(float(def->summonCount) * c.maxPopulation)));
+
     // Nobody near: the grid sleeps, no monster is brought.
-    if (alive >= def->summonCount || active.summonTimer > 0 || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    if (alive >= population || active.summonTimer > 0 || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
 
-    uint32 const wanted = active.filled ? 1 : def->summonCount - alive;
+    float const delay = std::max(respawn / (1.0f + pace * respawn), float(c.minRespawn) / IN_MILLISECONDS);
+    uint32 const wanted = active.filled
+        ? std::min(population - alive, std::max<uint32>(1, uint32(std::ceil(pace * delay))))
+        : population - alive;
     for (uint32 i = 0; i < wanted; ++i)
     {
         float const angle = frand(0.0f, 2.0f * float(M_PI));
@@ -1003,7 +1019,9 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
     }
 
     active.filled = true;
-    active.summonTimer = int64(def->summonRespawn) * IN_MILLISECONDS;
+    active.summonTimer = c.adaptiveSpawn && pace > 0.0f
+        ? int64(delay * IN_MILLISECONDS)
+        : int64(def->summonRespawn) * IN_MILLISECONDS;
 }
 
 // ---------------------------------------------------------------------------
@@ -1071,6 +1089,7 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     if (active->progress < active->def->objectiveCount)
         ++active->progress;
     ++active->contributors[player->GetGUID()].kills;
+    active->killTimes.push_back(int64(active->def->duration) * IN_MILLISECONDS - active->remaining);
 }
 
 void WowFatesExpeditionMgr::OnLogout(Player* player)

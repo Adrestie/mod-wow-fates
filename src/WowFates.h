@@ -121,6 +121,13 @@ struct WowFatesConfig
     uint32 areaInterval = 1000;      // ms between two looks at who is inside
     bool announce = true;
 
+    // Monsters of an Expedition: brought back faster, and more of them, when
+    // the area is cleared fast
+    bool adaptiveSpawn = true;
+    uint32 adaptiveWindow = 30000;   // ms of kills the pace is read on
+    uint32 minRespawn = 5000;        // ms, the shortest delay
+    float maxPopulation = 2.0f;      // times summon_count, the most alive at once
+
     // Participation
     float mediumShare = 0.5f;        // of the average contribution
     float strongShare = 1.0f;

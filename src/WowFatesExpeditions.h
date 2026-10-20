@@ -44,6 +44,7 @@
 #include "ObjectGuid.h"
 
 #include <atomic>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <string>
@@ -131,6 +132,7 @@ struct WowFatesActiveExpedition
     uint32 sentProgress = 0;    // progress the clients last heard of
     int64 summonTimer = 0;      // ms
     bool filled = false;        // the first wave of monsters is out
+    std::deque<int64> killTimes; // when its monsters died (ms since the start), for the pace
     std::vector<ObjectGuid> summons;
     std::unordered_map<ObjectGuid, WowFatesContribution> contributors;
     std::unordered_set<ObjectGuid> inside; // players in the area, synced to it
