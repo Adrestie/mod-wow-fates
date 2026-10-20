@@ -27,6 +27,8 @@
 #include "Define.h"
 
 #include <string>
+#include <utility>
+#include <vector>
 
 class Player;
 class WorldSession;
@@ -41,7 +43,7 @@ enum WowFatesSpells : uint32
     SPELL_WOW_FATES_SYNCED          = 96000, // all stats %, damage done %, healing done %
     SPELL_WOW_FATES_SYNCED_OFFENSE  = 96001, // hit, critical strike, haste ratings
     SPELL_WOW_FATES_SYNCED_DEFENSE  = 96002, // defense, dodge and parry, expertise and armor penetration ratings
-    SPELL_WOW_FATES_SYNCED_HEALTH   = 96003  // maximum health %, armor %, resilience rating
+    SPELL_WOW_FATES_SYNCED_HEALTH   = 96003  // maximum health %, armor %, maximum mana %
 };
 
 // module_string ids (data/sql/world/wow_fates_01_strings.sql).
@@ -98,6 +100,8 @@ struct WowFatesConfig
     float reduceArmor = 1.0f;
     float reduceDamage = 1.0f;
     float reduceHealing = 1.0f;
+    float reduceMana = 1.0f;
+    float damageLevelExponent = 1.4f; // damage by level: the creatures' base damage curve, to this power
     bool syncAnnounce = true;
 
     // Power score
@@ -105,11 +109,9 @@ struct WowFatesConfig
     float secondaryWeight = 0.5f;
     float powerWeight = 0.5f;
 
-    // Reference score
+    // Reference score: (level, score) points, a straight line between them
     float referenceFactor = 1.0f;
-    float referenceGearPrimary = 18.0f;
-    float referenceGearSecondary = 9.0f;
-    float referenceGearPower = 4.0f;
+    std::vector<std::pair<uint32, float>> referenceCurve;
 
     // Expeditions
     uint32 maxActive = 3;

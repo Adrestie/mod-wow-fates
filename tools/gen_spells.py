@@ -21,6 +21,7 @@ ATTR3_ALLOW_AURA_WHILE_DEAD = 0x00100000
 # Auras
 MOD_DAMAGE_PERCENT_DONE = 79
 MOD_RESISTANCE_PCT = 101
+MOD_INCREASE_ENERGY_PERCENT = 132
 MOD_INCREASE_HEALTH_PERCENT = 133
 MOD_HEALING_DONE_PERCENT = 136
 MOD_TOTAL_STAT_PERCENTAGE = 137
@@ -69,7 +70,7 @@ SPELLS = [
     (96002, {"enUS": "Synced (defense)"}, None, HIDDEN, ATTR1_NO_AURA_ICON, 58,
      [(MOD_RATING, cr(CR_DEFENSE)), (MOD_RATING, cr(CR_DODGE, CR_PARRY)), (MOD_RATING, cr(CR_EXPERTISE, CR_ARMOR_PENETRATION))]),
     (96003, {"enUS": "Synced (health)"}, None, HIDDEN, ATTR1_NO_AURA_ICON, 58,
-     [(MOD_INCREASE_HEALTH_PERCENT, 0), (MOD_RESISTANCE_PCT, 1), (MOD_RATING, cr(*CR_RESILIENCE))]),
+     [(MOD_INCREASE_HEALTH_PERCENT, 0), (MOD_RESISTANCE_PCT, 1), (MOD_INCREASE_ENERGY_PERCENT, 0)]),
 ]
 
 LANG_MASK = 16712190
@@ -175,7 +176,7 @@ def main():
 --   96001  hidden: hit, critical strike and haste ratings
 --   96002  hidden: defense rating, dodge and parry ratings, expertise and
 --          armor penetration ratings
---   96003  hidden: maximum health %, armor %, resilience rating
+--   96003  hidden: maximum health %, armor %, maximum mana %
 --
 -- Every amount is set by the module (WowFatesSync::Apply); the -1 of the
 -- base points only makes the auras harmful ones. They cannot be cancelled,

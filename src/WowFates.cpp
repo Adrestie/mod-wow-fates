@@ -22,6 +22,7 @@
 #include "WorldSession.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace
 {
@@ -36,6 +37,37 @@ namespace
     {
         return std::max(sConfigMgr->GetOption<float>(option, fallback), 0.0f);
     }
+
+    // "level:score level:score ...", sorted by level; the default when empty or wrong.
+    std::vector<std::pair<uint32, float>> ParseCurve(std::string const& text)
+    {
+        std::vector<std::pair<uint32, float>> curve;
+        std::size_t pos = 0;
+        while (pos < text.size())
+        {
+            std::size_t const end = text.find_first_of(" ,;", pos);
+            std::string const item = text.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+            std::size_t const colon = item.find(':');
+            if (colon != std::string::npos)
+            {
+                uint32 const level = uint32(std::strtoul(item.substr(0, colon).c_str(), nullptr, 10));
+                float const score = std::strtof(item.substr(colon + 1).c_str(), nullptr);
+                if (level > 0 && score > 0.0f)
+                    curve.emplace_back(level, score);
+            }
+            if (end == std::string::npos)
+                break;
+            pos = end + 1;
+        }
+        std::sort(curve.begin(), curve.end());
+        return curve;
+    }
+
+    // The power score of the random bots at their own level (median), measured on the test realm
+    // with .fates score: characters with the gear of their level.
+    constexpr char const* DEFAULT_CURVE =
+        "1:100 5:126 10:160 15:210 20:300 25:350 30:390 35:430 40:520 45:620 "
+        "50:800 55:850 60:900 65:1300 70:2000 75:2350 80:3400";
 }
 
 WowFatesConfig const& WowFatesConf()
@@ -58,6 +90,8 @@ void WowFatesLoadConfig()
     c.reduceArmor = Share("WowFates.Synced.Reduce.Armor", 1.0f);
     c.reduceDamage = Share("WowFates.Synced.Reduce.Damage", 1.0f);
     c.reduceHealing = Share("WowFates.Synced.Reduce.Healing", 1.0f);
+    c.reduceMana = Share("WowFates.Synced.Reduce.Mana", 1.0f);
+    c.damageLevelExponent = Positive("WowFates.Synced.DamageLevelExponent", 1.4f);
     c.syncAnnounce = sConfigMgr->GetOption<bool>("WowFates.Synced.Announce", true);
 
     c.primaryWeight = Positive("WowFates.Score.PrimaryWeight", 1.0f);
@@ -65,9 +99,9 @@ void WowFatesLoadConfig()
     c.powerWeight = Positive("WowFates.Score.PowerWeight", 0.5f);
 
     c.referenceFactor = Positive("WowFates.Reference.Factor", 1.0f);
-    c.referenceGearPrimary = Positive("WowFates.Reference.GearPrimary", 18.0f);
-    c.referenceGearSecondary = Positive("WowFates.Reference.GearSecondary", 9.0f);
-    c.referenceGearPower = Positive("WowFates.Reference.GearPower", 4.0f);
+    c.referenceCurve = ParseCurve(sConfigMgr->GetOption<std::string>("WowFates.Reference.Curve", DEFAULT_CURVE));
+    if (c.referenceCurve.empty())
+        c.referenceCurve = ParseCurve(DEFAULT_CURVE);
 
     c.maxActive = sConfigMgr->GetOption<uint32>("WowFates.Expedition.MaxActive", 3);
     c.spawnInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.SpawnInterval", 60), 1) * IN_MILLISECONDS;

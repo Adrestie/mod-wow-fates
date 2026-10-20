@@ -59,7 +59,7 @@ arrive par AIO.
 | 96000 | oui, ses charges indiquent le niveau | toutes les caractéristiques %, dégâts infligés %, soins prodigués % |
 | 96001 | non | scores de toucher, de critique, de hâte |
 | 96002 | non | score de défense, d'esquive et de parade, d'expertise et de pénétration d'armure |
-| 96003 | non | points de vie maximum %, armure %, résilience |
+| 96003 | non | points de vie maximum %, armure %, mana maximum % |
 
 Toutes les valeurs sont posées par le module. Pour mesurer le joueur sans le
 debuff, ses valeurs sont remises à 0, les statistiques lues, puis les nouvelles
@@ -69,13 +69,17 @@ valeurs posées, dans le même tick : le client ne voit que le résultat.
   secondaires × 0,5 (toucher, critique et hâte comptés une fois pour mêlée,
   distance et sorts) + puissance d'attaque venue de l'équipement et des auras
   (pas celle des caractéristiques, déjà comptées) ou puissance des sorts × 0,5.
-- **Score de référence** : caractéristiques de base de la race et de la classe
-  au niveau de l'Expédition + un budget d'équipement qui suit les héritages
-  (`ScalingStatValues.dbc`, prolongé en ligne droite après le niveau 80), × un
-  facteur de correction.
-- **Ratio** = référence / score, au moins 0,05. En dessous de 1, chaque
-  catégorie perd l'écart (réglable par catégorie). Points de vie et armure sont
-  ramenés à la part du ratio après la baisse des caractéristiques.
+- **Score de référence** : le score d'un personnage équipé pour son niveau,
+  une courbe par niveau (`WowFates.Reference.Curve`) tirée du score médian des
+  bots du royaume test à leur propre niveau.
+- **Synchronisé** dès que le joueur est au-dessus du niveau de l'Expédition ou
+  de la référence. Chaque grandeur vise sa valeur au niveau de l'Expédition :
+  caractéristiques, scores et armure coupés du ratio référence / score ; PV et
+  mana max ramenés à ceux d'un personnage de sa race et de sa classe à ce
+  niveau (PV et mana de base du niveau, plus l'endurance et l'intelligence de
+  référence : un 80 dans une Expédition de niveau 7 garde environ 190 PV) ;
+  dégâts et soins coupés au plus bas du ratio et de la part du niveau (dégâts
+  de base des créatures à ce niveau sur ceux du sien, à une puissance réglable).
 - Mesure à l'entrée dans la zone puis toutes les 5 s ; retiré à la sortie, à la
   fin de l'Expédition, à la déconnexion.
 

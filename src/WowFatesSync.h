@@ -37,6 +37,8 @@
 
 #include "Define.h"
 
+#include <utility>
+
 class Player;
 
 struct WowFatesScore
@@ -58,8 +60,16 @@ public:
     // The player's score without the debuff; his debuff is left as it was.
     WowFatesScore MeasureUnsynced(Player* player) const;
 
-    // What a character of the player's race and class scores at that level.
+    // What a character with the gear of that level scores (WowFates.Reference.Curve).
     float Reference(Player const* player, uint8 level) const;
+
+    // Maximum health and mana of a character of the player's race and class
+    // at that level, with the reference's gear.
+    std::pair<float, float> ReferencePools(Player const* player, uint8 level) const;
+
+    // The share of damage and healing a player keeps at that level, from the
+    // level alone (1 at or below it).
+    float LevelShare(Player const* player, uint8 level) const;
 
     // Measures the player and sets the debuff for that level: applied,
     // refreshed, or removed when he is not above the reference. Returns the

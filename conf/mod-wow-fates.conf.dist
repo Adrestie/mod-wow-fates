@@ -25,11 +25,20 @@ WowFates.Enable                         = 1
 #
 #    SYNCED
 #
-#    A player in the area of an Expedition is measured: his power score
-#    against the reference score of the Expedition's level. Below 1, their
-#    ratio is the share of his power he keeps: the Synced debuff (spell 96000,
-#    its charges show the level) cuts the rest off his stats, ratings, maximum
-#    health, armor, damage done and healing done.
+#    A player in the area of an Expedition whose level is above it, or whose
+#    power score is above the reference of its level, gets the Synced debuff
+#    (spell 96000, its charges show the level). Each quantity is brought to
+#    what a character of that level has:
+#
+#      stats, ratings, armor    cut by the ratio reference / score
+#      maximum health and mana  to those of a character of his race and class
+#                               at that level with the reference's gear: base
+#                               health and mana of the level, plus what its
+#                               stamina and intellect give (a level 80 in a
+#                               level 7 Expedition: about 190 health)
+#      damage and healing done  cut to the lower of the ratio and the level's
+#                               share: the creatures' base damage at that
+#                               level over his own, to DamageLevelExponent
 #
 #    WowFates.Synced.Enable
 #        0 = nobody is synced; the Expeditions still run.
@@ -39,14 +48,16 @@ WowFates.Enable                         = 1
 #        gets in the area is caught. Entering the area measures at once.
 #
 #    WowFates.Synced.MinRatio
-#        The least share of his power a player keeps, however strong.
-#        0.05 = the debuff takes 95 % at most.
+#        The least share of his stats a player keeps, however strong.
 #
-#    WowFates.Synced.Reduce.Stats, .Ratings, .Health, .Armor, .Damage, .Healing
-#        How much of the gap each category loses, from 0 (nothing) to 1 (all
-#        of it). With a ratio of 0.4 and Reduce.Damage 1, damage done is cut
-#        by 60 %; with Reduce.Damage 0.5, by 30 %. Damage also falls with the
-#        stats: lower Damage if synced players hit too softly.
+#    WowFates.Synced.Reduce.Stats, .Ratings, .Health, .Mana, .Armor, .Damage, .Healing
+#        How much of the gap each quantity loses, from 0 (nothing) to 1 (all
+#        of it, down to the target).
+#
+#    WowFates.Synced.DamageLevelExponent
+#        The power of the level's damage share. 1.4: a level 80 deals about
+#        2 % of his damage in a level 7 Expedition (the most cut is 99 %).
+#        Lower it if synced players hit too softly.
 #
 #    WowFates.Synced.Announce
 #        1 = a message when a player gets synced, and when he no longer is.
@@ -58,9 +69,11 @@ WowFates.Synced.MinRatio                = 0.05
 WowFates.Synced.Reduce.Stats            = 1.0
 WowFates.Synced.Reduce.Ratings          = 1.0
 WowFates.Synced.Reduce.Health           = 1.0
+WowFates.Synced.Reduce.Mana             = 1.0
 WowFates.Synced.Reduce.Armor            = 1.0
 WowFates.Synced.Reduce.Damage           = 1.0
 WowFates.Synced.Reduce.Healing          = 1.0
+WowFates.Synced.DamageLevelExponent     = 1.4
 WowFates.Synced.Announce                = 1
 
 ###############################################################################
@@ -87,28 +100,18 @@ WowFates.Score.PowerWeight              = 0.5
 #
 #    REFERENCE SCORE
 #
-#    What a character of the player's race and class is expected to score at
-#    the Expedition's level, with the same weights:
-#
-#      PrimaryWeight   x (base stats of that level + GearPrimary x H)
-#    + SecondaryWeight x GearSecondary x H
-#    + PowerWeight     x GearPower x P
-#
-#    H and P follow the heirlooms (ScalingStatValues.dbc): H is the stat
-#    multiplier of a shoulder slot at that level (2 at level 1, 6 at 10, 37 at
-#    60, 97 at 80), P the spell power (1 at level 1, 57 at 60, 343 at 80).
-#    Past level 80 they go on in a straight line. GearPrimary 18 is about a
-#    full set of heirloom-like gear.
+#    What a character with the gear of a level scores, as "level:score"
+#    points with a straight line between them (and past the ends). The
+#    default is the median score of the random bots at their own level,
+#    measured on the test realm with `.fates score`.
 #
 #    WowFates.Reference.Factor
-#        Multiplies the whole reference. Raise it if Synced bites too hard,
+#        Multiplies the whole curve. Raise it if Synced bites too hard,
 #        lower it if strong players still breeze through.
 #
 
+WowFates.Reference.Curve                = "1:100 5:126 10:160 15:210 20:300 25:350 30:390 35:430 40:520 45:620 50:800 55:850 60:900 65:1300 70:2000 75:2350 80:3400"
 WowFates.Reference.Factor               = 1.0
-WowFates.Reference.GearPrimary          = 18.0
-WowFates.Reference.GearSecondary        = 9.0
-WowFates.Reference.GearPower            = 4.0
 
 ###############################################################################
 #

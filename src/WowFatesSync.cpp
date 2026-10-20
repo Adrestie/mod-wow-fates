@@ -100,46 +100,71 @@ namespace
                     SetAmount(aura, e, amounts[s][e]);
     }
 
-    // The heirloom curve at a level: the stat multiplier of a shoulder slot
-    // and the spell power, read from ScalingStatValues.dbc. Past its last
-    // level (80), the curve goes on in a straight line from its last two
-    // levels.
-    struct Curve
+    // The reference curve at a level: a straight line between its points, and
+    // past its ends from the two nearest.
+    float CurveAt(std::vector<std::pair<uint32, float>> const& curve, uint32 level)
     {
-        float stat = 0.0f;
-        float spellPower = 0.0f;
-    };
+        if (curve.empty())
+            return 0.0f;
+        if (curve.size() == 1)
+            return curve.front().second;
+        std::size_t i = 1;
+        while (i < curve.size() - 1 && curve[i].first < level)
+            ++i;
+        auto const& [l0, s0] = curve[i - 1];
+        auto const& [l1, s1] = curve[i];
+        float const t = l1 == l0 ? 0.0f : (float(level) - float(l0)) / (float(l1) - float(l0));
+        return std::max(s0 + (s1 - s0) * t, 1.0f);
+    }
 
-    Curve HeirloomCurve(uint8 level)
+    // Health from stamina and mana from intellect, as the game counts them
+    // (Player::GetHealthBonusFromStamina, GetManaBonusFromIntellect).
+    float HealthFromStamina(float stamina)
     {
-        ScalingStatValuesEntry const* byLevel[256] = {};
-        uint32 top = 0;
-        for (uint32 i = 0; i < sScalingStatValuesStore.GetNumRows(); ++i)
-            if (ScalingStatValuesEntry const* ssv = sScalingStatValuesStore.LookupEntry(i))
-                if (ssv->Level > 0 && ssv->Level < 256)
-                {
-                    byLevel[ssv->Level] = ssv;
-                    top = std::max(top, ssv->Level);
-                }
+        float const base = std::min(stamina, 20.0f);
+        return base + std::max(stamina - base, 0.0f) * 10.0f;
+    }
 
-        auto at = [&](uint32 l) -> Curve
+    float ManaFromIntellect(float intellect)
+    {
+        float const base = std::min(intellect, 20.0f);
+        return base + std::max(intellect - base, 0.0f) * 15.0f;
+    }
+
+    // The class's base health and mana at a level (player_class_stats); a
+    // class without rows (custom) follows the warrior's health and the mage's
+    // mana, from its own values at its own level.
+    std::pair<float, float> BaseHealthMana(Player const* player, uint8 level)
+    {
+        PlayerClassLevelInfo info;
+        sObjectMgr->GetPlayerClassLevelInfo(player->getClass(), level, &info);
+        float health = float(info.basehealth);
+        float mana = float(info.basemana);
+
+        if (!health || (!mana && player->GetCreateMana()))
         {
-            for (; l > 0; --l)
-                if (byLevel[l])
-                    return { float(byLevel[l]->getssdMultiplier(1)), float(byLevel[l]->spellPower) };
-            return {};
-        };
+            PlayerClassLevelInfo warriorAt, warriorOwn, mageAt, mageOwn;
+            sObjectMgr->GetPlayerClassLevelInfo(CLASS_WARRIOR, level, &warriorAt);
+            sObjectMgr->GetPlayerClassLevelInfo(CLASS_WARRIOR, player->GetLevel(), &warriorOwn);
+            sObjectMgr->GetPlayerClassLevelInfo(CLASS_MAGE, level, &mageAt);
+            sObjectMgr->GetPlayerClassLevelInfo(CLASS_MAGE, player->GetLevel(), &mageOwn);
+            if (!health && warriorOwn.basehealth)
+                health = float(player->GetCreateHealth()) * float(warriorAt.basehealth) / float(warriorOwn.basehealth);
+            if (!mana && player->GetCreateMana() && mageOwn.basemana)
+                mana = float(player->GetCreateMana()) * float(mageAt.basemana) / float(mageOwn.basemana);
+        }
+        return { health, mana };
+    }
 
-        if (!top)
-            return {};
-        if (level <= top)
-            return at(std::max<uint8>(level, 1));
-
-        Curve const last = at(top);
-        Curve const before = at(top - 1);
-        float const steps = float(level - top);
-        return { last.stat + (last.stat - before.stat) * steps,
-                 last.spellPower + (last.spellPower - before.spellPower) * steps };
+    // The creatures' base damage at a level (creature_classlevelstats, of the
+    // expansion of that level): how much harder a level hits than another.
+    float LevelDamage(uint8 level)
+    {
+        CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(std::max<uint8>(level, 1), CLASS_WARRIOR);
+        if (!stats)
+            return 0.0f;
+        uint8 const expansion = level > 70 ? 2 : (level > 60 ? 1 : 0);
+        return stats->BaseDamage[expansion];
     }
 
     int32 CutPct(float gap, float share)
@@ -208,23 +233,45 @@ WowFatesScore WowFatesSync::MeasureUnsynced(Player* player) const
     return score;
 }
 
-float WowFatesSync::Reference(Player const* player, uint8 level) const
+float WowFatesSync::Reference(Player const* /*player*/, uint8 level) const
 {
     WowFatesConfig const& c = WowFatesConf();
+    return CurveAt(c.referenceCurve, std::max<uint8>(level, 1)) * c.referenceFactor;
+}
+
+// The maximum health and mana of a character of the player's race and class
+// at that level, with the gear of the reference: base health and mana, plus
+// what its stamina and intellect give, the base stats raised by the share of
+// the reference score above them.
+std::pair<float, float> WowFatesSync::ReferencePools(Player const* player, uint8 level) const
+{
+    WowFatesConfig const& c = WowFatesConf();
+    level = std::max<uint8>(level, 1);
 
     PlayerLevelInfo info;
-    sObjectMgr->GetPlayerLevelInfo(player->getRace(), player->getClass(), std::max<uint8>(level, 1), &info);
+    sObjectMgr->GetPlayerLevelInfo(player->getRace(), player->getClass(), level, &info);
     float base = 0.0f;
     for (uint8 i = STAT_STRENGTH; i < MAX_STATS; ++i)
         base += float(info.stats[i]);
+    float const gear = base > 0.0f ? std::max(Reference(player, level) / (std::max(c.primaryWeight, 0.01f) * base), 1.0f) : 1.0f;
 
-    Curve const curve = HeirloomCurve(level);
-    float const reference =
-        c.primaryWeight * (base + c.referenceGearPrimary * curve.stat) +
-        c.secondaryWeight * (c.referenceGearSecondary * curve.stat) +
-        c.powerWeight * (c.referenceGearPower * curve.spellPower);
+    auto const [baseHealth, baseMana] = BaseHealthMana(player, level);
+    float const health = baseHealth + HealthFromStamina(float(info.stats[STAT_STAMINA]) * gear);
+    float const mana = baseMana > 0.0f ? baseMana + ManaFromIntellect(float(info.stats[STAT_INTELLECT]) * gear) : 0.0f;
+    return { health, mana };
+}
 
-    return std::max(reference * c.referenceFactor, 0.0f);
+// How much of his damage and healing a player of his level keeps at that
+// level, from the level alone: the creatures' damage curve, to a power.
+float WowFatesSync::LevelShare(Player const* player, uint8 level) const
+{
+    if (player->GetLevel() <= level)
+        return 1.0f;
+    float const at = LevelDamage(level);
+    float const own = LevelDamage(player->GetLevel());
+    if (at <= 0.0f || own <= 0.0f)
+        return 1.0f;
+    return std::clamp(std::pow(at / own, WowFatesConf().damageLevelExponent), 0.0f, 1.0f);
 }
 
 float WowFatesSync::Apply(Player* player, uint8 level) const
@@ -237,7 +284,9 @@ float WowFatesSync::Apply(Player* player, uint8 level) const
     float const reference = Reference(player, level);
     float const ratio = score.total > 0.0f ? std::clamp(reference / score.total, c.minRatio, 1.0f) : 1.0f;
 
-    if (ratio >= 0.995f)
+    // Above the Expedition's level, or stronger than its reference: synced.
+    float const levelShare = LevelShare(player, level);
+    if (ratio >= 0.995f && levelShare >= 0.995f)
     {
         Remove(player);
         return 1.0f;
@@ -262,6 +311,7 @@ float WowFatesSync::Apply(Player* player, uint8 level) const
 
     float const gap = 1.0f - ratio;
     uint32 const healthBare = player->GetMaxHealth();
+    uint32 const manaBare = player->GetMaxPower(POWER_MANA);
     uint32 const armorBare = player->GetArmor();
 
     // Ratings first, read before anything moves.
@@ -271,22 +321,34 @@ float WowFatesSync::Apply(Player* player, uint8 level) const
     SetAmount(auras[2], EFFECT_0, CutRating(gap, c.reduceRatings, Rating(player, CR_DEFENSE_SKILL)));
     SetAmount(auras[2], EFFECT_1, CutRating(gap, c.reduceRatings, MinRating(player, CR_DODGE, CR_PARRY)));
     SetAmount(auras[2], EFFECT_2, CutRating(gap, c.reduceRatings, MinRating(player, CR_EXPERTISE, CR_ARMOR_PENETRATION)));
-    SetAmount(auras[3], EFFECT_2, CutRating(gap, c.reduceRatings, MinRating(player, CR_CRIT_TAKEN_MELEE, CR_CRIT_TAKEN_RANGED, CR_CRIT_TAKEN_SPELL)));
 
+    // Stats by the power ratio; damage and healing by the lower of the power
+    // ratio and the level's share (an ability of level 80 hits as hard naked).
     SetAmount(auras[0], EFFECT_0, CutPct(gap, c.reduceStats));
-    SetAmount(auras[0], EFFECT_1, CutPct(gap, c.reduceDamage));
-    SetAmount(auras[0], EFFECT_2, CutPct(gap, c.reduceHealing));
+    float const damageGap = 1.0f - std::min(ratio, levelShare);
+    SetAmount(auras[0], EFFECT_1, CutPct(damageGap, c.reduceDamage));
+    SetAmount(auras[0], EFFECT_2, CutPct(damageGap, c.reduceHealing));
 
-    // Health and armor do not follow the stats alone (base health of the
-    // level, armor of the gear): what the stats left, brought to the share.
-    SetAmount(auras[3], EFFECT_0, PctToward(float(healthBare) * (1.0f - gap * std::clamp(c.reduceHealth, 0.0f, 1.0f)), float(player->GetMaxHealth())));
+    // Health and mana to those of the reference character of that level (the
+    // base health of a level 80 alone is forty times a level 7's), never more
+    // than his own; armor by the power ratio.
+    auto const [refHealth, refMana] = ReferencePools(player, level);
+    auto toward = [](float own, float reference, float share)
+    {
+        float const target = std::min(own, reference);
+        return own - (own - target) * std::clamp(share, 0.0f, 1.0f);
+    };
+    SetAmount(auras[3], EFFECT_0, PctToward(toward(float(healthBare), refHealth, c.reduceHealth), float(player->GetMaxHealth())));
     SetAmount(auras[3], EFFECT_1, PctToward(float(armorBare) * (1.0f - gap * std::clamp(c.reduceArmor, 0.0f, 1.0f)), float(player->GetArmor())));
+    if (manaBare && refMana > 0.0f)
+        SetAmount(auras[3], EFFECT_2, PctToward(toward(float(manaBare), refMana, c.reduceMana), float(player->GetMaxPower(POWER_MANA))));
 
     // The level shows on the icon.
     if (auras[0]->GetCharges() != level)
         auras[0]->SetCharges(level);
 
-    return ratio;
+    // Synced by his level alone, he still is: below 1.
+    return std::min(ratio, 0.99f);
 }
 
 void WowFatesSync::Remove(Player* player) const

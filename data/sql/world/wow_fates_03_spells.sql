@@ -10,7 +10,7 @@
 --   96001  hidden: hit, critical strike and haste ratings
 --   96002  hidden: defense rating, dodge and parry ratings, expertise and
 --          armor penetration ratings
---   96003  hidden: maximum health %, armor %, resilience rating
+--   96003  hidden: maximum health %, armor %, maximum mana %
 --
 -- Every amount is set by the module (WowFatesSync::Apply); the -1 of the
 -- base points only makes the auras harmful ones. They cannot be cancelled,
@@ -26,4 +26,4 @@ VALUES (96001, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1
 INSERT INTO `spell_dbc` (`ID`, `Attributes`, `AttributesEx`, `AttributesEx2`, `AttributesEx3`, `CastingTimeIndex`, `ProcChance`, `DurationIndex`, `RangeIndex`, `EquippedItemClass`, `SpellIconID`, `SchoolMask`, `Effect_1`, `EffectDieSides_1`, `EffectBasePoints_1`, `ImplicitTargetA_1`, `EffectAura_1`, `EffectMiscValue_1`, `EffectChainAmplitude_1`, `Effect_2`, `EffectDieSides_2`, `EffectBasePoints_2`, `ImplicitTargetA_2`, `EffectAura_2`, `EffectMiscValue_2`, `EffectChainAmplitude_2`, `Effect_3`, `EffectDieSides_3`, `EffectBasePoints_3`, `ImplicitTargetA_3`, `EffectAura_3`, `EffectMiscValue_3`, `EffectChainAmplitude_3`, `Name_Lang_enUS`, `Name_Lang_Mask`, `NameSubtext_Lang_Mask`, `Description_Lang_Mask`, `AuraDescription_Lang_Mask`)
 VALUES (96002, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1, -2, 1, 189, 2, 1.0, 6, 1, -2, 1, 189, 12, 1.0, 6, 1, -2, 1, 189, 25165824, 1.0, 'Synced (defense)', 16712190, 16712190, 16712190, 16712190);
 INSERT INTO `spell_dbc` (`ID`, `Attributes`, `AttributesEx`, `AttributesEx2`, `AttributesEx3`, `CastingTimeIndex`, `ProcChance`, `DurationIndex`, `RangeIndex`, `EquippedItemClass`, `SpellIconID`, `SchoolMask`, `Effect_1`, `EffectDieSides_1`, `EffectBasePoints_1`, `ImplicitTargetA_1`, `EffectAura_1`, `EffectMiscValue_1`, `EffectChainAmplitude_1`, `Effect_2`, `EffectDieSides_2`, `EffectBasePoints_2`, `ImplicitTargetA_2`, `EffectAura_2`, `EffectMiscValue_2`, `EffectChainAmplitude_2`, `Effect_3`, `EffectDieSides_3`, `EffectBasePoints_3`, `ImplicitTargetA_3`, `EffectAura_3`, `EffectMiscValue_3`, `EffectChainAmplitude_3`, `Name_Lang_enUS`, `Name_Lang_Mask`, `NameSubtext_Lang_Mask`, `Description_Lang_Mask`, `AuraDescription_Lang_Mask`)
-VALUES (96003, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1, -2, 1, 133, 0, 1.0, 6, 1, -2, 1, 101, 1, 1.0, 6, 1, -2, 1, 189, 114688, 1.0, 'Synced (health)', 16712190, 16712190, 16712190, 16712190);
+VALUES (96003, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1, -2, 1, 133, 0, 1.0, 6, 1, -2, 1, 101, 1, 1.0, 6, 1, -2, 1, 132, 0, 1.0, 'Synced (health)', 16712190, 16712190, 16712190, 16712190);
