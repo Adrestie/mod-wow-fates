@@ -12,7 +12,16 @@
       UI-QuestBlob-Inside and UI-QuestBlob-Outside at fill alpha 128 and border
       alpha 192) drawn as a disc, its blue turned orange (red and blue swapped).
 
-Usage: python tools/gen_client_data.py [game folder]
+  data/art/Interface/WowFates/Tracker.blp
+      the tracker's block, the modern client's Mythic+ block cut out of its
+      sheets (ChallengeMode-Timer, -TimerBG-back, -TimerBG, -TimerFill from
+      interface/challenges/challengemodehud.blp; bonusobjectives-bar-frame-5
+      from interface/questframe/bonusobjectives.blp), the timer's blue bar and
+      fill turned orange. The sheets come as PNG from the wow.export bridge
+      (http://127.0.0.1:9455, as mod-forever-ui's tools/add_sheets.py), into
+      the folder given by --sheets; without it, Tracker.blp is left as it is.
+
+Usage: python tools/gen_client_data.py [game folder] [--sheets folder]
 """
 import math
 import os
@@ -26,7 +35,22 @@ sys.path.insert(0, os.path.join(ROOT, "..", "mod-forever-ui", "tools"))
 import mpq_archive  # noqa: E402
 from foreverui import blp  # noqa: E402
 
-GAME = sys.argv[1] if len(sys.argv) > 1 else r"E:\world of warcraft 3.3.5a hd"
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+SHEETS = sys.argv[sys.argv.index("--sheets") + 1] if "--sheets" in sys.argv else None
+if SHEETS in ARGS:
+    ARGS.remove(SHEETS)
+GAME = ARGS[0] if ARGS else r"E:\world of warcraft 3.3.5a hd"
+
+# The tracker's pieces: name -> (sheet, left, top, width, height, recolour) in the modern
+# client, and where they go in Tracker.blp (left, top). Mirrored in WowFates_Client.lua.
+TRACKER_SIZE = (512, 256)
+TRACKER_PIECES = {
+    "timer":      ("interface/challenges/challengemodehud.png", 621, 113, 261, 87, False, (0, 0)),
+    "timerBack":  ("interface/challenges/challengemodehud.png", 649, 94, 223, 11, False, (0, 88)),
+    "timerBG":    ("interface/challenges/challengemodehud.png", 649, 81, 223, 11, True, (0, 100)),
+    "timerFill":  ("interface/challenges/challengemodehud.png", 621, 202, 223, 11, True, (0, 112)),
+    "barFrame":   ("interface/questframe/bonusobjectives.png", 1, 315, 240, 51, False, (0, 124)),
+}
 
 ARCHIVES = ["enus/patch-enus-3.mpq", "enus/patch-enus-2.mpq", "enus/patch-enus.mpq",
             "enus/locale-enus.mpq", "frfr/patch-frfr-3.mpq", "frfr/patch-frfr-2.mpq",
@@ -132,6 +156,31 @@ def texture():
         f.write(blp.encode(SIZE, SIZE, bytes(rgba), mipmaps))
 
 
+def tracker():
+    from PIL import Image
+    sheet = Image.new("RGBA", TRACKER_SIZE, (0, 0, 0, 0))
+    sources = {}
+    for name, (src, left, top, width, height, orange, at) in TRACKER_PIECES.items():
+        if src not in sources:
+            sources[src] = Image.open(os.path.join(SHEETS, src.replace("/", os.sep))).convert("RGBA")
+        piece = sources[src].crop((left, top, left + width, top + height))
+        if orange:
+            r, g, b, a = piece.split()
+            piece = Image.merge("RGBA", (b, g, r, a))
+        sheet.paste(piece, at)
+    mipmaps = []
+    w, h = TRACKER_SIZE
+    while w > 1 or h > 1:
+        w, h = max(w // 2, 1), max(h // 2, 1)
+        mipmaps.append((w, h, sheet.resize((w, h), Image.LANCZOS).tobytes()))
+    path = os.path.join(ROOT, "data", "art", "Interface", "WowFates", "Tracker.blp")
+    with open(path, "wb") as f:
+        f.write(blp.encode(TRACKER_SIZE[0], TRACKER_SIZE[1], sheet.tobytes(), mipmaps))
+
+
+
 if __name__ == "__main__":
     bounds()
     texture()
+    if SHEETS:
+        tracker()

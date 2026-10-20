@@ -123,6 +123,7 @@ struct WowFatesActiveExpedition
     std::vector<ObjectGuid> summons;
     std::unordered_map<ObjectGuid, WowFatesContribution> contributors;
     std::unordered_set<ObjectGuid> inside; // players in the area, synced to it
+    std::unordered_map<ObjectGuid, uint32> sentStatus; // kills x 4 + participation, last sent
 };
 
 class WowFatesExpeditionMgr
@@ -178,6 +179,10 @@ private:
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
     void Leave(ObjectGuid guid, bool announce);
     std::string MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const;
+    std::string TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const;
+    bool Eligible(WowFatesActiveExpedition const& active, WowFatesContribution const& contribution) const;
+    void SendStatus(WowFatesActiveExpedition& active);
+    void LeaveArea(WowFatesActiveExpedition const& active, ObjectGuid guid);
     void BroadcastSet(WowFatesActiveExpedition const& active);
     void BroadcastDel(uint32 id);
 
@@ -194,6 +199,7 @@ private:
         uint32 expedition = 0;
         int64 timer = 0; // ms to the next measure
         float ratio = 1.0f; // the last one applied
+        int32 sentPct = -1; // the share of power the client last heard of
     };
     std::unordered_map<ObjectGuid, SyncState> _synced;
     // Players who left while out of the world (a teleport between maps):

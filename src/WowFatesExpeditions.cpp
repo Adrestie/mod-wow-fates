@@ -352,26 +352,6 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
 
     BroadcastDel(active.def->id);
 
-    // Who took part enough: a kill, or damage and healing worth a share of
-    // the average of those who did any.
-    uint64 total = 0;
-    uint32 counted = 0;
-    for (auto const& [guid, contribution] : active.contributors)
-        if (uint64 const value = contribution.damage + contribution.healing)
-        {
-            total += value;
-            ++counted;
-        }
-    double const average = counted ? double(total) / double(counted) : 0.0;
-
-    auto eligible = [&](WowFatesContribution const& contribution)
-    {
-        if (c.minKills && contribution.kills >= c.minKills)
-            return true;
-        uint64 const value = contribution.damage + contribution.healing;
-        return value > 0 && double(value) >= average * double(c.minShare);
-    };
-
     // Everyone concerned hears the end: those inside and those who helped.
     std::unordered_set<ObjectGuid> concerned(active.inside.begin(), active.inside.end());
     for (auto const& [guid, contribution] : active.contributors)
@@ -385,12 +365,13 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
 
         std::string const name = Name(active.def, player->GetSession());
         Tell(player, success ? WOW_FATES_STR_SUCCESS : WOW_FATES_STR_FAILED, name);
+        SendAddon(player, Acore::StringFormat("end\t{}\t{}", active.def->id, success ? 1 : 0));
         if (!success)
             continue;
 
         auto contribution = active.contributors.find(guid);
         bool const inRange = Inside(active, player, std::max(c.rewardRange, 1.0f));
-        if (contribution != active.contributors.end() && inRange && eligible(contribution->second))
+        if (contribution != active.contributors.end() && inRange && Eligible(active, contribution->second))
             Reward(active, player);
         else
             Tell(player, WOW_FATES_STR_NOT_ELIGIBLE, name);
@@ -525,15 +506,88 @@ void WowFatesExpeditionMgr::AnnounceParticipants(WowFatesActiveExpedition const&
 // The clients' map
 
 // "set", id, map, x, y, radius, level, progress, count, seconds left, name,
-// objective: the name and the objective in the player's language.
+// objective, tracker line, duration: the texts in the player's language.
 std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
-    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}",
+    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
         std::min(active.progress, def->objectiveCount), def->objectiveCount,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
-        Clean(Name(def, session)), Clean(Objective(active, session)));
+        Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
+        def->duration);
+}
+
+// The objective as the tracker shows it, the count apart: "Kobold Miner slain".
+std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const
+{
+    WowFatesExpeditionDef const* def = active.def;
+    if (!def->objectiveEntry)
+        return WowFatesText(session, WOW_FATES_STR_TRACKER_KILL_ANY);
+
+    std::string name;
+    if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(def->objectiveEntry))
+        name = creature->Name;
+    if (session)
+        if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(def->objectiveEntry))
+            ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
+    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), name);
+}
+
+// Took part enough: a kill, or damage and healing worth a share of the
+// average of those who did any.
+bool WowFatesExpeditionMgr::Eligible(WowFatesActiveExpedition const& active, WowFatesContribution const& contribution) const
+{
+    WowFatesConfig const& c = WowFatesConf();
+    if (c.minKills && contribution.kills >= c.minKills)
+        return true;
+
+    uint64 const value = contribution.damage + contribution.healing;
+    if (!value)
+        return false;
+
+    uint64 total = 0;
+    uint32 counted = 0;
+    for (auto const& [guid, other] : active.contributors)
+        if (uint64 const v = other.damage + other.healing)
+        {
+            total += v;
+            ++counted;
+        }
+    double const average = counted ? double(total) / double(counted) : 0.0;
+    return double(value) >= average * double(c.minShare);
+}
+
+// "me", id, kills, participation (0 nothing yet, 1 not enough, 2 enough): to
+// each player inside or who helped, when it changes.
+void WowFatesExpeditionMgr::SendStatus(WowFatesActiveExpedition& active)
+{
+    std::unordered_set<ObjectGuid> concerned(active.inside.begin(), active.inside.end());
+    for (auto const& [guid, contribution] : active.contributors)
+        concerned.insert(guid);
+
+    for (ObjectGuid const& guid : concerned)
+    {
+        uint32 kills = 0;
+        uint32 state = 0;
+        auto contribution = active.contributors.find(guid);
+        if (contribution != active.contributors.end())
+        {
+            kills = contribution->second.kills;
+            state = Eligible(active, contribution->second) ? 2 : 1;
+        }
+
+        uint32 const packed = kills * 4 + state;
+        auto sent = active.sentStatus.find(guid);
+        if (sent != active.sentStatus.end() && sent->second == packed)
+            continue;
+
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+        {
+            SendAddon(player, Acore::StringFormat("me\t{}\t{}\t{}", active.def->id, kills, state));
+            active.sentStatus[guid] = packed;
+        }
+    }
 }
 
 void WowFatesExpeditionMgr::BroadcastSet(WowFatesActiveExpedition const& active)
@@ -627,6 +681,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
                 active.sentProgress = active.progress;
                 BroadcastSet(active);
             }
+            SendStatus(active);
         }
 
         uint32 const count = active.def->objectiveCount;
@@ -706,19 +761,35 @@ void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* ma
                 if (synced != _synced.end() && synced->second.expedition != active.def->id)
                     continue;
 
-                _synced[guid] = { active.def->id, 0 };
+                _synced[guid] = SyncState();
+                _synced[guid].expedition = active.def->id;
                 _pendingUnsync.erase(guid);
                 Tell(player, WOW_FATES_STR_ENTERED, Name(active.def, player->GetSession()), uint32(active.def->level),
                     Objective(active, player->GetSession()), active.progress, active.def->objectiveCount);
+                // the banner and the tracker of the client
+                SendAddon(player, MapLine(active, player->GetSession()));
+                SendAddon(player, Acore::StringFormat("enter\t{}", active.def->id));
+                active.sentStatus.erase(guid);
             }
             now.insert(guid);
         }
 
     for (ObjectGuid const& guid : active.inside)
         if (!now.count(guid))
-            Leave(guid, true);
+            LeaveArea(active, guid);
 
     active.inside = std::move(now);
+}
+
+// Out of the area while the Expedition goes on.
+void WowFatesExpeditionMgr::LeaveArea(WowFatesActiveExpedition const& active, ObjectGuid guid)
+{
+    if (Player* player = ObjectAccessor::FindPlayer(guid))
+    {
+        Tell(player, WOW_FATES_STR_LEFT, Name(active.def, player->GetSession()));
+        SendAddon(player, Acore::StringFormat("leave\t{}", active.def->id));
+    }
+    Leave(guid, true);
 }
 
 void WowFatesExpeditionMgr::Leave(ObjectGuid guid, bool announce)
@@ -738,6 +809,7 @@ void WowFatesExpeditionMgr::Leave(ObjectGuid guid, bool announce)
         if (announce && WowFatesConf().syncAnnounce)
             Tell(player, WOW_FATES_STR_UNSYNCED);
     }
+    SendAddon(player, "sync\t0\t100");
 }
 
 void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
@@ -780,6 +852,14 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
         state.ratio = ratio;
         if (!was && ratio < 1.0f && c.syncAnnounce)
             Tell(player, WOW_FATES_STR_SYNCED, uint32(active->second.def->level), uint32(std::lround(ratio * 100.0f)));
+
+        // The debuff's tooltip on the client: the level and the share kept.
+        int32 const pct = int32(std::lround(ratio * 100.0f));
+        if (pct != state.sentPct)
+        {
+            state.sentPct = pct;
+            SendAddon(player, Acore::StringFormat("sync\t{}\t{}", pct < 100 ? uint32(active->second.def->level) : 0u, pct));
+        }
     }
 }
 

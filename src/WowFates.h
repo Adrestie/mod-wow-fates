@@ -60,9 +60,12 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_MAIL_SUBJECT      = 11,
     WOW_FATES_STR_MAIL_BODY         = 12,
     WOW_FATES_STR_ENTERED           = 13,
+    WOW_FATES_STR_LEFT              = 14,
 
     WOW_FATES_STR_OBJECTIVE_KILL_ANY = 20,
     WOW_FATES_STR_OBJECTIVE_KILL     = 21,
+    WOW_FATES_STR_TRACKER_KILL_ANY   = 22,  // the tracker's short line
+    WOW_FATES_STR_TRACKER_KILL       = 23,
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,

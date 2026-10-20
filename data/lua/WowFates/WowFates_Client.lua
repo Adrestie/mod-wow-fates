@@ -33,9 +33,25 @@
         player moves. A circle turns with nothing: with "Rotate Minimap" on,
         only its centre turns around the player.
 
-    Positions: the module sends world coordinates (addon message "WowFates":
-    "reset", "set" with id, map, x, y, radius, level, progress, count,
-    seconds left, name, objective, and "del" with id). WowFatesBounds
+    The Expedition the player stands in also gets, as the modern client's
+    Mythic+ block (ScenarioObjectiveTrackerChallengeModeMixin), a block at the
+    top of the objective tracker: its name and level, the time left, large,
+    over its bar, the objective with its count and a bar in percent (the
+    "enemy forces"), and whether the player took part enough to be rewarded.
+    Its art is the modern client's, cut out by tools/gen_client_data.py
+    (Interface\WowFates\Tracker), the timer turned orange. It is a handler of
+    WatchFrame (WATCHFRAME_OBJECTIVEHANDLERS, first): mod-forever-ui keeps
+    that API, so the block sits above its quests, as above the game's own.
+    Entering and leaving an area, and the end, show a banner in the middle of
+    the screen with a sound. The Synced debuff's tooltip gets the level and
+    the share of power kept.
+
+    Messages (addon message "WowFates", from the module): "reset"; "set" with
+    id, map, x, y, radius, level, progress, count, seconds left, name,
+    objective, tracker line, duration; "del" with id; "enter" and "leave"
+    with id; "end" with id and 1 or 0; "me" with id, kills and participation
+    (0 none, 1 not enough yet, 2 enough); "sync" with level and percent kept.
+    Positions are world coordinates. WowFatesBounds
     (WowFates_Bounds_Client.lua, from WorldMapArea.dbc) gives each map's edges
     in world coordinates: an Expedition's map fraction, and the player's world
     position from GetPlayerMapPosition.
@@ -49,6 +65,9 @@ end
 
 local PREFIX = "WowFates"
 local TEXTURE = "Interface\\WowFates\\Area"
+local TRACKER = "Interface\\WowFates\\Tracker"
+local SYNCED_SPELL = 96000
+local LINGER = 10                           -- seconds the block stays after leaving or the end
 local STRIPS = 24                           -- strips across the minimap's diameter
 local MINIMAP_WAIT = 0.05                   -- the minimap is drawn again at most twenty times a second
 local TITLE_COLOR = { 1, 0.55, 0.2 }
@@ -68,6 +87,41 @@ local TEXTS = {
     esES = { level = "Expedición, nivel %d", progress = "%s: %d/%d", left = "Quedan %d min", soon = "Termina pronto" },
     ruRU = { level = "Экспедиция, уровень %d", progress = "%s: %d/%d", left = "Осталось %d мин.", soon = "Скоро завершится" },
 }
+local TRACKER_TEXTS = {
+    enUS = {
+        title = "%s - Level %d", banner = "Expedition: %s", bannerLevel = "Level %d",
+        leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
+        part0 = "Participation: none yet", part1 = "Participation: not enough yet", part2 = "Participation: confirmed",
+        kills = "Your kills: %d", synced = "Synced to level %d: you keep %d%% of your power.",
+    },
+    frFR = {
+        title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
+        leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
+        part0 = "Participation : aucune pour l'instant", part1 = "Participation : pas encore suffisante", part2 = "Participation : validée",
+        kills = "Vos victimes : %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
+    },
+    deDE = {
+        title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
+        leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
+        part0 = "Teilnahme: noch keine", part1 = "Teilnahme: noch nicht genug", part2 = "Teilnahme: bestätigt",
+        kills = "Eure Siege: %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
+    },
+    esES = {
+        title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
+        leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
+        part0 = "Participación: ninguna aún", part1 = "Participación: aún insuficiente", part2 = "Participación: confirmada",
+        kills = "Tus víctimas: %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
+    },
+    ruRU = {
+        title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
+        leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
+        part0 = "Участие: пока нет", part1 = "Участие: пока недостаточно", part2 = "Участие: засчитано",
+        kills = "Ваши победы: %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
+    },
+}
+for locale, t in pairs(TRACKER_TEXTS) do
+    for k, v in pairs(t) do TEXTS[locale][k] = v end
+end
 TEXTS.esMX = TEXTS.esES
 local L = TEXTS[GetLocale()] or TEXTS.enUS
 
@@ -86,24 +140,34 @@ local function split(text)
 end
 
 local refresh                               -- set below
+local track = {}                            -- the tracker, the banner and the debuff (below)
 
 local function onMessage(message)
     local f = split(message)
     local command = f[1]
+    local id = tonumber(f[2])
     if command == "reset" then
         for k in pairs(expeditions) do expeditions[k] = nil end
-    elseif command == "set" and #f >= 12 then
-        local id = tonumber(f[2])
-        if id then
-            expeditions[id] = {
-                map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
-                level = tonumber(f[7]), progress = tonumber(f[8]), count = tonumber(f[9]),
-                ends = GetTime() + (tonumber(f[10]) or 0), name = f[11], objective = f[12],
-            }
-        end
-    elseif command == "del" then
-        local id = tonumber(f[2])
-        if id then expeditions[id] = nil end
+    elseif command == "set" and #f >= 12 and id then
+        expeditions[id] = {
+            id = id, map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
+            level = tonumber(f[7]), progress = tonumber(f[8]), count = tonumber(f[9]),
+            ends = GetTime() + (tonumber(f[10]) or 0), name = f[11], objective = f[12],
+            label = f[13], duration = tonumber(f[14]),
+        }
+        track.update(expeditions[id])
+    elseif command == "del" and id then
+        expeditions[id] = nil
+    elseif command == "enter" and id then
+        track.enter(id)
+    elseif command == "leave" and id then
+        track.leave(id)
+    elseif command == "end" and id then
+        track.finish(id, f[3] == "1")
+    elseif command == "me" and id then
+        track.status(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0)
+    elseif command == "sync" then
+        track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
     refresh()
 end
@@ -422,6 +486,371 @@ local function hoverMinimap()
     elseif mini.hovered then
         mini.hovered = false
         if GameTooltip:GetOwner() == Minimap then GameTooltip:Hide() end
+    end
+end
+
+
+-- ---------------------------------------------------------------------------
+-- TRACKER: the modern client's Mythic+ block
+-- ---------------------------------------------------------------------------
+
+-- Pieces of Interface\WowFates\Tracker (512 x 256): left, top, width, height
+local SHEET_W, SHEET_H = 512, 256
+local PIECE = {
+    timer = { 0, 0, 261, 87 }, timerBack = { 0, 88, 223, 11 }, timerBG = { 0, 100, 223, 11 },
+    timerFill = { 0, 112, 223, 11 }, barFrame = { 0, 124, 240, 51 },
+}
+local BLOCK_W, BLOCK_H = 251, 87            -- ScenarioObjectiveTrackerChallengeModeMixin
+local BAR_W, BAR_H = 191, 17                -- ScenarioProgressBarTemplate's bar
+local ORANGE = { 1, 0.55, 0.1 }
+local BAR_BG = { 0.18, 0.07, 0.04 }         -- the bar's (0.04, 0.07, 0.18), orange side
+local FONT = "Fonts\\FRIZQT__.TTF"
+local GREEN, GREY, RED = { 0.1, 1, 0.1 }, { 0.6, 0.6, 0.6 }, { 1, 0.1, 0.1 }
+
+local function piece(tex, name)
+    local p = PIECE[name]
+    tex:SetTexture(TRACKER)
+    tex:SetTexCoord(p[1] / SHEET_W, (p[1] + p[3]) / SHEET_W, p[2] / SHEET_H, (p[2] + p[4]) / SHEET_H)
+end
+
+local function text(parent, size, layer, flags)
+    local fs = parent:CreateFontString(nil, layer or "OVERLAY")
+    fs:SetFont(FONT, size, flags)
+    fs:SetShadowOffset(1, -1)
+    fs:SetShadowColor(0, 0, 0, 1)
+    fs:SetJustifyH("LEFT")
+    return fs
+end
+
+local function clock(seconds)
+    seconds = math.max(0, math.floor(seconds))
+    if seconds >= 3600 then
+        return string.format("%d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+    end
+    return string.format("%d:%02d", seconds / 60, seconds % 60)
+end
+
+-- What the block shows: the Expedition the player is in, or the one he left or saw end, for
+-- LINGER seconds
+track.id = nil
+track.copy = nil                            -- the Expedition's last values (it may be gone)
+track.kills, track.part = 0, 0
+track.result = nil                          -- "success", "failed" or "left"
+track.untilTime = nil
+track.syncLevel, track.syncPct = 0, 100
+
+local block
+
+local function buildBlock()
+    if block or not WatchFrameLines then return block end
+    local b = CreateFrame("Frame", "WowFatesTrackerBlock", WatchFrameLines)
+    b:SetWidth(BLOCK_W)
+    b:SetHeight(BLOCK_H)
+    b:Hide()
+
+    -- the timer: its frame, its bar's back, track and fill, its texts
+    local timer = CreateFrame("Frame", nil, b)
+    timer:SetWidth(BLOCK_W)
+    timer:SetHeight(BLOCK_H)
+    timer:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+    local back = timer:CreateTexture(nil, "BACKGROUND")
+    piece(back, "timerBack")
+    back:SetWidth(223) back:SetHeight(11)
+    back:SetPoint("BOTTOM", timer, "BOTTOM", 0, 13)
+    local bg = timer:CreateTexture(nil, "BORDER")
+    piece(bg, "timerBG")
+    bg:SetWidth(223) bg:SetHeight(11)
+    bg:SetPoint("BOTTOM", timer, "BOTTOM", 0, 13)
+    local fill = timer:CreateTexture(nil, "ARTWORK")
+    piece(fill, "timerFill")
+    fill:SetHeight(11)
+    fill:SetPoint("LEFT", bg, "LEFT", 0, 0)
+    local frame = timer:CreateTexture(nil, "OVERLAY")
+    piece(frame, "timer")
+    frame:SetAllPoints(timer)
+    local title = text(timer, 13, "OVERLAY")
+    title:SetPoint("TOPLEFT", timer, "TOPLEFT", 28, -18)
+    title:SetWidth(BLOCK_W - 50)
+    title:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
+    local timeLeft = text(timer, 22, "OVERLAY")
+    timeLeft:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+    timeLeft:SetTextColor(1, 1, 1)
+
+    -- the objective: its line, then its bar in percent
+    local objective = text(b, 12)
+    objective:SetPoint("TOPLEFT", timer, "BOTTOMLEFT", 12, -4)
+    objective:SetWidth(BLOCK_W - 24)
+    objective:SetTextColor(0.8, 0.8, 0.8)
+    local bar = CreateFrame("StatusBar", nil, b)
+    bar:SetWidth(BAR_W)
+    bar:SetHeight(BAR_H)
+    bar:SetPoint("TOPLEFT", objective, "BOTTOMLEFT", 10, -12)
+    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar:SetStatusBarColor(ORANGE[1], ORANGE[2], ORANGE[3])
+    bar:SetMinMaxValues(0, 100)
+    local barBG = bar:CreateTexture(nil, "BACKGROUND")
+    barBG:SetAllPoints(bar)
+    barBG:SetTexture(BAR_BG[1], BAR_BG[2], BAR_BG[3])
+    local barFrame = bar:CreateTexture(nil, "OVERLAY")
+    piece(barFrame, "barFrame")
+    barFrame:SetWidth(240) barFrame:SetHeight(51)
+    barFrame:SetPoint("LEFT", bar, "LEFT", -8, -1)
+    local barText = text(bar, 13, "OVERLAY")
+    barText:SetPoint("CENTER", bar, "CENTER", -1, -1)
+    barText:SetJustifyH("CENTER")
+    barText:SetTextColor(1, 1, 1)
+
+    -- the player: participation and kills, or the result
+    local part = text(b, 12)
+    part:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -10, -14)
+    part:SetWidth(BLOCK_W - 24)
+    local kills = text(b, 11)
+    kills:SetPoint("TOPLEFT", part, "BOTTOMLEFT", 0, -2)
+    kills:SetTextColor(0.7, 0.7, 0.7)
+
+    b.timer, b.fill, b.title, b.timeLeft = timer, fill, title, timeLeft
+    b.objective, b.bar, b.barText, b.part, b.kills = objective, bar, barText, part, kills
+    b.height = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 14 + 2 + 12 + 6
+    block = b
+    return b
+end
+
+local function color(fs, c)
+    fs:SetTextColor(c[1], c[2], c[3])
+end
+
+-- Fills the block from what is known now
+local function fillBlock()
+    local b, e = block, track.copy
+    if not (b and e) then return end
+    b.title:SetText(string.format(L.title, e.name or "", e.level or 0))
+    local count, progress = e.count or 0, math.min(e.progress or 0, e.count or 0)
+    b.objective:SetText(string.format("%d/%d %s", progress, count, e.label or e.objective or ""))
+    local pct = count > 0 and math.floor(progress * 100 / count) or 0
+    b.bar:SetValue(pct)
+    b.barText:SetText(pct .. "%")
+    if track.result == "success" then
+        b.part:SetText(L.success) color(b.part, GREEN)
+    elseif track.result == "failed" then
+        b.part:SetText(L.failed) color(b.part, RED)
+    else
+        b.part:SetText(L["part" .. (track.part or 0)])
+        color(b.part, track.part == 2 and GREEN or (track.part == 1 and ORANGE or GREY))
+    end
+    b.kills:SetText(string.format(L.kills, track.kills or 0))
+end
+
+-- The timer: every frame while shown, without laying the tracker out again
+local function tickBlock()
+    local b, e = block, track.copy
+    if not (b and e and b:IsShown()) then return end
+    local left = math.max(0, (e.ends or 0) - GetTime())
+    if track.result then left = math.max(0, e.frozen or left) end
+    b.timeLeft:SetText(clock(left))
+    local share = (e.duration and e.duration > 0) and math.min(1, left / e.duration) or 0
+    if share > 0 then
+        b.fill:SetWidth(223 * share)
+        b.fill:SetTexCoord(PIECE.timerFill[1] / SHEET_W, (PIECE.timerFill[1] + 223 * share) / SHEET_W,
+            PIECE.timerFill[2] / SHEET_H, (PIECE.timerFill[2] + PIECE.timerFill[4]) / SHEET_H)
+        b.fill:Show()
+    else
+        b.fill:Hide()
+    end
+end
+
+local function shown()
+    if track.id and not track.result then return true end
+    return track.untilTime and GetTime() < track.untilTime
+end
+
+-- WatchFrame's handler (WatchFrame_Update): lineFrame, the offset reached (negative), the
+-- frame's height and width; returns the height used and the width
+local function handler(lineFrame, offset, maxHeight, frameWidth)
+    local b = buildBlock()
+    if not b then return 0, 0 end
+    if not shown() then
+        b:Hide()
+        return 0, 0
+    end
+    -- ForeverUI's tracker is 260 wide; the game's may be narrower: the block is scaled down
+    local width = (ForeverUI and ForeverUI.ObjectiveTracker and ForeverUI.ObjectiveTracker.header) and 260
+        or (frameWidth or BLOCK_W)
+    local scale = math.min(1, width / (BLOCK_W + 6))
+    b:SetScale(scale)
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", math.max(0, (width - BLOCK_W * scale) / 2) / scale, offset / scale)
+    fillBlock()
+    b:Show()
+    tickBlock()
+    return b.height * scale, BLOCK_W * scale
+end
+
+local function relayout()
+    if WatchFrame_Update and WatchFrame then WatchFrame_Update(WatchFrame) end
+end
+
+local function install()
+    if track.installed or not WATCHFRAME_OBJECTIVEHANDLERS then return end
+    -- first: the block heads the tracker, above the quests
+    table.insert(WATCHFRAME_OBJECTIVEHANDLERS, 1, handler)
+    track.installed = true
+end
+
+-- ---------------------------------------------------------------------------
+-- BANNER: the middle of the screen, as the modern client's scenario banners
+-- ---------------------------------------------------------------------------
+
+local banner
+local FADE_IN, HOLD, FADE_OUT = 0.5, 3, 1
+
+local function buildBanner()
+    if banner then return banner end
+    local f = CreateFrame("Frame", "WowFatesBanner", UIParent)
+    f:SetWidth(600)
+    f:SetHeight(80)
+    f:SetPoint("TOP", UIParent, "TOP", 0, -180)
+    f:SetFrameStrata("HIGH")
+    f:Hide()
+    local title = f:CreateFontString(nil, "OVERLAY")
+    title:SetFont("Fonts\\MORPHEUS.TTF", 30, "OUTLINE")
+    title:SetShadowOffset(2, -2)
+    title:SetShadowColor(0, 0, 0, 1)
+    title:SetPoint("TOP", f, "TOP", 0, 0)
+    title:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
+    local sub = f:CreateFontString(nil, "OVERLAY")
+    sub:SetFont(FONT, 17, "OUTLINE")
+    sub:SetPoint("TOP", title, "BOTTOM", 0, -6)
+    sub:SetTextColor(1, 0.82, 0)
+    f.title, f.sub, f.t = title, sub, 0
+    f:SetScript("OnUpdate", function(self, elapsed)
+        self.t = self.t + elapsed
+        local t = self.t
+        if t < FADE_IN then
+            self:SetAlpha(t / FADE_IN)
+        elseif t < FADE_IN + HOLD then
+            self:SetAlpha(1)
+        elseif t < FADE_IN + HOLD + FADE_OUT then
+            self:SetAlpha(1 - (t - FADE_IN - HOLD) / FADE_OUT)
+        else
+            self:Hide()
+        end
+    end)
+    banner = f
+    return f
+end
+
+local function play(sound)
+    if PlaySoundFile then pcall(PlaySoundFile, sound) end
+end
+
+local function showBanner(title, sub, sound)
+    local f = buildBanner()
+    f.title:SetText(title or "")
+    f.sub:SetText(sub or "")
+    f.t = 0
+    f:SetAlpha(0)
+    f:Show()
+    if sound then play(sound) end
+end
+
+-- ---------------------------------------------------------------------------
+-- THE MESSAGES' EFFECTS
+-- ---------------------------------------------------------------------------
+
+local function copy(e)
+    local c = {}
+    for k, v in pairs(e) do c[k] = v end
+    return c
+end
+
+function track.update(e)
+    if track.id == e.id then
+        track.copy = copy(e)
+        if block and block:IsShown() then fillBlock() end
+    end
+end
+
+function track.enter(id)
+    local e = expeditions[id]
+    if track.id ~= id then track.kills, track.part = 0, 0 end
+    track.id, track.result, track.untilTime = id, nil, nil
+    if e then track.copy = copy(e) end
+    local c = track.copy
+    if c then
+        showBanner(string.format(L.banner, c.name or ""), string.format(L.bannerLevel, c.level or 0),
+            "Sound\\Interface\\iQuestActivate.wav")
+    end
+    relayout()
+end
+
+function track.leave(id)
+    if track.id ~= id then return end
+    track.result, track.untilTime = "left", GetTime() + LINGER
+    if track.copy then track.copy.frozen = math.max(0, (track.copy.ends or 0) - GetTime()) end
+    showBanner(L.leaving, track.copy and track.copy.name or "", "Sound\\Interface\\iQuestLogCloseA.wav")
+    relayout()
+end
+
+function track.finish(id, success)
+    if track.id ~= id then return end
+    track.result, track.untilTime = success and "success" or "failed", GetTime() + LINGER
+    if track.copy then
+        track.copy.frozen = math.max(0, (track.copy.ends or 0) - GetTime())
+        if success then track.copy.progress = track.copy.count end
+    end
+    showBanner(success and L.success or L.failed, track.copy and track.copy.name or "",
+        success and "Sound\\Interface\\iQuestComplete.wav" or "Sound\\Interface\\iQuestLogCloseA.wav")
+    relayout()
+end
+
+function track.status(id, kills, part)
+    if track.id ~= id then return end
+    track.kills, track.part = kills, part
+    if block and block:IsShown() then fillBlock() end
+end
+
+function track.sync(level, pct)
+    track.syncLevel, track.syncPct = level, pct
+end
+
+-- The block's own clock: the timer each frame, the tracker laid out again when it expires
+local trackerClock = CreateFrame("Frame")
+trackerClock:SetScript("OnUpdate", function()
+    if not track.installed then install() end
+    tickBlock()
+    if track.untilTime and GetTime() >= track.untilTime then
+        track.untilTime = nil
+        if track.result then track.id, track.result, track.copy = nil, nil, nil end
+        relayout()
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- THE SYNCED DEBUFF'S TOOLTIP
+-- ---------------------------------------------------------------------------
+
+local function auraSpell(unit, index, filter, getter)
+    if not (unit and index) then return nil end
+    local spellId = select(11, getter(unit, index, filter))
+    return spellId
+end
+
+local function addSyncedLine(tooltip, spellId)
+    if spellId ~= SYNCED_SPELL or (track.syncLevel or 0) <= 0 then return end
+    tooltip:AddLine(string.format(L.synced, track.syncLevel, track.syncPct or 100), 1, 0.82, 0, true)
+    tooltip:Show()
+end
+
+if GameTooltip and hooksecurefunc then
+    if GameTooltip.SetUnitAura then
+        hooksecurefunc(GameTooltip, "SetUnitAura", function(self, unit, index, filter)
+            addSyncedLine(self, auraSpell(unit, index, filter, UnitAura))
+        end)
+    end
+    if GameTooltip.SetUnitDebuff then
+        hooksecurefunc(GameTooltip, "SetUnitDebuff", function(self, unit, index, filter)
+            addSyncedLine(self, auraSpell(unit, index, filter, UnitDebuff))
+        end)
     end
 end
 
