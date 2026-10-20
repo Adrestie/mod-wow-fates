@@ -117,6 +117,7 @@ struct WowFatesActiveExpedition
     int64 remaining = 0;        // ms
     uint32 progress = 0;
     uint8 announcedQuarter = 0; // quarters of the objective already announced
+    uint32 sentProgress = 0;    // progress the clients last heard of
     int64 summonTimer = 0;      // ms
     bool filled = false;        // the first wave of monsters is out
     std::vector<ObjectGuid> summons;
@@ -153,6 +154,12 @@ public:
 
     void OnLogout(Player* player);
 
+    // The map of the clients (data/lua/WowFates/WowFates_Client.lua): every
+    // active Expedition, sent at login, on a change of zone and when the
+    // client asks; then each start, progress and end to every player.
+    void SendList(Player* player);
+    bool OnAddonMessage(Player* player, std::string const& msg);
+
     std::string Name(WowFatesExpeditionDef const* def, WorldSession* session) const;
 
 private:
@@ -169,6 +176,9 @@ private:
     void AnnounceParticipants(WowFatesActiveExpedition const& active, uint32 text, uint32 a = 0, uint32 b = 0);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
     void Leave(ObjectGuid guid, bool announce);
+    std::string MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const;
+    void BroadcastSet(WowFatesActiveExpedition const& active);
+    void BroadcastDel(uint32 id);
 
     std::map<uint32, WowFatesExpeditionDef> _defs;
     std::map<uint32, WowFatesSpawnPoint> _spawns;

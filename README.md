@@ -41,14 +41,16 @@ Le debuff est appliqué à l'entrée dans la zone de l'Expédition et retiré à
 
 > **Jalon 1, pas encore testé en jeu.** Le debuff Synchronisé, le gestionnaire
 > d'Expéditions (apparition, durée, rotation), l'objectif « tuer N monstres »,
-> la participation active et les récompenses par niveau sont écrits. L'affichage
-> sur la carte et les objectifs collecte et escorte viendront ensuite.
+> la participation active, les récompenses par niveau et l'affichage des zones
+> sur la carte et la minicarte sont écrits. Les objectifs collecte et escorte
+> viendront ensuite.
 
 Le module prend la tranche **96** (96000-96999) du
 [registre WoW-mods](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md) :
-les sorts 96000-96003 sont le debuff Synchronisé. Un patch client pour une seule
-chose : l'aura 96000 (nom, icône, infobulle) dans `Spell.dbc`, posée par
-l'installeur WoW-mods.
+les sorts 96000-96003 sont le debuff Synchronisé. Côté client, posés par
+l'installeur WoW-mods : l'aura 96000 (nom, icône, infobulle) dans `Spell.dbc`
+et la texture des zones (`Interface\WowFates\Area.blp`) ; le code de la carte
+arrive par AIO.
 
 ## Synchronisé
 
@@ -96,6 +98,26 @@ module) : Soulèvement kobold (forêt d'Elwynn, niveau 7), Raid tranchecrin
 l'Expédition à la fin et a fait au moins un kill, ou des dégâts dans la zone et
 des soins sur des joueurs en combat dans la zone valant au moins 25 % de la
 contribution moyenne. Rester sur place ne rapporte rien.
+
+## Carte et minicarte
+
+La zone de chaque Expédition active (un cercle : centre et rayon) est dessinée
+sur la carte du monde et sur la minicarte, comme les zones des quêtes suivies
+de mod-forever-ui, mais en orange : la texture des zones de quête du jeu
+(`UI-QuestBlob-Inside` et `-Outside`, mêmes transparences), rouge et bleu
+échangés (`Interface\WowFates\Area`, `tools/gen_client_data.py`). Au survol :
+nom, niveau, objectif et progression, temps restant, dans les 5 langues.
+
+- Le serveur envoie la liste au client (message addon `WowFates`) à la
+  connexion, au changement de zone et quand le client la demande, puis chaque
+  apparition, progression et fin à tous les joueurs. Nom et objectif dans la
+  langue du joueur.
+- Le code client (`data/lua/WowFates`, envoyé par AIO) marche avec
+  l'interface d'origine comme avec mod-forever-ui, dont il suit le zoom de la
+  carte. Sur la minicarte, découpée en bandes comme chez mod-forever-ui (rien
+  ne découpe en cercle en 3.3.5), la zone suit aussi la rotation.
+- Les positions : `WowFates_Bounds_Client.lua`, les bords de chaque carte tirés
+  de `WorldMapArea.dbc`.
 
 ## Commandes (MJ)
 

@@ -63,6 +63,12 @@
       ]
     }
   },
+  "lua": {
+    "folder": "WowFates",
+    "sources": [
+      "data/lua/WowFates"
+    ]
+  },
   "dbc": [
     {
       "file": "Spell.dbc",
@@ -268,7 +274,17 @@
       ]
     }
   ],
+  "game_files": {
+    "sources": [
+      "data/art"
+    ],
+    "owned_folders": [
+      "Interface/WowFates"
+    ]
+  },
   "exclude_from_sources": [
-    "tools"
+    "tools",
+    "data/art",
+    "data/lua"
   ]
 }

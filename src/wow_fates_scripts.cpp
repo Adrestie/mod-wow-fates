@@ -67,14 +67,35 @@ public:
             // THIS LIST GATES THE CALLS: an overridden method missing from
             // here compiles and never fires.
             PLAYERHOOK_ON_LOGIN,
-            PLAYERHOOK_ON_LOGOUT
+            PLAYERHOOK_ON_LOGOUT,
+            PLAYERHOOK_ON_UPDATE_ZONE,
+            PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT
         }) { }
+
+    // Only the whisper overload is ours.
+    using PlayerScript::OnPlayerCanUseChat;
 
     // A debuff saved with the character (a crash, a shutdown) does not
     // outlive its Expedition: the area puts it back if he is still inside.
     void OnPlayerLogin(Player* player) override
     {
         sWowFatesSync->Remove(player);
+        sWowFatesExpeditionMgr->SendList(player);
+    }
+
+    // The map of the client follows the player from zone to zone.
+    void OnPlayerUpdateZone(Player* player, uint32 /*newZone*/, uint32 /*newArea*/) override
+    {
+        sWowFatesExpeditionMgr->SendList(player);
+    }
+
+    // The client's requests: an addon whisper to himself, kept from the chat.
+    bool OnPlayerCanUseChat(Player* player, uint32 type, uint32 language, std::string& msg, Player* receiver) override
+    {
+        if (type == CHAT_MSG_WHISPER && language == LANG_ADDON && receiver == player
+            && sWowFatesExpeditionMgr->OnAddonMessage(player, msg))
+            return false;
+        return true;
     }
 
     void OnPlayerLogout(Player* player) override

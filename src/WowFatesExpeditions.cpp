@@ -35,6 +35,8 @@
 #include "Random.h"
 #include "StringFormat.h"
 #include "TemporarySummon.h"
+#include "WorldPacket.h"
+#include "WorldSession.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,6 +59,33 @@ namespace
     bool IsFromPlayer(Unit const* unit)
     {
         return unit && unit->GetCharmerOrOwnerPlayerOrPlayerItself();
+    }
+
+    // The client's addon channel: a whisper of the player to himself in the
+    // addon language, "WowFates<TAB>message" (CHAT_MSG_ADDON, prefix WowFates).
+    constexpr char const* ADDON_PREFIX = "WowFates";
+
+    void SendAddon(Player* player, std::string const& message)
+    {
+        std::string const text = std::string(ADDON_PREFIX) + "\t" + message;
+        WorldPacket data(SMSG_MESSAGECHAT, 30 + text.size());
+        data << uint8(CHAT_MSG_WHISPER);
+        data << int32(LANG_ADDON);
+        data << player->GetGUID();
+        data << uint32(0);
+        data << player->GetGUID();
+        data << uint32(text.length() + 1);
+        data << text;
+        data << uint8(0);
+        player->GetSession()->SendPacket(&data);
+    }
+
+    // A tab or a line break would cut the message.
+    std::string Clean(std::string text)
+    {
+        std::replace(text.begin(), text.end(), '\t', ' ');
+        std::replace(text.begin(), text.end(), '\n', ' ');
+        return text;
     }
 }
 
@@ -271,6 +300,8 @@ void WowFatesExpeditionMgr::StartLocked(WowFatesExpeditionDef const* def, WowFat
     LOG_INFO("module", "mod-wow-fates: Expedition {} ({}) starts at spawn point {} (map {}, zone {}).",
         def->id, def->name, spawn->id, spawn->map, active.zone);
 
+    BroadcastSet(active);
+
     if (WowFatesConf().announce)
         AnnounceZone(active, WOW_FATES_STR_STARTED);
 }
@@ -318,6 +349,8 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
 
     LOG_INFO("module", "mod-wow-fates: Expedition {} ends, {} ({}/{}, {} contributors).",
         active.def->id, success ? "complete" : "failed", active.progress, active.def->objectiveCount, active.contributors.size());
+
+    BroadcastDel(active.def->id);
 
     // Who took part enough: a kill, or damage and healing worth a share of
     // the average of those who did any.
@@ -489,6 +522,59 @@ void WowFatesExpeditionMgr::AnnounceParticipants(WowFatesActiveExpedition const&
 }
 
 // ---------------------------------------------------------------------------
+// The clients' map
+
+// "set", id, map, x, y, radius, level, progress, count, seconds left, name,
+// objective: the name and the objective in the player's language.
+std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
+{
+    WowFatesExpeditionDef const* def = active.def;
+    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}",
+        def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
+        std::min(active.progress, def->objectiveCount), def->objectiveCount,
+        uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
+        Clean(Name(def, session)), Clean(Objective(active, session)));
+}
+
+void WowFatesExpeditionMgr::BroadcastSet(WowFatesActiveExpedition const& active)
+{
+    for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+        if (player && player->IsInWorld())
+            SendAddon(player, MapLine(active, player->GetSession()));
+}
+
+void WowFatesExpeditionMgr::BroadcastDel(uint32 id)
+{
+    std::string const line = Acore::StringFormat("del\t{}", id);
+    for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+        if (player && player->IsInWorld())
+            SendAddon(player, line);
+}
+
+void WowFatesExpeditionMgr::SendList(Player* player)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    SendAddon(player, "reset");
+    if (!WowFatesConf().enable)
+        return;
+    for (auto const& [id, active] : _active)
+        SendAddon(player, MapLine(active, player->GetSession()));
+}
+
+// The client asks for the list when its map code is loaded (after the
+// login's list, which it may have missed).
+bool WowFatesExpeditionMgr::OnAddonMessage(Player* player, std::string const& msg)
+{
+    std::string const prefix = std::string(ADDON_PREFIX) + "\t";
+    if (msg.compare(0, prefix.size(), prefix) != 0)
+        return false;
+    if (msg.compare(prefix.size(), std::string::npos, "hello") == 0)
+        SendList(player);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // The world tick
 
 void WowFatesExpeditionMgr::Update(uint32 diff)
@@ -535,6 +621,12 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
             UpdateArea(active, map);
             UpdateSummons(active, map, diff);
+
+            if (active.progress != active.sentProgress && active.progress < active.def->objectiveCount)
+            {
+                active.sentProgress = active.progress;
+                BroadcastSet(active);
+            }
         }
 
         uint32 const count = active.def->objectiveCount;
