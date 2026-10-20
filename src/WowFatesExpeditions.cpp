@@ -971,27 +971,33 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
         return creature && creature->IsAlive();
     }));
 
-    // The pace of the area: kills per second over the last AdaptiveWindow. The
-    // faster it is cleared, the shorter the delay (MinRespawn at least) and
-    // the more monsters at once (MaxPopulation times summon_count at most);
-    // when the pace drops, both go back to the Expedition's own.
+    // The pace of the area: kills per second over the last AdaptiveWindow.
+    // The faster it is cleared, the shorter the delay (MinRespawn at least)
+    // and the more monsters at once (summon_count + pace x summon_respawn x
+    // AdaptiveAggression, MaxPopulation times summon_count at most), each wave
+    // filling the area back up; when the pace drops, both go back to the
+    // Expedition's own. The area is never empty: under MinAlivePct of
+    // summon_count alive, the missing ones come at once, at random points.
     WowFatesConfig const& c = WowFatesConf();
     int64 const now = int64(def->duration) * IN_MILLISECONDS - active.remaining;
     while (!active.killTimes.empty() && active.killTimes.front() < now - int64(c.adaptiveWindow))
         active.killTimes.pop_front();
     float const pace = c.adaptiveSpawn ? float(active.killTimes.size()) * IN_MILLISECONDS / float(c.adaptiveWindow) : 0.0f;
     float const respawn = float(def->summonRespawn);
-    uint32 const population = std::clamp<uint32>(def->summonCount + uint32(std::lround(pace * respawn)),
+    uint32 const population = std::clamp<uint32>(def->summonCount + uint32(std::lround(pace * respawn * c.adaptiveAggression)),
         def->summonCount, uint32(std::lround(float(def->summonCount) * c.maxPopulation)));
 
     // Nobody near: the grid sleeps, no monster is brought.
-    if (alive >= population || active.summonTimer > 0 || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    uint32 const floor = uint32(std::ceil(float(def->summonCount) * c.minAlivePct / 100.0f));
+    bool const thin = c.adaptiveSpawn && active.filled && alive < floor;
+    if (alive >= population || (active.summonTimer > 0 && !thin) || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
 
     float const delay = std::max(respawn / (1.0f + pace * respawn), float(c.minRespawn) / IN_MILLISECONDS);
-    uint32 const wanted = active.filled
-        ? std::min(population - alive, std::max<uint32>(1, uint32(std::ceil(pace * delay))))
-        : population - alive;
+    // Under the floor between two waves: up to the floor at once, the wave keeps its time.
+    uint32 const wanted = (thin && active.summonTimer > 0) ? floor - alive
+        : ((!active.filled || pace > 0.0f) ? population - alive : 1);
+    bool const wave = !(thin && active.summonTimer > 0);
     for (uint32 i = 0; i < wanted; ++i)
     {
         float const angle = frand(0.0f, 2.0f * float(M_PI));
@@ -1019,9 +1025,10 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
     }
 
     active.filled = true;
-    active.summonTimer = c.adaptiveSpawn && pace > 0.0f
-        ? int64(delay * IN_MILLISECONDS)
-        : int64(def->summonRespawn) * IN_MILLISECONDS;
+    if (wave)
+        active.summonTimer = c.adaptiveSpawn && pace > 0.0f
+            ? int64(delay * IN_MILLISECONDS)
+            : int64(def->summonRespawn) * IN_MILLISECONDS;
 }
 
 // ---------------------------------------------------------------------------

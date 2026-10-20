@@ -110,9 +110,11 @@ void WowFatesLoadConfig()
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
     c.announce = sConfigMgr->GetOption<bool>("WowFates.Expedition.Announce", true);
     c.adaptiveSpawn = sConfigMgr->GetOption<bool>("WowFates.Expedition.AdaptiveSpawn", true);
-    c.adaptiveWindow = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AdaptiveWindow", 30), 5) * IN_MILLISECONDS;
-    c.minRespawn = sConfigMgr->GetOption<uint32>("WowFates.Expedition.MinRespawn", 5) * IN_MILLISECONDS;
-    c.maxPopulation = std::max(sConfigMgr->GetOption<float>("WowFates.Expedition.MaxPopulation", 2.0f), 1.0f);
+    c.adaptiveWindow = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AdaptiveWindow", 15), 5) * IN_MILLISECONDS;
+    c.minRespawn = sConfigMgr->GetOption<uint32>("WowFates.Expedition.MinRespawn", 2) * IN_MILLISECONDS;
+    c.maxPopulation = std::max(sConfigMgr->GetOption<float>("WowFates.Expedition.MaxPopulation", 3.0f), 1.0f);
+    c.adaptiveAggression = Positive("WowFates.Expedition.AdaptiveAggression", 1.5f);
+    c.minAlivePct = std::clamp(sConfigMgr->GetOption<float>("WowFates.Expedition.MinAlivePct", 50.0f), 0.0f, 100.0f);
 
     c.mediumShare = Positive("WowFates.Participation.MediumShare", 0.5f);
     c.strongShare = std::max(Positive("WowFates.Participation.StrongShare", 1.0f), c.mediumShare);

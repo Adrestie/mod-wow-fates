@@ -158,8 +158,18 @@ WowFates.Expedition.Announce            = 1
 #        Expedition's own delay (summon_respawn) and number (summon_count).
 #        The monsters of the game in the area keep their own respawn.
 #
+#        Each wave fills the area back up, at random points of it.
+#
 #    WowFates.Expedition.AdaptiveWindow
 #        Seconds of kills the pace is read on.
+#
+#    WowFates.Expedition.AdaptiveAggression
+#        The population sought: summon_count + kills per second x
+#        summon_respawn x this.
+#
+#    WowFates.Expedition.MinAlivePct
+#        Under this share of summon_count alive, the missing ones come at once,
+#        without waiting for the next wave. 0 = never.
 #
 #    WowFates.Expedition.MinRespawn
 #        Seconds, the shortest delay between two waves.
@@ -169,9 +179,11 @@ WowFates.Expedition.Announce            = 1
 #
 
 WowFates.Expedition.AdaptiveSpawn       = 1
-WowFates.Expedition.AdaptiveWindow      = 30
-WowFates.Expedition.MinRespawn          = 5
-WowFates.Expedition.MaxPopulation       = 2.0
+WowFates.Expedition.AdaptiveWindow      = 15
+WowFates.Expedition.AdaptiveAggression  = 1.5
+WowFates.Expedition.MinAlivePct         = 50
+WowFates.Expedition.MinRespawn          = 2
+WowFates.Expedition.MaxPopulation       = 3.0
 
 ###############################################################################
 #

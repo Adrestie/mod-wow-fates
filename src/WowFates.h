@@ -124,9 +124,11 @@ struct WowFatesConfig
     // Monsters of an Expedition: brought back faster, and more of them, when
     // the area is cleared fast
     bool adaptiveSpawn = true;
-    uint32 adaptiveWindow = 30000;   // ms of kills the pace is read on
-    uint32 minRespawn = 5000;        // ms, the shortest delay
-    float maxPopulation = 2.0f;      // times summon_count, the most alive at once
+    uint32 adaptiveWindow = 15000;   // ms of kills the pace is read on
+    uint32 minRespawn = 2000;        // ms, the shortest delay
+    float maxPopulation = 3.0f;      // times summon_count, the most alive at once
+    float adaptiveAggression = 1.5f; // how hard the pace raises the population
+    float minAlivePct = 50.0f;       // under this share of summon_count alive, filled up at once
 
     // Participation
     float mediumShare = 0.5f;        // of the average contribution
