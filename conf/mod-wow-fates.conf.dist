@@ -1,0 +1,183 @@
+#
+# mod-wow-fates — configuration
+#
+# Expeditions appear at points of the map for a while; whoever takes part in
+# one is rewarded by his level, and whoever is too strong for it is Synced:
+# brought down to its level.
+#
+# Every value below is also the built-in default, so a setting left out changes
+# nothing. Reloaded by `.reload config`.
+#
+# Copy this file to your configs/modules directory and drop the .dist extension.
+#
+
+[worldserver]
+
+###############################################################################
+#
+#    WowFates.Enable
+#        0 = no Expedition appears, the active ones end without rewards.
+#
+
+WowFates.Enable                         = 1
+
+###############################################################################
+#
+#    SYNCED
+#
+#    A player in the area of an Expedition is measured: his power score
+#    against the reference score of the Expedition's level. Below 1, their
+#    ratio is the share of his power he keeps: the Synced debuff (spell 96000,
+#    its charges show the level) cuts the rest off his stats, ratings, maximum
+#    health, armor, damage done and healing done.
+#
+#    WowFates.Synced.Enable
+#        0 = nobody is synced; the Expeditions still run.
+#
+#    WowFates.Synced.Interval
+#        Seconds between two measures of a synced player, so that a buff he
+#        gets in the area is caught. Entering the area measures at once.
+#
+#    WowFates.Synced.MinRatio
+#        The least share of his power a player keeps, however strong.
+#        0.05 = the debuff takes 95 % at most.
+#
+#    WowFates.Synced.Reduce.Stats, .Ratings, .Health, .Armor, .Damage, .Healing
+#        How much of the gap each category loses, from 0 (nothing) to 1 (all
+#        of it). With a ratio of 0.4 and Reduce.Damage 1, damage done is cut
+#        by 60 %; with Reduce.Damage 0.5, by 30 %. Damage also falls with the
+#        stats: lower Damage if synced players hit too softly.
+#
+#    WowFates.Synced.Announce
+#        1 = a message when a player gets synced, and when he no longer is.
+#
+
+WowFates.Synced.Enable                  = 1
+WowFates.Synced.Interval                = 5
+WowFates.Synced.MinRatio                = 0.05
+WowFates.Synced.Reduce.Stats            = 1.0
+WowFates.Synced.Reduce.Ratings          = 1.0
+WowFates.Synced.Reduce.Health           = 1.0
+WowFates.Synced.Reduce.Armor            = 1.0
+WowFates.Synced.Reduce.Damage           = 1.0
+WowFates.Synced.Reduce.Healing          = 1.0
+WowFates.Synced.Announce                = 1
+
+###############################################################################
+#
+#    POWER SCORE
+#
+#    Read live on the player, the debuff left out:
+#
+#      PrimaryWeight   x (strength + agility + stamina + intellect + spirit)
+#    + SecondaryWeight x ratings (hit, critical strike and haste counted once
+#                        for melee, ranged and spells; expertise, armor
+#                        penetration, defense, dodge, parry, block, resilience)
+#    + PowerWeight     x the best of: attack power from gear and auras (not
+#                        the part stats give), spell power, healing power
+#
+#    `.fates score` shows each part.
+#
+
+WowFates.Score.PrimaryWeight            = 1.0
+WowFates.Score.SecondaryWeight          = 0.5
+WowFates.Score.PowerWeight              = 0.5
+
+###############################################################################
+#
+#    REFERENCE SCORE
+#
+#    What a character of the player's race and class is expected to score at
+#    the Expedition's level, with the same weights:
+#
+#      PrimaryWeight   x (base stats of that level + GearPrimary x H)
+#    + SecondaryWeight x GearSecondary x H
+#    + PowerWeight     x GearPower x P
+#
+#    H and P follow the heirlooms (ScalingStatValues.dbc): H is the stat
+#    multiplier of a shoulder slot at that level (2 at level 1, 6 at 10, 37 at
+#    60, 97 at 80), P the spell power (1 at level 1, 57 at 60, 343 at 80).
+#    Past level 80 they go on in a straight line. GearPrimary 18 is about a
+#    full set of heirloom-like gear.
+#
+#    WowFates.Reference.Factor
+#        Multiplies the whole reference. Raise it if Synced bites too hard,
+#        lower it if strong players still breeze through.
+#
+
+WowFates.Reference.Factor               = 1.0
+WowFates.Reference.GearPrimary          = 18.0
+WowFates.Reference.GearSecondary        = 9.0
+WowFates.Reference.GearPower            = 4.0
+
+###############################################################################
+#
+#    EXPEDITIONS
+#
+#    Defined in the world database: mod_wow_fates_expedition, their spawn
+#    points (mod_wow_fates_spawn), their rewards (mod_wow_fates_reward).
+#    `.fates reload` reads them again.
+#
+#    WowFates.Expedition.MaxActive
+#        Expeditions running at once, picked at random by their weight among
+#        those out of cooldown. 0 = none but those started by `.fates start`.
+#
+#    WowFates.Expedition.SpawnInterval
+#        Seconds between two looks for a free slot.
+#
+#    WowFates.Expedition.Cooldown
+#        Seconds an Expedition waits, once ended, before it may appear again,
+#        when its own `cooldown` is 0.
+#
+#    WowFates.Expedition.AreaInterval
+#        Milliseconds between two looks at who is in each area (entering,
+#        leaving, monsters to bring back). 200 at least.
+#
+#    WowFates.Expedition.Announce
+#        1 = the players of the zone are told when an Expedition begins.
+#
+
+WowFates.Expedition.MaxActive           = 3
+WowFates.Expedition.SpawnInterval       = 60
+WowFates.Expedition.Cooldown            = 600
+WowFates.Expedition.AreaInterval        = 1000
+WowFates.Expedition.Announce            = 1
+
+###############################################################################
+#
+#    PARTICIPATION
+#
+#    Standing in the area earns nothing. A player is rewarded when the
+#    Expedition is complete if he is within RewardRange times its radius and
+#    took an active part: MinKills kills of its monsters, or damage done in
+#    the area plus healing done to players fighting there worth MinShare of
+#    the average of those who did any.
+#
+#    WowFates.Participation.MinKills
+#        0 = kills alone never suffice.
+#
+#    WowFates.Participation.MinShare
+#        0.25 = a quarter of the average contribution.
+#
+#    WowFates.Participation.RewardRange
+#        Times the radius of the Expedition. 1 at least.
+#
+
+WowFates.Participation.MinKills         = 1
+WowFates.Participation.MinShare         = 0.25
+WowFates.Participation.RewardRange      = 2.0
+
+###############################################################################
+#
+#    REWARDS
+#
+#    Every row of mod_wow_fates_reward that matches the level is given: the
+#    Expedition's own rows, else those of expedition 0.
+#
+#    WowFates.Reward.LevelMargin
+#        -1 = the rewards of the player's level.
+#        N  = of his level, but at most the Expedition's level + N: a level 80
+#             finishing a level 7 Expedition with 3 gets the rewards of level 10.
+#
+
+WowFates.Reward.LevelMargin             = -1

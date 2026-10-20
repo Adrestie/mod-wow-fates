@@ -1,0 +1,274 @@
+{
+  "format": "wow-mods-installer/1",
+  "module": "mod-wow-fates",
+  "title": "WoW Fates",
+  "fields": {
+    "game": "required",
+    "worldserver": "required",
+    "sources": "required",
+    "mysql": "required"
+  },
+  "signature": [
+    "src/wow_fates_loader.cpp",
+    "src/WowFatesExpeditions.cpp",
+    "src/WowFatesSync.cpp"
+  ],
+  "configuration": {
+    "file": "mod-wow-fates.conf",
+    "template": "conf/mod-wow-fates.conf.dist"
+  },
+  "database": {
+    "characters": {
+      "rows": [
+        {
+          "table": "character_aura",
+          "where": "spell IN ({ids:Spell.dbc})"
+        }
+      ]
+    },
+    "world": {
+      "rows": [
+        {
+          "table": "module_string",
+          "where": "module = 'mod-wow-fates'"
+        },
+        {
+          "table": "module_string_locale",
+          "where": "module = 'mod-wow-fates'"
+        },
+        {
+          "table": "command",
+          "where": "name = 'fates' OR name LIKE 'fates %'"
+        },
+        {
+          "table": "spell_dbc",
+          "where": "ID IN ({ids:Spell.dbc})"
+        },
+        {
+          "table": "updates",
+          "where": "name IN ({sql_files:world})"
+        }
+      ],
+      "tables": [
+        "mod_wow_fates_expedition",
+        "mod_wow_fates_expedition_locale",
+        "mod_wow_fates_spawn",
+        "mod_wow_fates_reward"
+      ],
+      "kept_on_update": [
+        "mod_wow_fates_expedition",
+        "mod_wow_fates_expedition_locale",
+        "mod_wow_fates_spawn",
+        "mod_wow_fates_reward"
+      ]
+    }
+  },
+  "dbc": [
+    {
+      "file": "Spell.dbc",
+      "fields": 234,
+      "text_fields": [
+        [
+          136,
+          151
+        ],
+        [
+          153,
+          168
+        ],
+        [
+          170,
+          185
+        ],
+        [
+          187,
+          202
+        ]
+      ],
+      "client": true,
+      "server": false,
+      "rows": [
+        {
+          "0": 96000,
+          "4": 2684354560,
+          "5": 0,
+          "6": 1,
+          "7": 1048576,
+          "28": 1,
+          "35": 101,
+          "40": 21,
+          "46": 1,
+          "68": -1,
+          "71": 6,
+          "72": 6,
+          "73": 6,
+          "74": 1,
+          "75": 1,
+          "76": 1,
+          "80": -2,
+          "81": -2,
+          "82": -2,
+          "86": 1,
+          "87": 1,
+          "88": 1,
+          "95": 137,
+          "96": 79,
+          "97": 136,
+          "110": -1,
+          "111": 127,
+          "112": 0,
+          "133": 58,
+          "136": "Synced",
+          "138": "Synchronisé",
+          "139": "Synchronisiert",
+          "142": "Sincronizado",
+          "143": "Sincronizado",
+          "144": "Синхронизация",
+          "152": 16712190,
+          "169": 16712190,
+          "170": "Synced to the level of the Expedition, shown on the icon: your stats, ratings, health, armor, damage and healing are reduced to match it.",
+          "172": "Synchronisé au niveau de l'Expédition, indiqué sur l'icône : vos caractéristiques, scores, points de vie, armure, dégâts et soins sont réduits en conséquence.",
+          "173": "Auf die Stufe der Expedition synchronisiert, die das Symbol anzeigt: Eure Werte, Wertungen, Gesundheit, Rüstung, Euer Schaden und Eure Heilung sind entsprechend verringert.",
+          "176": "Sincronizado al nivel de la Expedición, indicado en el icono: tus atributos, índices, salud, armadura, daño y sanación se reducen en consecuencia.",
+          "177": "Sincronizado al nivel de la Expedición, indicado en el icono: tus atributos, índices, salud, armadura, daño y sanación se reducen en consecuencia.",
+          "178": "Синхронизация с уровнем экспедиции, указанным на значке: ваши характеристики, рейтинги, здоровье, броня, наносимый урон и исцеление снижены.",
+          "186": 16712190,
+          "187": "Synced to the level of the Expedition, shown on the icon: your stats, ratings, health, armor, damage and healing are reduced to match it.",
+          "189": "Synchronisé au niveau de l'Expédition, indiqué sur l'icône : vos caractéristiques, scores, points de vie, armure, dégâts et soins sont réduits en conséquence.",
+          "190": "Auf die Stufe der Expedition synchronisiert, die das Symbol anzeigt: Eure Werte, Wertungen, Gesundheit, Rüstung, Euer Schaden und Eure Heilung sind entsprechend verringert.",
+          "193": "Sincronizado al nivel de la Expedición, indicado en el icono: tus atributos, índices, salud, armadura, daño y sanación se reducen en consecuencia.",
+          "194": "Sincronizado al nivel de la Expedición, indicado en el icono: tus atributos, índices, salud, armadura, daño y sanación se reducen en consecuencia.",
+          "195": "Синхронизация с уровнем экспедиции, указанным на значке: ваши характеристики, рейтинги, здоровье, броня, наносимый урон и исцеление снижены.",
+          "203": 16712190,
+          "216": 1065353216,
+          "217": 1065353216,
+          "218": 1065353216,
+          "225": 1
+        },
+        {
+          "0": 96001,
+          "4": 2684354688,
+          "5": 268435456,
+          "6": 1,
+          "7": 1048576,
+          "28": 1,
+          "35": 101,
+          "40": 21,
+          "46": 1,
+          "68": -1,
+          "71": 6,
+          "72": 6,
+          "73": 6,
+          "74": 1,
+          "75": 1,
+          "76": 1,
+          "80": -2,
+          "81": -2,
+          "82": -2,
+          "86": 1,
+          "87": 1,
+          "88": 1,
+          "95": 189,
+          "96": 189,
+          "97": 189,
+          "110": 224,
+          "111": 1792,
+          "112": 917504,
+          "133": 58,
+          "136": "Synced (offense)",
+          "152": 16712190,
+          "169": 16712190,
+          "186": 16712190,
+          "203": 16712190,
+          "216": 1065353216,
+          "217": 1065353216,
+          "218": 1065353216,
+          "225": 1
+        },
+        {
+          "0": 96002,
+          "4": 2684354688,
+          "5": 268435456,
+          "6": 1,
+          "7": 1048576,
+          "28": 1,
+          "35": 101,
+          "40": 21,
+          "46": 1,
+          "68": -1,
+          "71": 6,
+          "72": 6,
+          "73": 6,
+          "74": 1,
+          "75": 1,
+          "76": 1,
+          "80": -2,
+          "81": -2,
+          "82": -2,
+          "86": 1,
+          "87": 1,
+          "88": 1,
+          "95": 189,
+          "96": 189,
+          "97": 189,
+          "110": 2,
+          "111": 12,
+          "112": 25165824,
+          "133": 58,
+          "136": "Synced (defense)",
+          "152": 16712190,
+          "169": 16712190,
+          "186": 16712190,
+          "203": 16712190,
+          "216": 1065353216,
+          "217": 1065353216,
+          "218": 1065353216,
+          "225": 1
+        },
+        {
+          "0": 96003,
+          "4": 2684354688,
+          "5": 268435456,
+          "6": 1,
+          "7": 1048576,
+          "28": 1,
+          "35": 101,
+          "40": 21,
+          "46": 1,
+          "68": -1,
+          "71": 6,
+          "72": 6,
+          "73": 6,
+          "74": 1,
+          "75": 1,
+          "76": 1,
+          "80": -2,
+          "81": -2,
+          "82": -2,
+          "86": 1,
+          "87": 1,
+          "88": 1,
+          "95": 133,
+          "96": 101,
+          "97": 189,
+          "110": 0,
+          "111": 1,
+          "112": 114688,
+          "133": 58,
+          "136": "Synced (health)",
+          "152": 16712190,
+          "169": 16712190,
+          "186": 16712190,
+          "203": 16712190,
+          "216": 1065353216,
+          "217": 1065353216,
+          "218": 1065353216,
+          "225": 1
+        }
+      ]
+    }
+  ],
+  "exclude_from_sources": [
+    "tools"
+  ]
+}
