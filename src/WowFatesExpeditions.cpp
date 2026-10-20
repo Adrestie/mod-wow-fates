@@ -905,6 +905,41 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
     }
 }
 
+// A point of the area for a monster: a random spot of the ground within 80 %
+// of the radius, seen from the centre (not behind a wall nor in a cave under
+// it) and not much higher or lower than the centre. The ground is searched
+// from well above, so that a slope or a hill around the centre is found (from
+// just above the centre, every point higher up the hill had no ground and the
+// monster fell back on the centre). Several tries; the centre, a little
+// spread, as the last resort.
+Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const
+{
+    WowFatesSpawnPoint const& c = active.spawn;
+    float const reach = active.def->radius * 0.8f;
+    for (uint32 attempt = 0; attempt < 16; ++attempt)
+    {
+        float const angle = frand(0.0f, 2.0f * float(M_PI));
+        float const dist = reach * std::sqrt(frand(0.0f, 1.0f)); // even over the disc
+        float const x = c.x + dist * std::cos(angle);
+        float const y = c.y + dist * std::sin(angle);
+        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
+        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
+            continue;
+        if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
+                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+            continue;
+        return Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
+    }
+
+    float const angle = frand(0.0f, 2.0f * float(M_PI));
+    float const x = c.x + 3.0f * std::cos(angle);
+    float const y = c.y + 3.0f * std::sin(angle);
+    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 5.0f, true, 20.0f);
+    if (z <= INVALID_HEIGHT)
+        return Position(c.x, c.y, c.z, angle);
+    return Position(x, y, z, angle);
+}
+
 void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 /*diff*/)
 {
     WowFatesExpeditionDef const* def = active.def;
@@ -953,27 +988,21 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
     bool const wave = !(thin && active.summonTimer > 0);
     for (uint32 i = 0; i < wanted; ++i)
     {
-        float const angle = frand(0.0f, 2.0f * float(M_PI));
-        float const dist = frand(0.0f, def->radius * 0.8f);
-        float x = active.spawn.x + dist * std::cos(angle);
-        float y = active.spawn.y + dist * std::sin(angle);
-        float z = map->GetHeight(PHASEMASK_NORMAL, x, y, active.spawn.z + 10.0f, true, 50.0f);
-        if (z <= INVALID_HEIGHT)
-        {
-            x = active.spawn.x;
-            y = active.spawn.y;
-            z = active.spawn.z;
-        }
-
-        Position const pos(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
+        Position const pos = SpawnPoint(active, map);
         TempSummon* summon = map->SummonCreature(def->summonEntry, pos);
         if (!summon)
             break;
 
         summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
         summon->SetTimer(SUMMON_CORPSE_MS);
-        summon->SetWanderDistance(8.0f);
-        summon->GetMotionMaster()->MoveRandom(8.0f);
+
+        // They roam around where they appeared, back to it after a fight: random
+        // as their default movement, so that a reset of their AI keeps it.
+        float const wander = std::clamp(def->radius * 0.25f, 5.0f, 15.0f);
+        summon->SetHomePosition(pos);
+        summon->SetWanderDistance(wander);
+        summon->SetDefaultMovementType(RANDOM_MOTION_TYPE);
+        summon->GetMotionMaster()->Initialize();
         active.summons.push_back(summon->GetGUID());
     }
 

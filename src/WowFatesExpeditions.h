@@ -42,6 +42,7 @@
 
 #include "Define.h"
 #include "ObjectGuid.h"
+#include "Position.h"
 
 #include <atomic>
 #include <deque>
@@ -186,6 +187,7 @@ private:
     void UpdateArea(WowFatesActiveExpedition& active, Map* map);
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
     void Finish(WowFatesActiveExpedition& active, bool success);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
