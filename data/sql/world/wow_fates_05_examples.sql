@@ -4,7 +4,7 @@
 --
 --   1  Kobold Uprising, Elwynn Forest, level 7: Fargodeep or Jasperlode Mine
 --   2  Razormane Raid, Durotar, level 8: the Razormane grounds by Razor Hill
---   3  Restless Dead, Icecrown, level 80: the ghouls south of the Shadow Vault
+--   3  Restless Dead, Icecrown, level 80: the ghouls of central-east Icecrown (64, 45)
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -41,7 +41,7 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (2, 1,   0, -9256.03,  -707.889,  63.1122, 0, 'Jasperlode Mine, outside'),
 (3, 2,   1,  92.7794, -4557.56,   54.6971, 0, 'Razormane grounds, south'),
 (4, 2,   1,  80.3499, -4406.12,   43.5863, 0, 'Razormane grounds, north'),
-(5, 3, 571,  7547.05,  1417.36,  324.996,  0, 'Icecrown, below the Shadow Vault');
+(5, 3, 571,  7547.05,  1417.36,  324.996,  0, 'Icecrown, central-east (map 64, 45)');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `comment`) VALUES
