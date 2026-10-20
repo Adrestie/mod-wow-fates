@@ -8,7 +8,10 @@
 --
 -- Each is a goober (type 10) whose ScriptName hands the click to the module:
 -- go_wow_fates_gather (consumable) counts it for the Expedition and the
--- object goes, nothing is looted, nothing goes in the bags;
+-- object goes, nothing is looted, nothing goes in the bags. Its lock (Data0
+-- 43, as many objects of the game's quests) asks for a one second kneeling
+-- "Opening" (spell 6478), broken by moving or a blow: only one that ends
+-- counts;
 -- go_wow_fates_channel starts the channel of whoever clicks near it.
 --
 -- Idempotent: the module's rows are deleted before being written again.
@@ -19,7 +22,7 @@ INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconNa
   `Data12`, `Data13`, `Data14`, `Data15`, `Data16`, `Data17`, `Data18`, `Data19`, `Data20`, `Data21`, `Data22`, `Data23`,
   `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
 (960000, 10, 336, 'Kul Tiras Supply Crate', '', '', '', 1,
-  0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  43, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   '', 'go_wow_fates_gather', 0),
 (960100, 10, 328, 'Ritual Altar', '', '', '', 1,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
