@@ -50,7 +50,8 @@
     id, map, x, y, radius, level, progress, count, seconds left, name,
     objective, tracker line, seconds it waits for players, type of objective (1 extermination,
     2 assault and boss, 3 gathering, 4 defence, 5 invocation, 6 wave support:
-    named in the map's tooltip), 1 when players are at it ("in progress" on the map); "del" with id; "enter" and "leave"
+    named in the map's tooltip), 1 when players are at it ("in progress" on the map), the tracker's
+    second line (what there is to protect, or empty); "del" with id; "enter" and "leave"
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
     "defend" with id and the ally's name, "invoke" with id and the altar's
@@ -169,6 +170,7 @@ local function onMessage(message)
             level = tonumber(f[7]), progress = tonumber(f[8]), count = tonumber(f[9]),
             ends = GetTime() + (tonumber(f[10]) or 0), name = f[11], objective = f[12],
             label = f[13], duration = tonumber(f[14]), type = tonumber(f[15]) or 1, inProgress = f[16] == "1",
+            guard = f[17] or "",
         }
         track.update(expeditions[id])
     elseif command == "del" and id then
@@ -712,6 +714,12 @@ local function buildBlock()
     barText:SetJustifyH("CENTER")
     barText:SetTextColor(1, 1, 1)
 
+    -- what there is to protect (a defence, a wave support), under the bar
+    local guard = text(b, 12)
+    guard:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -10, -14)
+    guard:SetWidth(BLOCK_W - 24)
+    guard:SetTextColor(0.55, 1, 0.55)
+
     -- the result, at the end, over the rewards (no participation shown)
     local part = text(b, 12)
     part:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -10, -14)
@@ -732,7 +740,7 @@ local function buildBlock()
 
     b.timer, b.fill, b.title, b.timeLeft = timer, fill, title, timeLeft
     b.objective, b.bar, b.barText, b.part, b.kills = objective, bar, barText, part, kills
-    b.rewHeader, b.rewText, b.items = rewHeader, rewText, {}
+    b.rewHeader, b.rewText, b.items, b.guard = rewHeader, rewText, {}, guard
     b.baseHeight = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 15 + 15
     b.height = b.baseHeight
     block = b
@@ -838,8 +846,25 @@ local function fillBlock()
         b.part:Hide()
         b.rewHeader:Show()
     end
+    -- what there is to protect, between the bar and the rewards
+    local below, extra = b.bar, 0
+    if e.guard and e.guard ~= "" then
+        b.guard:SetText(e.guard)
+        b.guard:Show()
+        below, extra = b.guard, 18
+    else
+        b.guard:Hide()
+    end
+    for _, fs in ipairs({ b.part, b.rewHeader }) do
+        fs:ClearAllPoints()
+        if below == b.bar then
+            fs:SetPoint("TOPLEFT", b.bar, "BOTTOMLEFT", -10, -14)
+        else
+            fs:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -4)
+        end
+    end
     -- a new height lays the tracker out again
-    local height = fillRewards(b)
+    local height = fillRewards(b) + extra
     if height ~= b.height then
         b.height = height
         return true

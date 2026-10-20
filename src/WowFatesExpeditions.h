@@ -219,6 +219,12 @@ struct WowFatesActiveExpedition
     int64 waveClearedAt = -1;   // elapsed, when its last monster died; -1 while some live
     float pace = 1.0f;          // the waves' size for the pace of the kills, 1 to PaceMax
     uint32 repelled = 0;        // waves pushed back
+
+    // The tracker's second line (the allies alive, the ally's health): what it
+    // showed when it was last sent, to send it again only when it changes.
+    int32 alliesAlive = -1;
+    int32 allyHealthPct = -1;   // by steps of five
+    int32 sentGuard = -1;
 };
 
 class WowFatesExpeditionMgr
@@ -299,6 +305,7 @@ private:
     void Leave(ObjectGuid guid, bool announce);
     std::string MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const;
     std::string TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const;
+    std::string TrackerGuard(WowFatesActiveExpedition const& active, WorldSession* session) const;
     WowFatesParticipation Participation(WowFatesActiveExpedition const& active, ObjectGuid guid) const;
     std::vector<WowFatesReward const*> RewardRows(WowFatesActiveExpedition const& active, Player const* player) const;
     std::string RewardLine(WowFatesActiveExpedition const& active, Player const* player) const;

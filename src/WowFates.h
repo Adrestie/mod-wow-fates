@@ -78,6 +78,8 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_TRACKER_INVOKE     = 31,
     WOW_FATES_STR_OBJECTIVE_SUPPORT  = 32,
     WOW_FATES_STR_TRACKER_SUPPORT    = 33,
+    WOW_FATES_STR_ALLIES_ALIVE       = 34,  // the tracker's second line: allies alive
+    WOW_FATES_STR_ALLY_HEALTH        = 35,  // the tracker's second line: the ally's health
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,

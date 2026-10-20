@@ -676,18 +676,19 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 
 // "set", id, map, x, y, radius, level, progress in percent, 100, seconds left, name,
 // objective, tracker line, seconds it waits for players, type of objective
-// (the map's icon), 1 when players are at it: the texts in the player's
-// language. The seconds left are not shown, only "expires soon" under three
+// (named in the map's tooltip), 1 when players are at it, the tracker's
+// second line (empty but for a defence or a wave support): the texts in the
+// player's language. The seconds left are not shown, only "expires soon" under three
 // minutes; while players are at it, they do not run.
 std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
-    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
         std::min<uint32>(uint32(active.progressPct), 100), 100u,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
         Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
-        IdleExpire(def), uint32(def->objectiveType), active.inProgress ? 1 : 0);
+        IdleExpire(def), uint32(def->objectiveType), active.inProgress ? 1 : 0, Clean(TrackerGuard(active, session)));
 }
 
 // The objective as the tracker shows it, the count apart: "Kobold Miner slain";
@@ -708,6 +709,20 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
     if (!def->objectiveEntry)
         return WowFatesText(session, WOW_FATES_STR_TRACKER_KILL_ANY);
     return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->objectiveEntry, session));
+}
+
+// The tracker's second line: what there is to protect. A wave support: its
+// allies alive out of ally_count; a defence: its ally's health.
+std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& active, WorldSession* session) const
+{
+    WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
+            uint32(active.alliesAlive), def->allyCount);
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE && active.allyHealthPct >= 0)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLY_HEALTH), CreatureName(def->allyEntry, session),
+            uint32(active.allyHealthPct));
+    return "";
 }
 
 // None: nothing done. Light: a kill, an object gathered, or any damage or
@@ -929,9 +944,11 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
                 UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
-            if (pct != active.sentProgress && pct < 100)
+            int32 const guard = active.alliesAlive * 1000 + active.allyHealthPct;
+            if ((pct != active.sentProgress && pct < 100) || guard != active.sentGuard)
             {
                 active.sentProgress = pct;
+                active.sentGuard = guard;
                 BroadcastSet(active);
             }
             SendStatus(active);
@@ -1513,6 +1530,7 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
     Creature* ally = active.ally ? map->GetCreature(active.ally) : nullptr;
     if (ally && !ally->IsAlive())
     {
+        active.allyHealthPct = 0;
         LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died after {} s and {} waves.",
             active.def->id, active.held / IN_MILLISECONDS, active.wave);
         active.failed = true;
@@ -1531,6 +1549,7 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
+    active.allyHealthPct = std::max<int32>(5, int32(std::ceil(ally->GetHealthPct() / 5.0f)) * 5);
 
     if (!Start(active, "defend", &WowFatesExpeditionMgr::CreatureName, active.def->allyEntry))
         return;
@@ -1817,6 +1836,7 @@ void WowFatesExpeditionMgr::UpdateSupport(WowFatesActiveExpedition& active, Map*
                 alive.push_back(ally);
             }
     active.allyPlayers = setFor;
+    active.alliesAlive = int32(alive.size());
     if (alive.empty())
     {
         LOG_INFO("module", "mod-wow-fates: Expedition {}: its allies died, {} waves pushed back.", def->id, active.repelled);
