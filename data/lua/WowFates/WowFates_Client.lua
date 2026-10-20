@@ -75,10 +75,10 @@ local LINGER = 10                           -- seconds the block stays after lea
 local STRIPS = 24                           -- strips across the minimap's diameter
 local MINIMAP_WAIT = 0.05                   -- the minimap is drawn again at most twenty times a second
 local TITLE_COLOR = { 1, 0.55, 0.2 }
--- The banners' sounds: a boss out or a defence begun, and each wave (the ogres' war drums;
--- any sound file of the client may take their place)
+-- The banners' sounds: a boss out or a defence begun; a wave's banner is silent (WAVE_SOUND
+-- false; any sound file of the client may take its place)
 local ALERT_SOUND = "Sound\\Interface\\RaidWarning.wav"
-local WAVE_SOUND = "Sound\\Event Sounds\\Event_wardrum_ogre.wav"
+local WAVE_SOUND = false
 
 -- Minimap diameter in yards by zoom (0 to 5), outdoors and indoors (the client's fixed values)
 local OUTDOOR = { [0] = 466 + 2 / 3, 400, 333 + 1 / 3, 266 + 2 / 3, 200, 133 + 1 / 3 }
@@ -1002,10 +1002,12 @@ function track.finish(id, success)
     relayout()
 end
 
--- A boss out, a defence begun: a banner with ALERT_SOUND; a wave coming: WAVE_SOUND
+-- A boss out, a defence begun: a banner with ALERT_SOUND; a wave coming: WAVE_SOUND (false:
+-- none)
 function track.alert(id, title, sound)
     if track.id ~= id or track.result then return end
-    showBanner(title, track.copy and track.copy.name or "", sound or ALERT_SOUND)
+    if sound == nil then sound = ALERT_SOUND end
+    showBanner(title, track.copy and track.copy.name or "", sound or nil)
 end
 
 function track.status(id, kills, part, pct)
