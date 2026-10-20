@@ -38,7 +38,10 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates', 109, '{}: power score {} (main stats {}, ratings {}, attack or spell power {}). Reference at level {}: {}. Ratio {:.2f}.'),
 ('mod-wow-fates', 110, 'The module is turned off (WowFates.Enable = 0).'),
 ('mod-wow-fates', 111, 'Expedition {} completed: its participants are rewarded.'),
-('mod-wow-fates', 112, '#{} {} (level {}): {} spawn points, weight {}, {}.');
+('mod-wow-fates', 112, '#{} {} (level {}): {} spawn points, weight {}, {}.'),
+('mod-wow-fates', 113, '{}: Expedition {} (level {}), ratio {:.2f}, debuff {}.'),
+('mod-wow-fates', 114, 'Nobody is in the area of an Expedition.'),
+('mod-wow-fates', 115, 'No such player in the world.');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -69,6 +72,9 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates', 110, 'frFR', 'Le module est désactivé (WowFates.Enable = 0).'),
 ('mod-wow-fates', 111, 'frFR', 'Expédition {} accomplie : ses participants sont récompensés.'),
 ('mod-wow-fates', 112, 'frFR', '#{} {} (niveau {}) : {} points d''apparition, poids {}, {}.'),
+('mod-wow-fates', 113, 'frFR', '{} : Expédition {} (niveau {}), ratio {:.2f}, debuff {}.'),
+('mod-wow-fates', 114, 'frFR', 'Personne n''est dans la zone d''une Expédition.'),
+('mod-wow-fates', 115, 'frFR', 'Aucun joueur de ce nom dans le monde.'),
 
 ('mod-wow-fates',   1, 'deDE', '[Expedition] {} hat in der Nähe begonnen (Stufe {}): {}. {} Minuten.'),
 ('mod-wow-fates',   2, 'deDE', '[Expedition] {}: {}/{}.'),
@@ -97,6 +103,9 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates', 110, 'deDE', 'Das Modul ist ausgeschaltet (WowFates.Enable = 0).'),
 ('mod-wow-fates', 111, 'deDE', 'Expedition {} abgeschlossen: Ihre Teilnehmer werden belohnt.'),
 ('mod-wow-fates', 112, 'deDE', '#{} {} (Stufe {}): {} Erscheinungspunkte, Gewicht {}, {}.'),
+('mod-wow-fates', 113, 'deDE', '{}: Expedition {} (Stufe {}), Verhältnis {:.2f}, Schwächung {}.'),
+('mod-wow-fates', 114, 'deDE', 'Niemand ist im Gebiet einer Expedition.'),
+('mod-wow-fates', 115, 'deDE', 'Kein solcher Spieler in der Welt.'),
 
 ('mod-wow-fates',   1, 'esES', '[Expedición] {} ha comenzado cerca (nivel {}): {}. {} minutos.'),
 ('mod-wow-fates',   2, 'esES', '[Expedición] {}: {}/{}.'),
@@ -125,6 +134,9 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates', 110, 'esES', 'El módulo está desactivado (WowFates.Enable = 0).'),
 ('mod-wow-fates', 111, 'esES', 'Expedición {} completada: sus participantes reciben su recompensa.'),
 ('mod-wow-fates', 112, 'esES', '#{} {} (nivel {}): {} puntos de aparición, peso {}, {}.'),
+('mod-wow-fates', 113, 'esES', '{}: Expedición {} (nivel {}), proporción {:.2f}, perjuicio {}.'),
+('mod-wow-fates', 114, 'esES', 'Nadie está en la zona de una Expedición.'),
+('mod-wow-fates', 115, 'esES', 'No hay ningún jugador con ese nombre en el mundo.'),
 
 ('mod-wow-fates',   1, 'ruRU', '[Экспедиция] Неподалеку началась экспедиция «{}» (уровень {}): {}. Минут: {}.'),
 ('mod-wow-fates',   2, 'ruRU', '[Экспедиция] «{}»: {}/{}.'),
@@ -152,4 +164,7 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates', 109, 'ruRU', '{}: показатель силы {} (характеристики {}, рейтинги {}, сила атаки или заклинаний {}). Эталон на уровне {}: {}. Соотношение {:.2f}.'),
 ('mod-wow-fates', 110, 'ruRU', 'Модуль отключен (WowFates.Enable = 0).'),
 ('mod-wow-fates', 111, 'ruRU', 'Экспедиция {} завершена: участники награждены.'),
-('mod-wow-fates', 112, 'ruRU', '#{} {} (уровень {}): точек появления {}, вес {}, {}.');
+('mod-wow-fates', 112, 'ruRU', '#{} {} (уровень {}): точек появления {}, вес {}, {}.'),
+('mod-wow-fates', 113, 'ruRU', '{}: экспедиция {} (уровень {}), соотношение {:.2f}, эффект {}.'),
+('mod-wow-fates', 114, 'ruRU', 'Никого нет в зоне экспедиции.'),
+('mod-wow-fates', 115, 'ruRU', 'Такого игрока нет в мире.');

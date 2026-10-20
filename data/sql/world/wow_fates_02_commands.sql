@@ -11,4 +11,5 @@ INSERT INTO `command` (`name`, `security`, `help`) VALUES
 ('fates stop', 2, 'Syntax: .fates stop $id\n\nEnds Expedition $id as failed: no rewards, its monsters go.'),
 ('fates complete', 2, 'Syntax: .fates complete $id\n\nEnds Expedition $id as complete: its active participants are rewarded.'),
 ('fates reload', 3, 'Syntax: .fates reload\n\nStops every active Expedition, without rewards, and reloads the Expeditions, spawn points and rewards from the world database.'),
-('fates score', 2, 'Syntax: .fates score [$level]\n\nPower score of the selected player (or yours), measured without the Synced debuff, against the reference score of $level: by default the level of his Expedition, else his own. Below 1, the ratio is what Synced would leave him.');
+('fates score', 2, 'Syntax: .fates score [$player] [$level]\n\nPower score of $player (else the selected player, else yours), measured without the Synced debuff, against the reference score of $level: by default the level of his Expedition, else his own. Below 1, the ratio is what Synced would leave him. Works from the console with a name.'),
+('fates synced', 2, 'Syntax: .fates synced\n\nThe players in the area of an Expedition: its level, the ratio last applied to them, and whether they wear the Synced debuff.');

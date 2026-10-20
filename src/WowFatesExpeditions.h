@@ -140,6 +140,7 @@ public:
     void StopAll();
     void List(ChatHandler* handler);
     void ListDefinitions(ChatHandler* handler);
+    void ListSynced(ChatHandler* handler);
     uint32 CountDefinitions() const { return uint32(_defs.size()); }
     uint32 CountSpawns() const { return uint32(_spawns.size()); }
     uint32 CountRewards() const { return uint32(_rewards.size()); }
@@ -192,6 +193,7 @@ private:
     {
         uint32 expedition = 0;
         int64 timer = 0; // ms to the next measure
+        float ratio = 1.0f; // the last one applied
     };
     std::unordered_map<ObjectGuid, SyncState> _synced;
     // Players who left while out of the world (a teleport between maps):

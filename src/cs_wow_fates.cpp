@@ -64,7 +64,8 @@ public:
             { "stop",     HandleStopCommand,     SEC_GAMEMASTER,    Console::Yes },
             { "complete", HandleCompleteCommand, SEC_GAMEMASTER,    Console::Yes },
             { "reload",   HandleReloadCommand,   SEC_ADMINISTRATOR, Console::Yes },
-            { "score",    HandleScoreCommand,    SEC_GAMEMASTER,    Console::No }
+            { "score",    HandleScoreCommand,    SEC_GAMEMASTER,    Console::Yes },
+            { "synced",   HandleSyncedCommand,   SEC_GAMEMASTER,    Console::Yes }
         };
 
         static ChatCommandTable commandTable =
@@ -125,13 +126,24 @@ public:
         return true;
     }
 
-    // The score of the selected player (or yours), without the debuff, against
-    // the reference of a level: the one given, else his Expedition's, else his own.
-    static bool HandleScoreCommand(ChatHandler* handler, Optional<uint8> level)
+    static bool HandleSyncedCommand(ChatHandler* handler)
     {
-        Player* player = handler->getSelectedPlayerOrSelf();
-        if (!player)
-            return false;
+        sWowFatesExpeditionMgr->ListSynced(handler);
+        return true;
+    }
+
+    // The score of a player (named, else the selected one, else you), without
+    // the debuff, against the reference of a level: the one given, else his
+    // Expedition's, else his own.
+    static bool HandleScoreCommand(ChatHandler* handler, Optional<PlayerIdentifier> target, Optional<uint8> level)
+    {
+        Player* player = target ? target->GetConnectedPlayer()
+            : (handler->GetSession() ? handler->getSelectedPlayerOrSelf() : nullptr);
+        if (!player || !player->IsInWorld())
+        {
+            Say(handler, WOW_FATES_STR_CMD_NO_PLAYER);
+            return true;
+        }
 
         uint8 at = level.value_or(0);
         if (!at)

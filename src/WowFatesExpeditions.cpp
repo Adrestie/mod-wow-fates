@@ -777,6 +777,7 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
 
         bool const was = sWowFatesSync->IsSynced(player);
         float const ratio = sWowFatesSync->Apply(player, active->second.def->level);
+        state.ratio = ratio;
         if (!was && ratio < 1.0f && c.syncAnnounce)
             Tell(player, WOW_FATES_STR_SYNCED, uint32(active->second.def->level), uint32(std::lround(ratio * 100.0f)));
     }
@@ -929,6 +930,28 @@ void WowFatesExpeditionMgr::List(ChatHandler* handler)
             int32(active.spawn.x), int32(active.spawn.y), int32(active.spawn.z),
             active.progress, active.def->objectiveCount, uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
             uint32(active.inside.size()), uint32(active.contributors.size())));
+}
+
+// Who is in an area, the ratio last applied and whether he wears the debuff.
+void WowFatesExpeditionMgr::ListSynced(ChatHandler* handler)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    if (_synced.empty())
+    {
+        handler->SendSysMessage(handler->PGetParseModuleString(WOW_FATES_MODULE, WOW_FATES_STR_CMD_SYNCED_NONE));
+        return;
+    }
+
+    for (auto const& [guid, state] : _synced)
+    {
+        Player* player = ObjectAccessor::FindPlayer(guid);
+        auto active = _active.find(state.expedition);
+        handler->SendSysMessage(handler->PGetParseModuleString(WOW_FATES_MODULE, WOW_FATES_STR_CMD_SYNCED_LINE,
+            player ? player->GetName() : guid.ToString(), state.expedition,
+            active != _active.end() ? uint32(active->second.def->level) : 0u, state.ratio,
+            player && sWowFatesSync->IsSynced(player) ? "yes" : "no"));
+    }
 }
 
 void WowFatesExpeditionMgr::ListDefinitions(ChatHandler* handler)
