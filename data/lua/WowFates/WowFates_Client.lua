@@ -75,6 +75,10 @@ local LINGER = 10                           -- seconds the block stays after lea
 local STRIPS = 24                           -- strips across the minimap's diameter
 local MINIMAP_WAIT = 0.05                   -- the minimap is drawn again at most twenty times a second
 local TITLE_COLOR = { 1, 0.55, 0.2 }
+-- The banners' sounds: a boss out or a defence begun, and each wave (the ogres' war drums;
+-- any sound file of the client may take their place)
+local ALERT_SOUND = "Sound\\Interface\\RaidWarning.wav"
+local WAVE_SOUND = "Sound\\Event Sounds\\Event_wardrum_ogre.wav"
 
 -- Minimap diameter in yards by zoom (0 to 5), outdoors and indoors (the client's fixed values)
 local OUTDOOR = { [0] = 466 + 2 / 3, 400, 333 + 1 / 3, 266 + 2 / 3, 200, 133 + 1 / 3 }
@@ -198,7 +202,7 @@ local function onMessage(message)
     elseif command == "invoke" and id then
         track.alert(id, string.format(L.invoke, f[3] or ""))
     elseif command == "wave" and id then
-        track.alert(id, string.format(L.wave, tonumber(f[3]) or 0))
+        track.alert(id, string.format(L.wave, tonumber(f[3]) or 0), WAVE_SOUND)
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -998,10 +1002,10 @@ function track.finish(id, success)
     relayout()
 end
 
--- A boss out, a defence begun, a wave coming: a banner with a raid warning's sound
-function track.alert(id, title)
+-- A boss out, a defence begun: a banner with ALERT_SOUND; a wave coming: WAVE_SOUND
+function track.alert(id, title, sound)
     if track.id ~= id or track.result then return end
-    showBanner(title, track.copy and track.copy.name or "", "Sound\\Interface\\RaidWarning.wav")
+    showBanner(title, track.copy and track.copy.name or "", sound or ALERT_SOUND)
 end
 
 function track.status(id, kills, part, pct)
