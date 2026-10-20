@@ -50,27 +50,27 @@
         },
         {
           "table": "creature_template",
-          "where": "entry BETWEEN 96000 AND 96999"
+          "where": "entry BETWEEN 96000 AND 96399"
         },
         {
           "table": "creature_template_model",
-          "where": "CreatureID BETWEEN 96000 AND 96999"
+          "where": "CreatureID BETWEEN 96000 AND 96399"
         },
         {
           "table": "creature_template_locale",
-          "where": "entry BETWEEN 96000 AND 96999"
+          "where": "entry BETWEEN 96000 AND 96399"
         },
         {
           "table": "smart_scripts",
-          "where": "source_type = 0 AND entryorguid BETWEEN 96000 AND 96999"
+          "where": "source_type = 0 AND entryorguid BETWEEN 96000 AND 96399"
         },
         {
           "table": "gameobject_template",
-          "where": "entry BETWEEN 960000 AND 969999"
+          "where": "entry BETWEEN 960000 AND 963999"
         },
         {
           "table": "gameobject_template_locale",
-          "where": "entry BETWEEN 960000 AND 969999"
+          "where": "entry BETWEEN 960000 AND 963999"
         },
         {
           "table": "updates",

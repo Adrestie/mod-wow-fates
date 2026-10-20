@@ -169,7 +169,7 @@ Every text the players see is in English, French, German, Spanish and Russian.
 
 ## Identifiers
 
-The module uses tranche **96** (96000-96999) of the
+The module uses the blocks **96000-96399** of the
 [WoW-mods registry](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md):
 spells 96000-96003 are the Synced debuff and 96004 the channel of the
 invocations; creatures 96100-96199 are the leaders of the assaults,

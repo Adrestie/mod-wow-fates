@@ -1,7 +1,7 @@
 -- mod-wow-fates — the objects of the Expeditions: what the gatherings ask to
 -- pick up (960000 to 960099) and the altars of the invocations (960100 to
--- 960199). Gameobjects 960000 to 960999 (tranche 96 of ID_RANGES.md: a
--- module's gameobject templates are its tranche times ten).
+-- 960199). Gameobjects 960000 to 960999 (blocks 96000-96399 of ID_RANGES.md: a
+-- module's gameobject templates are its numbers times ten).
 --
 --   960000  Kul Tiras Supply Crate: Kul Tiras Supplies (Durotar, level 7).
 --   960100  Ritual Altar: Harpy Ritual (Durotar, level 8).

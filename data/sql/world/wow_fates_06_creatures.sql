@@ -1,6 +1,6 @@
 -- mod-wow-fates — the creatures of the Expeditions: the leaders of the
 -- assaults (96100 to 96199) and the allies of the defences (96200 to 96299),
--- in tranche 96 of ID_RANGES.md.
+-- in the module's blocks 96000-96399 of ID_RANGES.md.
 --
 --   96100  Defias Ringleader: the leader of the Defias Assault (Elwynn
 --          Forest, level 10 elite), a Defias Bandit made bigger and stronger.

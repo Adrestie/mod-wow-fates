@@ -17,7 +17,7 @@
 
 /*
  * mod-wow-fates — what every part of the module shares: the identifiers
- * (tranche 96 of the WoW-mods registry), the texts of module_string and the
+ * (blocks 96000-96399 of the WoW-mods registry), the texts of module_string and the
  * configuration (conf/mod-wow-fates.conf.dist).
  */
 
