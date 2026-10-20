@@ -23,8 +23,7 @@ ones and rewards for those who take part.
   objective with a progress bar in percent, and the
   rewards the player can expect. It works with the game's own tracker and with
   mod-forever-ui's.
-- **Types of objectives.** Each type has its icon in the centre of its areas
-  on the world map:
+- **Types of objectives.** Each type is named in the map's tooltip:
   - *Extermination*: kill monsters in the area.
   - *Assault and boss*: kill monsters until the bar reaches a set point (70 %
     by default), then their leader appears in the centre with a banner; its

@@ -50,7 +50,7 @@
     id, map, x, y, radius, level, progress, count, seconds left, name,
     objective, tracker line, seconds it waits for players, type of objective (1 extermination,
     2 assault and boss, 3 gathering, 4 defence, 5 invocation, 6 wave support:
-    the map's icon), 1 when players are at it ("in progress" on the map); "del" with id; "enter" and "leave"
+    named in the map's tooltip), 1 when players are at it ("in progress" on the map); "del" with id; "enter" and "leave"
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
     "defend" with id and the ally's name, "invoke" with id and the altar's
@@ -338,19 +338,7 @@ end
 -- WORLD MAP
 -- ---------------------------------------------------------------------------
 
-local world = { textures = {}, icons = {}, hovered = false }
-
--- The icon of each type of objective, in the centre of its areas on the world map:
--- { texture, inset of the texture's border }
-local TYPE_ICON = {
-    [1] = { "Interface\\Icons\\Ability_DualWield", 0.08 },
-    [2] = { "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", 0 },
-    [3] = { "Interface\\Icons\\INV_Crate_01", 0.08 },
-    [4] = { "Interface\\Icons\\INV_Shield_06", 0.08 },
-    [5] = { "Interface\\Icons\\Spell_Arcane_Arcane04", 0.08 },
-    [6] = { "Interface\\Icons\\Ability_Warrior_RallyingCry", 0.08 },
-}
-local ICON_SIZE = 18
+local world = { textures = {}, hovered = false }
 
 local function worldTooltip()
     return WorldMapTooltip or GameTooltip
@@ -387,15 +375,6 @@ local function worldTexture(i)
     return t
 end
 
-local function worldIcon(i)
-    local t = world.icons[i]
-    if not t then
-        t = world.frame:CreateTexture(nil, "OVERLAY")
-        world.icons[i] = t
-    end
-    return t
-end
-
 -- Lays the areas out on the map as it is now, cropped to the view; returns the shown ones, for
 -- the hover test: { e, cx, cy, rw, rh } in the frame's units, y downward
 local placed = {}
@@ -403,7 +382,7 @@ local placed = {}
 local function layoutWorld()
     local f = world.frame
     for k in pairs(placed) do placed[k] = nil end
-    local used, icons = 0, 0
+    local used = 0
     local b = currentBounds()
     local W, H = f:GetWidth(), f:GetHeight()
     local clip = worldClip()
@@ -432,28 +411,12 @@ local function layoutWorld()
                     tex:Show()
                     placed[#placed + 1] = { e = e, cx = cx, cy = cy, rw = rw, rh = rh,
                                             vl = vl, vr = vr, vt = vt, vb = vb }
-                    local icon = TYPE_ICON[e.type or 1]
-                    local half = ICON_SIZE / 2
-                    if icon and cx - half >= vl and cx + half <= vr and cy - half >= vt and cy + half <= vb then
-                        icons = icons + 1
-                        local it = worldIcon(icons)
-                        it:SetTexture(icon[1])
-                        it:SetTexCoord(icon[2], 1 - icon[2], icon[2], 1 - icon[2])
-                        it:ClearAllPoints()
-                        it:SetPoint("CENTER", f, "TOPLEFT", cx, -cy)
-                        it:SetWidth(ICON_SIZE)
-                        it:SetHeight(ICON_SIZE)
-                        it:Show()
-                    end
                 end
             end
         end
     end
     for i = used + 1, #world.textures do
         world.textures[i]:Hide()
-    end
-    for i = icons + 1, #world.icons do
-        world.icons[i]:Hide()
     end
 end
 
