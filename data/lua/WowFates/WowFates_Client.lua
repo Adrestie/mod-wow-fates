@@ -154,6 +154,7 @@ local function onMessage(message)
     local id = tonumber(f[2])
     if command == "reset" then
         for k in pairs(expeditions) do expeditions[k] = nil end
+        for k in pairs(rewards) do rewards[k] = nil end
     elseif command == "set" and #f >= 12 and id then
         expeditions[id] = {
             id = id, map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
@@ -164,6 +165,7 @@ local function onMessage(message)
         track.update(expeditions[id])
     elseif command == "del" and id then
         expeditions[id] = nil
+        rewards[id] = nil
     elseif command == "enter" and id then
         track.enter(id)
     elseif command == "leave" and id then
@@ -490,8 +492,15 @@ end
 -- downward
 local function minimapAreas()
     if WorldMapFrame and WorldMapFrame:IsShown() then
-        -- the map shown may not be the player's: keep the last drawing
-        return mini.kept
+        -- the map shown may not be the player's: keep the last drawing, without the
+        -- Expeditions that ended since
+        local kept = mini.kept
+        if kept then
+            for i = #kept, 1, -1 do
+                if not expeditions[kept[i].e.id] then table.remove(kept, i) end
+            end
+        end
+        return kept
     end
     local list = mini.drawn
     for k in pairs(list) do list[k] = nil end

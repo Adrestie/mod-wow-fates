@@ -379,11 +379,15 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
             Tell(player, WOW_FATES_STR_NOT_ELIGIBLE, name);
     }
 
-    // Its monsters go with it.
+    // Its monsters go with it, alive or dead, in a fight or far away.
     if (map)
         for (ObjectGuid const& guid : active.summons)
             if (Creature* creature = map->GetCreature(guid))
+            {
+                if (creature->IsAlive())
+                    creature->CombatStop(true);
                 creature->DespawnOrUnsummon();
+            }
     active.summons.clear();
 
     for (ObjectGuid const& guid : active.inside)
@@ -953,18 +957,24 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
     if (!def->summonEntry || !def->summonCount || !map)
         return;
 
-    // The living only; a corpse goes away by itself.
+    // Every monster brought is kept in the list, corpses included, so that the
+    // end takes them all away; only those gone from the map (despawned, grid
+    // unloaded) leave it. The living count against summon_count.
     std::erase_if(active.summons, [map](ObjectGuid const& guid)
     {
-        Creature* creature = map->GetCreature(guid);
-        return !creature || !creature->IsAlive();
+        return !map->GetCreature(guid);
     });
+    uint32 const alive = uint32(std::count_if(active.summons.begin(), active.summons.end(), [map](ObjectGuid const& guid)
+    {
+        Creature* creature = map->GetCreature(guid);
+        return creature && creature->IsAlive();
+    }));
 
     // Nobody near: the grid sleeps, no monster is brought.
-    if (active.summons.size() >= def->summonCount || active.summonTimer > 0 || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    if (alive >= def->summonCount || active.summonTimer > 0 || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
 
-    uint32 const wanted = active.filled ? 1 : def->summonCount - uint32(active.summons.size());
+    uint32 const wanted = active.filled ? 1 : def->summonCount - alive;
     for (uint32 i = 0; i < wanted; ++i)
     {
         float const angle = frand(0.0f, 2.0f * float(M_PI));
