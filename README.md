@@ -9,14 +9,18 @@ ones and rewards for those who take part.
 
 - **On the map.** Each active Expedition is an orange area on the world map and
   the minimap, drawn like the quest areas of the modern client. Hovering it
-  shows its name, level, objective, progress, time left and the rewards it
-  gives.
-- **A rotation.** A few Expeditions run at a time, picked at random among those
-  defined in the database, each at one of its spawn points, for a set duration;
-  an Expedition that ended waits a while before it may appear again.
+  shows its name, level, type, objective and the rewards it gives; "In
+  progress: 37 %" while players are at it, "Expires soon" when it is about to
+  go for lack of players. No clock is shown.
+- **Where the players are.** Expeditions appear only in the zones (Elwynn
+  Forest, Durotar...) where there are players: one at least, three at most,
+  picked at random among the zone's. When the last one of a zone ends, another
+  comes at once. One nobody takes up for fifteen minutes goes, and another of
+  the zone takes its place; one players are at never goes by itself. An
+  Expedition that ended waits a while before it may appear again.
 - **A Mythic+ style tracker.** Entering an area shows a banner with a sound, and
-  a block heads the objective tracker: the Expedition's name and level, a large
-  timer over its bar, the objective with a progress bar in percent, and the
+  a block heads the objective tracker: the Expedition's name and level, the
+  objective with a progress bar in percent, and the
   rewards the player can expect. It works with the game's own tracker and with
   mod-forever-ui's.
 - **Types of objectives.** Each type has its icon in the centre of its areas
@@ -123,7 +127,8 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | Setting | Default | |
 |---|---|---|
 | `WowFates.Enable` | 1 | the whole module |
-| `WowFates.Expedition.MaxActive` | 3 | Expeditions running at once |
+| `WowFates.Rotation.MaxPerZone` | 3 | Expeditions at once in a zone with players |
+| `WowFates.Rotation.IdleExpire` | 900 | seconds without activity before an Expedition goes (never while players are at it) |
 | `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |

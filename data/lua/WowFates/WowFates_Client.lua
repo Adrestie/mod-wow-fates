@@ -48,9 +48,9 @@
 
     Messages (addon message "WowFates", from the module): "reset"; "set" with
     id, map, x, y, radius, level, progress, count, seconds left, name,
-    objective, tracker line, duration, type of objective (1 extermination,
+    objective, tracker line, seconds it waits for players, type of objective (1 extermination,
     2 assault and boss, 3 gathering, 4 defence, 5 invocation, 6 wave support:
-    the map's icon); "del" with id; "enter" and "leave"
+    the map's icon), 1 when players are at it ("in progress" on the map); "del" with id; "enter" and "leave"
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
     "defend" with id and the ally's name, "invoke" with id and the altar's
@@ -85,11 +85,11 @@ local INDOOR = { [0] = 300, 240, 180, 120, 80, 50 }
 -- ---------------------------------------------------------------------------
 
 local TEXTS = {
-    enUS = { level = "Expedition, level %d", progress = "%s: %d%%", left = "%d min left", soon = "Ending soon" },
-    frFR = { level = "Expédition, niveau %d", progress = "%s : %d %%", left = "%d min restantes", soon = "Bientôt terminée" },
-    deDE = { level = "Expedition, Stufe %d", progress = "%s: %d %%", left = "Noch %d Min.", soon = "Endet bald" },
-    esES = { level = "Expedición, nivel %d", progress = "%s: %d %%", left = "Quedan %d min", soon = "Termina pronto" },
-    ruRU = { level = "Экспедиция, уровень %d", progress = "%s: %d%%", left = "Осталось %d мин.", soon = "Скоро завершится" },
+    enUS = { level = "Expedition, level %d", inProgress = "In progress: %d%%", soon = "Expires soon" },
+    frFR = { level = "Expédition, niveau %d", inProgress = "En cours : %d %%", soon = "Expire bientôt" },
+    deDE = { level = "Expedition, Stufe %d", inProgress = "Im Gange: %d %%", soon = "Läuft bald ab" },
+    esES = { level = "Expedición, nivel %d", inProgress = "En curso: %d %%", soon = "Expira pronto" },
+    ruRU = { level = "Экспедиция, уровень %d", inProgress = "Выполняется: %d%%", soon = "Скоро исчезнет" },
 }
 local TRACKER_TEXTS = {
     enUS = {
@@ -164,7 +164,7 @@ local function onMessage(message)
             id = id, map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
             level = tonumber(f[7]), progress = tonumber(f[8]), count = tonumber(f[9]),
             ends = GetTime() + (tonumber(f[10]) or 0), name = f[11], objective = f[12],
-            label = f[13], duration = tonumber(f[14]), type = tonumber(f[15]) or 1,
+            label = f[13], duration = tonumber(f[14]), type = tonumber(f[15]) or 1, inProgress = f[16] == "1",
         }
         track.update(expeditions[id])
     elseif command == "del" and id then
@@ -314,13 +314,13 @@ local function tooltipLines(tooltip, e)
     tooltip:AddLine(string.format(L.level, e.level or 0), 1, 0.82, 0)
     if L.types[e.type or 1] then tooltip:AddLine(L.types[e.type or 1], 0.9, 0.9, 0.9) end
     if e.objective and e.objective ~= "" then
-        tooltip:AddLine(string.format(L.progress, e.objective, e.progress or 0), 1, 1, 1, true)
+        tooltip:AddLine(e.objective, 1, 1, 1, true)
     end
-    local left = math.ceil(((e.ends or 0) - GetTime()) / 60)
-    if left >= 1 then
-        tooltip:AddLine(string.format(L.left, left), 0.7, 0.7, 0.7)
-    else
-        tooltip:AddLine(L.soon, 0.7, 0.7, 0.7)
+    -- no clock: who is at it and how far, or that it will soon go for lack of players
+    if e.inProgress then
+        tooltip:AddLine(string.format(L.inProgress, e.progress or 0), 0.1, 1, 0.1)
+    elseif (e.ends or 0) - GetTime() <= 180 then
+        tooltip:AddLine(L.soon, 1, 0.5, 0.25)
     end
     rewardLines(tooltip, rewards[e.id])
 end
@@ -675,14 +675,6 @@ local function text(parent, size, layer, flags)
     return fs
 end
 
-local function clock(seconds)
-    seconds = math.max(0, math.floor(seconds))
-    if seconds >= 3600 then
-        return string.format("%d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
-    end
-    return string.format("%d:%02d", seconds / 60, seconds % 60)
-end
-
 -- What the block shows: the Expedition the player is in, or the one he left or saw end, for
 -- LINGER seconds
 track.id = nil
@@ -887,22 +879,13 @@ local function fillBlock()
     end
 end
 
--- The timer: every frame while shown, without laying the tracker out again
+-- The timer's place: the players do not see how long an Expedition waits for
+-- them; it stays empty
 local function tickBlock()
     local b, e = block, track.copy
     if not (b and e and b:IsShown()) then return end
-    local left = math.max(0, (e.ends or 0) - GetTime())
-    if track.result then left = math.max(0, e.frozen or left) end
-    b.timeLeft:SetText(clock(left))
-    local share = (e.duration and e.duration > 0) and math.min(1, left / e.duration) or 0
-    if share > 0 then
-        b.fill:SetWidth(223 * share)
-        b.fill:SetTexCoord(PIECE.timerFill[1] / SHEET_W, (PIECE.timerFill[1] + 223 * share) / SHEET_W,
-            PIECE.timerFill[2] / SHEET_H, (PIECE.timerFill[2] + PIECE.timerFill[4]) / SHEET_H)
-        b.fill:Show()
-    else
-        b.fill:Hide()
-    end
+    b.timeLeft:SetText("")
+    b.fill:Hide()
 end
 
 local function shown()

@@ -121,7 +121,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.summonCount = f[7].Get<uint32>();
             def.summonRespawn = f[8].Get<uint32>();
             def.radius = std::max(f[9].Get<float>(), 5.0f);
-            def.duration = std::max<uint32>(f[10].Get<uint32>(), 60);
+            def.duration = f[10].Get<uint32>();
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
 
@@ -239,6 +239,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 continue;
             }
 
+            spawn.zone = sMapMgr->GetZoneId(PHASEMASK_NORMAL, spawn.map, spawn.x, spawn.y, spawn.z);
             def->second.spawns.push_back(spawn.id);
             _spawns[spawn.id] = spawn;
         } while (result->NextRow());
@@ -380,8 +381,8 @@ void WowFatesExpeditionMgr::StartLocked(WowFatesExpeditionDef const* def, WowFat
     active = WowFatesActiveExpedition();
     active.def = def;
     active.spawn = *spawn;
-    active.zone = sMapMgr->GetZoneId(PHASEMASK_NORMAL, spawn->map, spawn->x, spawn->y, spawn->z);
-    active.remaining = int64(def->duration) * IN_MILLISECONDS;
+    active.zone = spawn->zone;
+    active.remaining = int64(IdleExpire(def)) * IN_MILLISECONDS;
     _cooldowns.erase(def->id);
     ++_activeCount;
 
@@ -428,13 +429,19 @@ void WowFatesExpeditionMgr::StopAll()
     _active.clear();
 }
 
-void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool success)
+uint32 WowFatesExpeditionMgr::IdleExpire(WowFatesExpeditionDef const* def) const
+{
+    return def->duration ? std::max<uint32>(def->duration, 60) : WowFatesConf().idleExpire;
+}
+
+void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool success, bool expired)
 {
     WowFatesConfig const& c = WowFatesConf();
     Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
 
     LOG_INFO("module", "mod-wow-fates: Expedition {} ends, {} ({} %, {} kills, {} contributors).",
-        active.def->id, success ? "complete" : "failed", uint32(active.progressPct), active.progress, active.contributors.size());
+        active.def->id, success ? "complete" : (expired ? "gone for lack of activity" : "failed"),
+        uint32(active.progressPct), active.progress, active.contributors.size());
 
     BroadcastDel(active.def->id);
 
@@ -446,7 +453,7 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
     for (ObjectGuid const& guid : concerned)
     {
         Player* player = ObjectAccessor::FindPlayer(guid);
-        if (!player)
+        if (!player || expired)
             continue;
 
         // No chat: the client's banner, then, on success, its window of what
@@ -664,17 +671,19 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 // The clients' map
 
 // "set", id, map, x, y, radius, level, progress in percent, 100, seconds left, name,
-// objective, tracker line, duration, type of objective (the map's icon): the
-// texts in the player's language.
+// objective, tracker line, seconds it waits for players, type of objective
+// (the map's icon), 1 when players are at it: the texts in the player's
+// language. The seconds left are not shown, only "expires soon" under three
+// minutes; while players are at it, they do not run.
 std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
-    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
         std::min<uint32>(uint32(active.progressPct), 100), 100u,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
         Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
-        def->duration, uint32(def->objectiveType));
+        IdleExpire(def), uint32(def->objectiveType), active.inProgress ? 1 : 0);
 }
 
 // The objective as the tracker shows it, the count apart: "Kobold Miner slain";
@@ -844,22 +853,46 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             ++itr;
     }
 
-    _rotateTimer -= diff;
-    if (_rotateTimer <= 0)
-    {
-        _rotateTimer = c.spawnInterval;
-        Rotate();
-    }
-
     _areaTimer -= diff;
     bool const areaTick = _areaTimer <= 0;
     if (areaTick)
+    {
         _areaTimer = c.areaInterval;
 
+        // The zones with players, those of the continents only.
+        _populated.clear();
+        for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+            if (player && player->IsInWorld() && player->GetInstanceId() == 0)
+                _populated.insert(player->GetZoneId());
+    }
+
+    // A zone with players and no Expedition gets one at once; one more every
+    // spawn interval, up to MaxPerZone.
+    _rotateTimer -= diff;
+    bool const fill = _rotateTimer <= 0;
+    if (fill)
+        _rotateTimer = c.spawnInterval;
+    if (areaTick || fill)
+        Rotate(fill);
+
     std::vector<std::pair<uint32, bool>> ended;
+    std::vector<uint32> expired;
     for (auto& [id, active] : _active)
     {
-        active.remaining -= diff;
+        // The wait for players: it runs only when nobody is at it, and starts
+        // again with each activity.
+        active.elapsed += diff;
+        bool const recent = active.elapsed - active.lastActivity < 120 * IN_MILLISECONDS && active.lastActivity > 0;
+        bool const inProgress = recent && !active.inside.empty();
+        if (recent)
+            active.remaining = int64(IdleExpire(active.def)) * IN_MILLISECONDS;
+        else
+            active.remaining -= diff;
+        if (inProgress != active.inProgress)
+        {
+            active.inProgress = inProgress;
+            BroadcastSet(active);
+        }
         active.summonTimer -= diff;
         active.gatherTimer -= diff;
         if (active.def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
@@ -890,8 +923,10 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
 
         if (active.progressPct >= 100.0)
             ended.emplace_back(id, true);
-        else if (active.remaining <= 0 || active.failed)
+        else if (active.failed)
             ended.emplace_back(id, false);
+        else if (active.remaining <= 0)
+            expired.push_back(id);
     }
 
     for (auto const& [id, success] : ended)
@@ -900,26 +935,84 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
         Finish(itr->second, success);
         _active.erase(itr);
     }
+    for (uint32 id : expired)
+    {
+        // gone for lack of activity: another takes its place, if the zone has players
+        auto itr = _active.find(id);
+        uint32 const zone = itr->second.zone;
+        Finish(itr->second, false, true);
+        _active.erase(itr);
+        if (_populated.count(zone))
+            StartInZone(zone, true);
+    }
+    // the zones left without one get another at once
+    if (!ended.empty() || !expired.empty())
+        Rotate(false);
 
     UpdateSync(diff);
 }
 
-void WowFatesExpeditionMgr::Rotate()
+// Each zone with players: one Expedition at least, at once, cooldown or not;
+// with fill, one more up to MaxPerZone. The zones without players get none.
+void WowFatesExpeditionMgr::Rotate(bool fill)
 {
     WowFatesConfig const& c = WowFatesConf();
+    if (!c.maxPerZone)
+        return;
 
-    while (_active.size() < c.maxActive)
+    for (uint32 zone : _populated)
     {
+        uint32 const count = uint32(std::count_if(_active.begin(), _active.end(), [zone](auto const& pair)
+        {
+            return pair.second.zone == zone;
+        }));
+        if (!count)
+            StartInZone(zone, true);
+        else if (fill && count < c.maxPerZone)
+            StartInZone(zone, false);
+    }
+}
+
+// One of the zone's Expeditions, picked at random by weight among those out
+// of cooldown (forced: in cooldown too), at one of its points in the zone
+// whose area does not cross an active one's.
+bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
+{
+    auto freePoints = [this, zone](WowFatesExpeditionDef const& def)
+    {
+        std::vector<WowFatesSpawnPoint const*> points;
+        for (uint32 spawnId : def.spawns)
+        {
+            WowFatesSpawnPoint const& spawn = _spawns[spawnId];
+            if (spawn.zone != zone)
+                continue;
+            bool const crosses = std::any_of(_active.begin(), _active.end(), [&spawn, &def](auto const& pair)
+            {
+                WowFatesActiveExpedition const& other = pair.second;
+                return other.spawn.map == spawn.map
+                    && std::hypot(other.spawn.x - spawn.x, other.spawn.y - spawn.y) < other.def->radius + def.radius;
+            });
+            if (!crosses)
+                points.push_back(&spawn);
+        }
+        return points;
+    };
+
+    for (bool const ignoreCooldown : { false, true })
+    {
+        if (ignoreCooldown && !force)
+            return false;
+
         std::vector<WowFatesExpeditionDef const*> candidates;
         uint64 totalWeight = 0;
         for (auto const& [id, def] : _defs)
-            if (def.weight && !def.spawns.empty() && !_active.count(id) && !_cooldowns.count(id))
+            if (def.weight && !_active.count(id) && (ignoreCooldown || !_cooldowns.count(id)) && !freePoints(def).empty())
             {
                 candidates.push_back(&def);
                 totalWeight += def.weight;
             }
         if (candidates.empty())
-            return;
+            continue;
 
         uint64 roll = urand(0, uint32(std::min<uint64>(totalWeight, 0xFFFFFFFF) - 1));
         WowFatesExpeditionDef const* chosen = candidates.back();
@@ -933,9 +1026,10 @@ void WowFatesExpeditionMgr::Rotate()
             roll -= def->weight;
         }
 
-        uint32 const spawnId = Acore::Containers::SelectRandomContainerElement(chosen->spawns);
-        StartLocked(chosen, &_spawns[spawnId]);
+        StartLocked(chosen, Acore::Containers::SelectRandomContainerElement(freePoints(*chosen)));
+        return true;
     }
+    return false;
 }
 
 void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* map)
@@ -1125,7 +1219,7 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
     // Expedition's own. The area is never empty: under MinAlivePct of
     // summon_count alive, the missing ones come at once, at random points.
     WowFatesConfig const& c = WowFatesConf();
-    int64 const now = int64(def->duration) * IN_MILLISECONDS - active.remaining;
+    int64 const now = active.elapsed;
     while (!active.killTimes.empty() && active.killTimes.front() < now - int64(c.adaptiveWindow))
         active.killTimes.pop_front();
     float const pace = c.adaptiveSpawn ? float(active.killTimes.size()) * IN_MILLISECONDS / float(c.adaptiveWindow) : 0.0f;
@@ -1315,6 +1409,7 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
         ++active.progress;
         active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
         ++active.contributors[player->GetGUID()].picks;
+        Active(active);
         if (active.gatherTimer <= 0)
             active.gatherTimer = int64(active.def->gatherRespawn) * IN_MILLISECONDS;
         return;
@@ -1543,6 +1638,7 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
         }
         channeling.push_back(player);
         active.contributors[player->GetGUID()].channel += diff;
+        Active(active);
         ++itr;
     }
 
@@ -1675,7 +1771,10 @@ void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32 damage
 
     std::lock_guard<std::recursive_mutex> guard(_lock);
     if (WowFatesActiveExpedition* active = FindAt(victim))
+    {
         active->contributors[player->GetGUID()].damage += damage;
+        Active(*active);
+    }
 }
 
 void WowFatesExpeditionMgr::OnHeal(Unit* healer, Unit* target, uint32 gain)
@@ -1692,7 +1791,10 @@ void WowFatesExpeditionMgr::OnHeal(Unit* healer, Unit* target, uint32 gain)
     if (WowFatesActiveExpedition* active = FindAt(target))
         if (IsFromPlayer(target) || target->GetGUID() == active->ally
             || std::find(active->allies.begin(), active->allies.end(), target->GetGUID()) != active->allies.end())
+        {
             active->contributors[player->GetGUID()].healing += gain;
+            Active(*active);
+        }
 }
 
 void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
@@ -1712,6 +1814,7 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     if (!active)
         return;
     WowFatesExpeditionDef const* def = active->def;
+    Active(*active);
 
     // The leader of an assault: the end of the bar.
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active->bossOut && creature->GetGUID() == active->boss)
@@ -1726,7 +1829,7 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     if (def->objectiveType >= WOW_FATES_OBJECTIVE_GATHER)
     {
         ++active->contributors[player->GetGUID()].kills;
-        active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);
+        active->killTimes.push_back(active->elapsed);
         return;
     }
 
@@ -1746,7 +1849,7 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     else
         active->progressPct = std::min(100.0, active->progressPct + 100.0 / Needed(*active));
     ++active->contributors[player->GetGUID()].kills;
-    active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);
+    active->killTimes.push_back(active->elapsed);
 }
 
 // The kills the objective asks for, with the players in the area now.

@@ -20,11 +20,12 @@
  *
  * An Expedition is defined in mod_wow_fates_expedition (world database), with
  * the points where it may appear (mod_wow_fates_spawn) and the rewards by
- * level of the player (mod_wow_fates_reward). The manager keeps up to
- * WowFates.Expedition.MaxActive of them running: it picks one at random
- * (weighted, out of cooldown), at one of its points, for its duration. The
- * area of an Expedition is a circle around its point; whoever stands in it is
- * synced to its level.
+ * level of the player (mod_wow_fates_reward). Only the zones with players
+ * have Expeditions: one at least, WowFates.Rotation.MaxPerZone at most, each
+ * picked at random among the zone's (weighted, out of cooldown), at one of
+ * its points in the zone. One with no activity for WowFates.Rotation.
+ * IdleExpire goes, never while players are at it. The area of an Expedition
+ * is a circle around its point; whoever stands in it is synced to its level.
  *
  * Objectives, by type:
  *   1 kill: a number of monsters in the area (one entry, or any);
@@ -103,7 +104,7 @@ struct WowFatesExpeditionDef
     uint32 summonCount = 0;                            // alive at once
     uint32 summonRespawn = 10;                         // s between two summons
     float radius = 60.0f;
-    uint32 duration = 900;                             // s
+    uint32 duration = 0;                               // s without activity before it goes, 0 = WowFates.Rotation.IdleExpire
     uint32 cooldown = 0;                               // s, 0 = WowFates.Expedition.Cooldown
     uint32 weight = 1;                                 // 0 = only by command
     // mod_wow_fates_objective, by type
@@ -129,6 +130,7 @@ struct WowFatesSpawnPoint
     uint32 expedition = 0;
     uint32 map = 0;
     float x = 0.0f, y = 0.0f, z = 0.0f, o = 0.0f;
+    uint32 zone = 0;   // the game's zone (AreaTable), read at loading
 };
 
 // How much a player took part, from his damage and healing against the
@@ -167,7 +169,10 @@ struct WowFatesActiveExpedition
     WowFatesExpeditionDef const* def = nullptr;
     WowFatesSpawnPoint spawn;
     uint32 zone = 0;
-    int64 remaining = 0;        // ms
+    int64 remaining = 0;        // ms before it goes for lack of activity
+    int64 elapsed = 0;          // ms since its start
+    int64 lastActivity = 0;     // ms since its start, of the last kill, blow, heal, object, channel
+    bool inProgress = false;    // players at it: in the area, active lately (the map's "in progress")
     uint32 progress = 0;        // kills counted, for the GM commands
     double progressPct = 0.0;   // what the players see: 100 completes it
     uint8 announcedQuarter = 0; // quarters of the objective already announced
@@ -256,7 +261,11 @@ private:
     WowFatesActiveExpedition* FindAt(Unit const* unit);
     bool Inside(WowFatesActiveExpedition const& active, Unit const* unit, float rangeFactor = 1.0f) const;
     void StartLocked(WowFatesExpeditionDef const* def, WowFatesSpawnPoint const* spawn);
-    void Rotate();
+    void Rotate(bool fill);
+    bool StartInZone(uint32 zone, bool force);
+    uint32 IdleExpire(WowFatesExpeditionDef const* def) const;
+    int64 Elapsed(WowFatesActiveExpedition const& active) const { return active.elapsed; }
+    void Active(WowFatesActiveExpedition& active) { active.lastActivity = active.elapsed; }
     void UpdateArea(WowFatesActiveExpedition& active, Map* map);
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
@@ -275,7 +284,8 @@ private:
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;
     double Needed(WowFatesActiveExpedition const& active) const;
-    void Finish(WowFatesActiveExpedition& active, bool success);
+    // Ended: success, failure, or gone for lack of activity (quietly).
+    void Finish(WowFatesActiveExpedition& active, bool success, bool expired = false);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
     void Leave(ObjectGuid guid, bool announce);
@@ -310,6 +320,7 @@ private:
     std::unordered_set<ObjectGuid> _pendingUnsync;
     std::atomic<uint32> _activeCount{0};
 
+    std::unordered_set<uint32> _populated; // zones with players, at the last look
     int64 _rotateTimer = 0;
     int64 _areaTimer = 0;
 };

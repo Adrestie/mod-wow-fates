@@ -122,12 +122,25 @@ WowFates.Reference.Factor               = 1.0
 #    points (mod_wow_fates_spawn), their rewards (mod_wow_fates_reward).
 #    `.fates reload` reads them again.
 #
-#    WowFates.Expedition.MaxActive
-#        Expeditions running at once, picked at random by their weight among
-#        those out of cooldown. 0 = none but those started by `.fates start`.
+#    Expeditions appear only in the zones (Elwynn Forest, Durotar...) where
+#    there are players, picked at random by their weight among those of the
+#    zone out of cooldown. A zone with players always has one: when its last
+#    one ends, another of the zone comes at once, out of cooldown or not.
+#
+#    WowFates.Rotation.MaxPerZone
+#        Expeditions at once in a zone with players. 0 = none but those
+#        started by `.fates start`.
+#
+#    WowFates.Rotation.IdleExpire
+#        Seconds an Expedition waits for players: with no activity for that
+#        long (no kill, damage, healing, object, channel), it goes and another
+#        of the zone takes its place if the zone has players. Activity starts
+#        the wait again; it never goes while players are at it. An
+#        Expedition's own `duration` replaces it. 60 at least.
 #
 #    WowFates.Expedition.SpawnInterval
-#        Seconds between two looks for a free slot.
+#        Seconds between two more Expeditions in a zone with players, up to
+#        MaxPerZone.
 #
 #    WowFates.Expedition.Cooldown
 #        Seconds an Expedition waits, once ended, before it may appear again,
@@ -138,7 +151,8 @@ WowFates.Reference.Factor               = 1.0
 #        leaving, monsters to bring back). 200 at least.
 #
 
-WowFates.Expedition.MaxActive           = 3
+WowFates.Rotation.MaxPerZone            = 3
+WowFates.Rotation.IdleExpire            = 900
 WowFates.Expedition.SpawnInterval       = 60
 WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000

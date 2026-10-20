@@ -31,14 +31,14 @@
 
 DELETE FROM `mod_wow_fates_expedition` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`, `objective_entry`, `objective_count`, `summon_entry`, `summon_count`, `summon_respawn`, `radius`, `duration`, `cooldown`, `weight`, `enabled`, `comment`) VALUES
-(1, 'Kobold Uprising',  7, 1,    40, 15,    40, 6, 15, 45, 900, 0, 1, 1, 'Elwynn Forest: Kobold Miner'),
-(2, 'Razormane Raid',   8, 1,  3111, 15,  3111, 6, 15, 50, 900, 0, 1, 1, 'Durotar: Razormane Quilboar'),
-(3, 'Restless Dead',   80, 1, 31812, 25, 31812, 8, 10, 50, 900, 0, 1, 1, 'Icecrown: Decomposed Ghoul'),
-(4, 'Defias Assault',  10, 2,   116, 12,   116, 6, 15, 45, 900, 0, 1, 1, 'Elwynn Forest: Defias Bandit, then the Defias Ringleader'),
-(5, 'Kul Tiras Supplies', 7, 3,   0, 12,  3129, 5, 20, 40, 900, 0, 1, 1, 'Durotar: Kul Tiras Supply Crate, guarded by Kul Tiras Marines'),
-(6, 'Riverpaw Raid',   10, 4,     0,  1,   478, 0, 15, 40, 900, 0, 1, 1, 'Elwynn Forest: the Westbrook Sentinel against waves of Riverpaw Outrunners'),
-(7, 'Harpy Ritual',     8, 5,     0,  1,  3116, 0, 15, 40, 900, 0, 1, 1, 'Durotar: channel at the Ritual Altar against waves of Dustwind Pillagers'),
-(8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40, 900, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards');
+(1, 'Kobold Uprising',  7, 1,    40, 15,    40, 6, 15, 45,   0, 0, 1, 1, 'Elwynn Forest: Kobold Miner'),
+(2, 'Razormane Raid',   8, 1,  3111, 15,  3111, 6, 15, 50,   0, 0, 1, 1, 'Durotar: Razormane Quilboar'),
+(3, 'Restless Dead',   80, 1, 31812, 25, 31812, 8, 10, 50,   0, 0, 1, 1, 'Icecrown: Decomposed Ghoul'),
+(4, 'Defias Assault',  10, 2,   116, 12,   116, 6, 15, 45,   0, 0, 1, 1, 'Elwynn Forest: Defias Bandit, then the Defias Ringleader'),
+(5, 'Kul Tiras Supplies', 7, 3,   0, 12,  3129, 5, 20, 40,   0, 0, 1, 1, 'Durotar: Kul Tiras Supply Crate, guarded by Kul Tiras Marines'),
+(6, 'Riverpaw Raid',   10, 4,     0,  1,   478, 0, 15, 40,   0, 0, 1, 1, 'Elwynn Forest: the Westbrook Sentinel against waves of Riverpaw Outrunners'),
+(7, 'Harpy Ritual',     8, 5,     0,  1,  3116, 0, 15, 40,   0, 0, 1, 1, 'Durotar: channel at the Ritual Altar against waves of Dustwind Pillagers'),
+(8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40,   0, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,

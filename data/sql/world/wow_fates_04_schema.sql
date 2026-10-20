@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `summon_count` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'of them alive at once',
   `summon_respawn` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'seconds between two of them',
   `radius` FLOAT NOT NULL DEFAULT 60 COMMENT 'yards around the spawn point',
-  `duration` INT UNSIGNED NOT NULL DEFAULT 900 COMMENT 'seconds to complete it',
+  `duration` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'seconds without activity before it goes (never while players are at it); 0 = WowFates.Rotation.IdleExpire',
   `cooldown` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'seconds before it may appear again; 0 = WowFates.Expedition.Cooldown',
   `weight` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'chance in the rotation; 0 = only by .fates start',
   `enabled` TINYINT UNSIGNED NOT NULL DEFAULT 1,
