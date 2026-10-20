@@ -1,138 +1,136 @@
 # mod-wow-fates
-AzerothCore mod for dynamic map events
 
-# L'idée
-des évenements scriptés dit "Expeditions" apparaissent à des points spécifiques de la carte.
-différents objectifs (tuer des monstres, ramasser des objets, accompagner un PNJ qui doit survivre à des attaques de monstres, etc.)
-des récompenses en fonction du niveau du personnage
-pour éviter que les personnages de haut niveau farment facilement des Expéditions pour avoir des récompensent de haut niveau simplement, il faut mettre un scaling négatif temporaire si un joueur dépasse le niveau de l'Expedition. Ex : un niveau 80 arrive sur une Expédition de niveau 10 -> réduction de X% des statistiques
+An AzerothCore module (WoW 3.3.5a) that brings **Expeditions** to the open
+world: timed events that appear at chosen places of the map, open to every
+player passing by, with a Mythic+ style tracker, level sync for the stronger
+ones and rewards for those who take part.
 
-Les Expéditions doivent être affichées sur la carte
-Un joueur doit participer activement à une Expedition pour prétendre à la récompense (se tenir sur le lieux ne suffit pas)
+## What are Expeditions
 
-# Synchronisation de niveau : le debuff « Synchronisé » (« Synced »)
+- **On the map.** Each active Expedition is an orange area on the world map and
+  the minimap, drawn like the quest areas of the modern client. Hovering it
+  shows its name, level, objective, progress, time left and the rewards it
+  gives.
+- **A rotation.** A few Expeditions run at a time, picked at random among those
+  defined in the database, each at one of its spawn points, for a set duration;
+  an Expedition that ended waits a while before it may appear again.
+- **A Mythic+ style tracker.** Entering an area shows a banner with a sound, and
+  a block heads the objective tracker: the Expedition's name and level, a large
+  timer over its bar, the objective with a progress bar in percent, and the
+  rewards the player can expect. It works with the game's own tracker and with
+  mod-forever-ui's.
+- **An objective that grows with the crowd.** Players see a percentage, never a
+  count: the more players in the area, the more work each percent takes.
+- **Monsters that keep up.** An Expedition brings its own monsters. The faster
+  the area is cleared, the faster and the more of them come back, and the area
+  is never left empty.
+- **What you won.** When an Expedition is completed, a window at the top of the
+  screen shows what the player earned (items with their icons, money,
+  experience) for five seconds.
+- **Quiet.** The module writes nothing in the chat; banners, the tracker and the
+  end window say everything.
 
-Lorsqu'un joueur trop puissant participe à une Expédition, il reçoit le debuff **Synchronisé**, qui ramène sa puissance au niveau prévu pour l'Expédition.
+## Synced
 
-## Score de puissance
+A level 80 should not breeze through a level 7 Expedition. Whoever stands in an
+Expedition's area while above its level, or stronger than a character of that
+level would be, gets the **Synced** debuff (its icon shows the level):
 
-La puissance d'un personnage est mesurée par un **score de puissance** : la somme de ses statistiques principales et de ses scores de statistiques secondaires, lus en direct sur le personnage.
+- the player's power is measured live from his stats, ratings and attack or
+  spell power, so gear, buffs and the bonuses of other modules all count;
+- stats, ratings and armor are cut to match a character of the Expedition's
+  level;
+- maximum health and mana are brought to those of a character of his race and
+  class at that level;
+- damage and healing done are cut by the difference of level.
 
-Le serveur comporte beaucoup de sources de puissance qui viennent d'auras, donc l'équipement pèsera de moins en moins dans la puissance d'un personnage. Lire les statistiques réelles prend en compte automatiquement l'équipement, les auras, les buffs et les bonus des autres mods.
+The debuff's tooltip gives the level and the share of power kept. It comes off
+when the player leaves the area or the Expedition ends.
 
-## Calcul
+## Rewards
 
-- **Score du joueur** : mesuré quand le joueur entre dans l'Expédition, sans tenir compte du debuff Synchronisé lui-même.
-- **Score de référence** : le score attendu d'un personnage au niveau de l'Expédition, calculé à partir des statistiques de base par niveau et de la courbe de gain de puissance des objets héritages (`ScalingStatValues.dbc`). Cette courbe est extrapolée jusqu'au niveau d'objet 300.
-- **Ratio** = score de référence / score du joueur. Si le ratio est inférieur à 1, Synchronisé réduit les statistiques du personnage de ce ratio.
+Rewards are set by level of the player: money, experience and items, from rows
+that apply to every Expedition and rows of a given Expedition. A player is
+rewarded only if he took an active part: standing in the area earns nothing,
+and the more he did compared to the others, the more of the rewards he gets
+(alone, a player gets them all). Some rewards can be **hidden**: they show as a
+red question mark ("???") on the map and in the tracker until they are won.
 
-## Points à régler
+Items go to the bags, or by mail when the bags are full.
 
-1. **Pondération** : un point d'Endurance ne vaut pas un point de score de critique. Il faut pondérer les statistiques, par exemple en comptant les secondaires à 0,5, pour ne pas favoriser les classes à forte Endurance.
-2. **Puissance d'attaque et puissance des sorts** : elles ne sont ni des statistiques principales ni des scores secondaires. Il faut les inclure si les auras du serveur en donnent beaucoup.
-3. **Auras en pourcentage** : un bonus de type « +10 % de dégâts » ne change aucune statistique, donc le score ne le voit pas. Synchronisé doit aussi réduire les dégâts et les soins infligés, pas seulement les statistiques.
-4. **Recalcul** : le score doit être recalculé quand le joueur gagne un buff pendant l'Expédition, à chaque nouvelle aura ou à intervalle régulier.
+## Requirements
 
-## Affichage
+- AzerothCore 3.3.5a with this module compiled in.
+- ALE (Lua engine) with AIO: the client code of the map, the tracker and the
+  windows is sent by AIO.
+- A client patch, written by the WoW-mods installer into `patch-Z.MPQ`: the
+  Synced debuff (`Spell.dbc`) and the textures of the areas and the tracker
+  (`Interface\WowFates\`). mod-forever-ui is optional.
 
-Le debuff est appliqué à l'entrée dans la zone de l'Expédition et retiré à la sortie ou à la fin de l'Expédition. Son infobulle indique le niveau de synchronisation (« Synchronisé niveau X »).
+## Installation
 
-# État : jalon 1
+With the [WoW-mods installer](https://github.com/Adrestie/WoW-mods-installer):
+it copies the module into the server's sources, its configuration and Lua
+scripts, and writes the client patch. Then rebuild the worldserver (reconfigure
+CMake first) and start it: the module's SQL is applied by the core updater.
 
-> **Jalon 1, pas encore testé en jeu.** Le debuff Synchronisé, le gestionnaire
-> d'Expéditions (apparition, durée, rotation), l'objectif « tuer N monstres »,
-> la participation active, les récompenses par niveau et l'affichage des zones
-> sur la carte et la minicarte sont écrits. Les objectifs collecte et escorte
-> viendront ensuite.
+By hand: copy the module into `modules/`, copy `data/lua/WowFates` into the
+ALE scripts folder, copy `conf/mod-wow-fates.conf.dist` to `configs/modules/`
+as `mod-wow-fates.conf`, rebuild, and add the client patch with the installer.
 
-Le module prend la tranche **96** (96000-96999) du
-[registre WoW-mods](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md) :
-les sorts 96000-96003 sont le debuff Synchronisé. Côté client, posés par
-l'installeur WoW-mods : l'aura 96000 (nom, icône, infobulle) dans `Spell.dbc`
-et la texture des zones (`Interface\WowFates\Area.blp`) ; le code de la carte
-arrive par AIO.
+Three example Expeditions come with it: Kobold Uprising (Elwynn Forest,
+level 7), Razormane Raid (Durotar, level 8) and Restless Dead (Icecrown,
+level 80). Expeditions, spawn points and rewards live in the world database
+(`mod_wow_fates_expedition`, `mod_wow_fates_expedition_locale`,
+`mod_wow_fates_spawn`, `mod_wow_fates_reward`); give your own ids 100 and up.
 
-## Synchronisé
+## Configuration
 
-| Sort | Visible | Effets |
+`conf/mod-wow-fates.conf.dist` documents every setting. The main ones:
+
+| Setting | Default | |
 |---|---|---|
-| 96000 | oui, ses charges indiquent le niveau | toutes les caractéristiques %, dégâts infligés %, soins prodigués % |
-| 96001 | non | scores de toucher, de critique, de hâte |
-| 96002 | non | score de défense, d'esquive et de parade, d'expertise et de pénétration d'armure |
-| 96003 | non | points de vie maximum %, armure %, mana maximum % |
+| `WowFates.Enable` | 1 | the whole module |
+| `WowFates.Expedition.MaxActive` | 3 | Expeditions running at once |
+| `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
+| `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
+| `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
+| `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |
+| `WowFates.Expedition.MaxPopulation` | 3.0 | most monsters at once, times the Expedition's number |
+| `WowFates.Expedition.MinAlivePct` | 50 | under this share alive, the area is filled up at once |
+| `WowFates.Synced.Enable` | 1 | the Synced debuff |
+| `WowFates.Synced.Interval` | 5 | seconds between two measures of a synced player |
+| `WowFates.Synced.PoolBonus` | 1.15 | health and mana kept, times those of a character of the level |
+| `WowFates.Synced.DamageLevelExponent` | 1.0 | how hard the level difference cuts damage |
+| `WowFates.Reference.Curve` | 1:100 … 80:3400 | the power of a geared character, by level |
+| `WowFates.Reward.LightPct` / `MediumPct` | 33 / 66 | share of the rewards for a smaller part |
+| `WowFates.Reward.LevelMargin` | -1 | caps the reward level above the Expedition's (-1: off) |
 
-Toutes les valeurs sont posées par le module. Pour mesurer le joueur sans le
-debuff, ses valeurs sont remises à 0, les statistiques lues, puis les nouvelles
-valeurs posées, dans le même tick : le client ne voit que le résultat.
+`.reload config` applies them.
 
-- **Score de puissance** : caractéristiques principales × 1 + scores
-  secondaires × 0,5 (toucher, critique et hâte comptés une fois pour mêlée,
-  distance et sorts) + puissance d'attaque venue de l'équipement et des auras
-  (pas celle des caractéristiques, déjà comptées) ou puissance des sorts × 0,5.
-- **Score de référence** : le score d'un personnage équipé pour son niveau,
-  une courbe par niveau (`WowFates.Reference.Curve`) tirée du score médian des
-  bots du royaume test à leur propre niveau.
-- **Synchronisé** dès que le joueur est au-dessus du niveau de l'Expédition ou
-  de la référence. Chaque grandeur vise sa valeur au niveau de l'Expédition :
-  caractéristiques, scores et armure coupés du ratio référence / score ; PV et
-  mana max ramenés à ceux d'un personnage de sa race et de sa classe à ce
-  niveau (PV et mana de base du niveau, plus l'endurance et l'intelligence de
-  référence : un 80 dans une Expédition de niveau 7 garde environ 190 PV) ;
-  dégâts et soins coupés au plus bas du ratio et de la part du niveau (dégâts
-  de base des créatures à ce niveau sur ceux du sien, à une puissance réglable).
-- Mesure à l'entrée dans la zone puis toutes les 5 s ; retiré à la sortie, à la
-  fin de l'Expédition, à la déconnexion.
+## GM commands
 
-## Expéditions
-
-Tables du monde (`data/sql/world/wow_fates_04_schema.sql`) :
-
-| Table | Contenu |
+| Command | |
 |---|---|
-| `mod_wow_fates_expedition` | niveau, objectif (type 1 : tuer `objective_count` monstres, `objective_entry` ou n'importe lesquels), monstres amenés (`summon_*`), rayon, durée, temps de recharge, poids dans la rotation |
-| `mod_wow_fates_expedition_locale` | nom dans les autres langues |
-| `mod_wow_fates_spawn` | points d'apparition (continents seulement), un tiré au hasard |
-| `mod_wow_fates_reward` | récompenses par niveau du joueur : argent, expérience, objet (par courrier si les sacs sont pleins) ; les lignes de l'Expédition, sinon celles de l'Expédition 0 |
+| `.fates list` | the active Expeditions: where, progress, time left, players inside |
+| `.fates defs` | every Expedition loaded, ready or cooling down |
+| `.fates start $id [$spawn]` | starts an Expedition now |
+| `.fates stop $id` | ends it without rewards |
+| `.fates complete $id` | ends it as completed, rewards given |
+| `.fates reload` | reloads the Expeditions from the database |
+| `.fates score [$player] [$level]` | a player's power against the reference of a level |
+| `.fates synced` | the players in an area and their Synced state |
 
-Trois exemples (`wow_fates_05_examples.sql`, identifiants 1 à 99 réservés au
-module) : Soulèvement kobold (forêt d'Elwynn, niveau 7), Raid tranchecrin
-(Durotar, niveau 8), Morts sans repos (Couronne de glace, niveau 80).
+## Localization
 
-**Participation active** : un joueur est récompensé s'il est près de
-l'Expédition à la fin et a fait au moins un kill, ou des dégâts dans la zone et
-des soins sur des joueurs en combat dans la zone valant au moins 25 % de la
-contribution moyenne. Rester sur place ne rapporte rien.
+Every text the players see is in English, French, German, Spanish and Russian.
 
-## Carte et minicarte
+## Identifiers
 
-La zone de chaque Expédition active (un cercle : centre et rayon) est dessinée
-sur la carte du monde et sur la minicarte, comme les zones des quêtes suivies
-de mod-forever-ui, mais en orange : la texture des zones de quête du jeu
-(`UI-QuestBlob-Inside` et `-Outside`, mêmes transparences), rouge et bleu
-échangés (`Interface\WowFates\Area`, `tools/gen_client_data.py`). Au survol :
-nom, niveau, objectif et progression, temps restant, dans les 5 langues.
+The module uses tranche **96** (96000-96999) of the
+[WoW-mods registry](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md):
+spells 96000-96003 are the Synced debuff.
 
-- Le serveur envoie la liste au client (message addon `WowFates`) à la
-  connexion, au changement de zone et quand le client la demande, puis chaque
-  apparition, progression et fin à tous les joueurs. Nom et objectif dans la
-  langue du joueur.
-- Le code client (`data/lua/WowFates`, envoyé par AIO) marche avec
-  l'interface d'origine comme avec mod-forever-ui, dont il suit le zoom de la
-  carte. Sur la minicarte, découpée en bandes comme chez mod-forever-ui (rien
-  ne découpe en cercle en 3.3.5), la zone suit aussi la rotation.
-- Les positions : `WowFates_Bounds_Client.lua`, les bords de chaque carte tirés
-  de `WorldMapArea.dbc`.
+## License
 
-## Commandes (MJ)
-
-| Commande | Effet |
-|---|---|
-| `.fates list` | Expéditions actives |
-| `.fates defs` | Expéditions chargées |
-| `.fates start $id [$point]` | lance une Expédition |
-| `.fates stop $id` | l'arrête, sans récompense |
-| `.fates complete $id` | l'accomplit, récompenses données |
-| `.fates reload` | recharge les tables (arrête les Expéditions actives) |
-| `.fates score [$niveau]` | score du joueur ciblé, référence, ratio |
-
-Réglages : `conf/mod-wow-fates.conf.dist`.
+GNU General Public License v2 or later.
