@@ -35,7 +35,12 @@
  *     they are taken; a click counts, nothing goes in the bags;
  *   4 defence: an ally in the centre holds out for hold_time seconds against
  *     waves of monsters from the edge of the area; the bar is the time held,
- *     the Expedition fails when the ally dies.
+ *     the Expedition fails when the ally dies;
+ *   5 invocation: players channel at an altar in the centre while waves come
+ *     at them; the bar fills while someone channels and never goes back;
+ *   6 wave support: allies in the centre push back wave_count waves, one
+ *     after the other; the bar is the waves pushed back, the Expedition fails
+ *     when every ally is dead.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -75,8 +80,15 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_KILL    = 1,
     WOW_FATES_OBJECTIVE_ASSAULT = 2, // kills, then a boss
     WOW_FATES_OBJECTIVE_GATHER  = 3, // objects to pick up
-    WOW_FATES_OBJECTIVE_DEFENCE = 4  // an ally to keep alive against waves
+    WOW_FATES_OBJECTIVE_DEFENCE = 4, // an ally to keep alive against waves
+    WOW_FATES_OBJECTIVE_INVOKE  = 5, // channel at an altar against waves
+    WOW_FATES_OBJECTIVE_SUPPORT = 6  // allies pushing back a number of waves
 };
+
+// The channel of an invocation: Quillboar Channeling, a self channel of the
+// game with no effect but its look, no script on it.
+constexpr uint32 WOW_FATES_CHANNEL_SPELL = 7083;
+constexpr float WOW_FATES_CHANNEL_RANGE = 6.0f; // yards from the altar
 
 struct WowFatesExpeditionDef
 {
@@ -105,6 +117,9 @@ struct WowFatesExpeditionDef
     uint32 waveInterval = 40;                          // waves: s between two
     uint32 waveSize = 3;                               // waves: monsters of the first, for one player
     uint32 waveGrowth = 1;                             // waves: more in each next one
+    uint32 channelEntry = 0;                           // invocation: the altar (gameobject)
+    uint32 allyCount = 1;                              // wave support: allies in the centre
+    uint32 waveCount = 5;                              // wave support: waves to push back
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -144,6 +159,7 @@ struct WowFatesContribution
     uint64 healing = 0;
     uint32 kills = 0;
     uint32 picks = 0;     // objects gathered
+    int64 channel = 0;    // ms channeled at an invocation's altar
 };
 
 struct WowFatesActiveExpedition
@@ -183,6 +199,15 @@ struct WowFatesActiveExpedition
     int64 waveTimer = 0;        // ms before the next wave
     uint32 wave = 0;            // waves sent
     bool failed = false;        // the ally died
+
+    // Invocation
+    ObjectGuid altar;
+    std::unordered_set<ObjectGuid> channelers;
+
+    // Wave support
+    std::vector<ObjectGuid> allies;
+    std::vector<ObjectGuid> waveMobs; // the wave on its way
+    uint32 repelled = 0;        // waves pushed back
 };
 
 class WowFatesExpeditionMgr
@@ -214,6 +239,8 @@ public:
     void OnDeath(Unit* victim, Unit* killer);
     // A gathering's object used, from its map's thread.
     void OnGather(Player* player, GameObject* go);
+    // An invocation's altar used, from its map's thread.
+    void OnChannel(Player* player, GameObject* go);
 
     void OnLogout(Player* player);
 
@@ -238,8 +265,12 @@ private:
     void SpawnBoss(WowFatesActiveExpedition& active, Map* map);
     void UpdateGather(WowFatesActiveExpedition& active, Map* map);
     void UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff);
-    Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map);
-    void SendWave(WowFatesActiveExpedition& active, Map* map, Creature* target);
+    Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map, Position const& pos);
+    void SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target);
+    bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);
+    Position Centre(WowFatesActiveExpedition const& active, Map* map, float spread = 0.0f) const;
+    void UpdateInvoke(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;

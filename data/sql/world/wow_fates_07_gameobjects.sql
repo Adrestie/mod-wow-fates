@@ -1,12 +1,15 @@
 -- mod-wow-fates — the objects of the Expeditions: what the gatherings ask to
--- pick up. Gameobjects 960000 to 960999 (tranche 96 of ID_RANGES.md: a
+-- pick up (960000 to 960099) and the altars of the invocations (960100 to
+-- 960199). Gameobjects 960000 to 960999 (tranche 96 of ID_RANGES.md: a
 -- module's gameobject templates are its tranche times ten).
 --
 --   960000  Kul Tiras Supply Crate: Kul Tiras Supplies (Durotar, level 7).
+--   960100  Ritual Altar: Harpy Ritual (Durotar, level 8).
 --
--- Each is a goober (type 10, consumable) whose ScriptName go_wow_fates_gather
--- hands the click to the module: it counts for the Expedition and the object
--- goes; nothing is looted, nothing goes in the bags.
+-- Each is a goober (type 10) whose ScriptName hands the click to the module:
+-- go_wow_fates_gather (consumable) counts it for the Expedition and the
+-- object goes, nothing is looted, nothing goes in the bags;
+-- go_wow_fates_channel starts the channel of whoever clicks near it.
 --
 -- Idempotent: the module's rows are deleted before being written again.
 
@@ -17,7 +20,10 @@ INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconNa
   `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
 (960000, 10, 336, 'Kul Tiras Supply Crate', '', '', '', 1,
   0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  '', 'go_wow_fates_gather', 0);
+  '', 'go_wow_fates_gather', 0),
+(960100, 10, 328, 'Ritual Altar', '', '', '', 1,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  '', 'go_wow_fates_channel', 0);
 
 DELETE FROM `gameobject_template_locale` WHERE `entry` BETWEEN 960000 AND 960999;
 INSERT INTO `gameobject_template_locale` (`entry`, `locale`, `name`, `castBarCaption`, `VerifiedBuild`) VALUES
@@ -25,4 +31,9 @@ INSERT INTO `gameobject_template_locale` (`entry`, `locale`, `name`, `castBarCap
 (960000, 'deDE', 'Nachschubkiste von Kul Tiras', '', 0),
 (960000, 'esES', 'Caja de suministros de Kul Tiras', '', 0),
 (960000, 'esMX', 'Caja de suministros de Kul Tiras', '', 0),
-(960000, 'ruRU', 'Ящик с припасами Кул-Тираса', '', 0);
+(960000, 'ruRU', 'Ящик с припасами Кул-Тираса', '', 0),
+(960100, 'frFR', 'Autel du rituel', '', 0),
+(960100, 'deDE', 'Ritualaltar', '', 0),
+(960100, 'esES', 'Altar del ritual', '', 0),
+(960100, 'esMX', 'Altar del ritual', '', 0),
+(960100, 'ruRU', 'Ритуальный алтарь', '', 0);

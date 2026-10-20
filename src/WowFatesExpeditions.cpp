@@ -35,6 +35,8 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "Random.h"
+#include "Spell.h"
+#include "SpellInfo.h"
 #include "StringFormat.h"
 #include "TemporarySummon.h"
 #include "World.h"
@@ -123,7 +125,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
 
-            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_DEFENCE)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_SUPPORT)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -146,7 +148,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
     // The settings of each type of objective.
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`, "
-        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth` FROM `mod_wow_fates_objective`"))
+        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count` "
+        "FROM `mod_wow_fates_objective`"))
     {
         do
         {
@@ -164,6 +167,9 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.waveInterval = std::max<uint32>(f[8].Get<uint32>(), 5);
             itr->second.waveSize = std::max<uint32>(f[9].Get<uint32>(), 1);
             itr->second.waveGrowth = f[10].Get<uint32>();
+            itr->second.channelEntry = f[11].Get<uint32>();
+            itr->second.allyCount = std::clamp<uint32>(f[12].Get<uint32>(), 1, 10);
+            itr->second.waveCount = std::max<uint32>(f[13].Get<uint32>(), 1);
         } while (result->NextRow());
     }
 
@@ -175,11 +181,18 @@ void WowFatesExpeditionMgr::LoadFromDB()
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
             itr = _defs.erase(itr);
         }
-        else if (def.objectiveType == WOW_FATES_OBJECTIVE_DEFENCE
+        else if ((def.objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def.objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
             && (!sObjectMgr->GetCreatureTemplate(def.allyEntry) || !sObjectMgr->GetCreatureTemplate(def.summonEntry)))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is a defence whose ally (creature {}) or monsters (summon_entry {}) do not exist; skipped.",
                 def.id, def.allyEntry, def.summonEntry);
+            itr = _defs.erase(itr);
+        }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_INVOKE
+            && (!sObjectMgr->GetGameObjectTemplate(def.channelEntry) || !sObjectMgr->GetCreatureTemplate(def.summonEntry)))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is an invocation whose altar (gameobject {}) or monsters (summon_entry {}) do not exist; skipped.",
+                def.id, def.channelEntry, def.summonEntry);
             itr = _defs.erase(itr);
         }
         else if (def.objectiveType == WOW_FATES_OBJECTIVE_GATHER && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
@@ -308,6 +321,10 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_DEFENCE), CreatureName(def->allyEntry, session),
             (def->holdTime + 59) / 60);
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_INVOKE), GameObjectName(def->channelEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_SUPPORT), CreatureName(def->allyEntry, session), def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -462,13 +479,27 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
             if (GameObject* go = map->GetGameObject(guid))
                 go->DespawnOrUnsummon();
     active.objects.clear();
-    // The ally is never left behind, its corpse after a while.
-    if (map && active.ally)
-        if (Creature* ally = map->GetCreature(active.ally))
-        {
-            ally->CombatStop(true);
-            ally->DespawnOrUnsummon(ally->IsAlive() ? 0ms : Milliseconds(SUMMON_CORPSE_MS));
-        }
+    // The allies are never left behind, their corpses after a while.
+    if (map)
+    {
+        std::vector<ObjectGuid> allies(active.allies);
+        if (active.ally)
+            allies.push_back(active.ally);
+        for (ObjectGuid const& guid : allies)
+            if (Creature* ally = map->GetCreature(guid))
+            {
+                ally->CombatStop(true);
+                ally->DespawnOrUnsummon(ally->IsAlive() ? 0ms : Milliseconds(SUMMON_CORPSE_MS));
+            }
+        if (active.altar)
+            if (GameObject* altar = map->GetGameObject(active.altar))
+                altar->DespawnOrUnsummon();
+    }
+    for (ObjectGuid const& guid : active.channelers)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            if (player->IsInWorld())
+                player->InterruptSpell(CURRENT_CHANNELED_SPELL);
+    active.channelers.clear();
     if (map && active.boss)
         if (Creature* boss = map->GetCreature(active.boss))
             if (boss->IsAlive())
@@ -655,6 +686,10 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_DEFENCE), CreatureName(def->allyEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_INVOKE), GameObjectName(def->channelEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_SUPPORT), active.repelled, def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -695,7 +730,7 @@ WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedit
             totalValue += v;
             ++withValue;
         }
-        if (uint32 const actions = o.kills + o.picks)
+        if (uint32 const actions = o.kills + o.picks + uint32(o.channel / 5000))
         {
             totalKills += actions;
             ++withKills;
@@ -705,7 +740,7 @@ WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedit
     WowFatesContribution const& own = contribution->second;
     WowFatesParticipation const byValue = tier(double(own.damage + own.healing),
         withValue ? double(totalValue) / double(withValue) : 0.0);
-    WowFatesParticipation const byKills = tier(double(own.kills + own.picks),
+    WowFatesParticipation const byKills = tier(double(own.kills + own.picks + uint32(own.channel / 5000)),
         withKills ? double(totalKills) / double(withKills) : 0.0);
     return std::max(byValue, byKills);
 }
@@ -829,6 +864,10 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
         active.gatherTimer -= diff;
         if (active.def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
             UpdateDefence(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
+            UpdateInvoke(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
+            UpdateSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -1303,13 +1342,21 @@ void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, u
     setFor = players;
 }
 
-Creature* WowFatesExpeditionMgr::SpawnAlly(WowFatesActiveExpedition& active, Map* map)
+// The centre of the area on the ground, or a point a little around it.
+Position WowFatesExpeditionMgr::Centre(WowFatesActiveExpedition const& active, Map* map, float spread) const
 {
     WowFatesSpawnPoint const& c = active.spawn;
-    float z = map->GetHeight(PHASEMASK_NORMAL, c.x, c.y, c.z + 5.0f, true, 20.0f);
+    float const angle = frand(0.0f, 2.0f * float(M_PI));
+    float const x = c.x + spread * std::cos(angle);
+    float const y = c.y + spread * std::sin(angle);
+    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 5.0f, true, 20.0f);
     if (z <= INVALID_HEIGHT)
-        z = c.z;
-    Position const pos(c.x, c.y, z, c.o);
+        return Position(c.x, c.y, c.z, c.o);
+    return Position(x, y, z, c.o);
+}
+
+Creature* WowFatesExpeditionMgr::SpawnAlly(WowFatesActiveExpedition& active, Map* map, Position const& pos)
+{
     TempSummon* ally = map->SummonCreature(active.def->allyEntry, pos);
     if (!ally)
         return nullptr;
@@ -1321,10 +1368,26 @@ Creature* WowFatesExpeditionMgr::SpawnAlly(WowFatesActiveExpedition& active, Map
     ally->SetHomePosition(pos);
     ally->SetDefaultMovementType(IDLE_MOTION_TYPE);
     ally->GetMotionMaster()->Initialize();
-    active.ally = ally->GetGUID();
     active.allyHealth = ally->GetMaxHealth();
-    active.allyPlayers = 1;
     return ally;
+}
+
+// The first player in the area starts a defence, an invocation or a wave
+// support: its clock and its waves (the first one at once), with a banner.
+bool WowFatesExpeditionMgr::Start(WowFatesActiveExpedition& active, char const* banner,
+    std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry)
+{
+    if (active.started)
+        return true;
+    if (active.inside.empty())
+        return false;
+    active.started = true;
+    active.waveTimer = 0;
+    for (ObjectGuid const& guid : active.inside)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            SendAddon(player, Acore::StringFormat("{}\t{}\t{}", banner, active.def->id,
+                Clean((this->*name)(entry, player->GetSession()))));
+    return true;
 }
 
 // The ally waits in the centre; the first player who comes starts the clock
@@ -1348,25 +1411,18 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
     {
         if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
             return;
-        ally = SpawnAlly(active, map);
+        ally = SpawnAlly(active, map, Centre(active, map));
         if (!ally)
             return;
+        active.ally = ally->GetGUID();
+        active.allyPlayers = 1;
     }
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
 
-    if (!active.started)
-    {
-        if (active.inside.empty())
-            return;
-        active.started = true;
-        active.waveTimer = 0;
-        for (ObjectGuid const& guid : active.inside)
-            if (Player* player = ObjectAccessor::FindPlayer(guid))
-                SendAddon(player, Acore::StringFormat("defend\t{}\t{}", active.def->id,
-                    Clean(CreatureName(active.def->allyEntry, player->GetSession()))));
-    }
+    if (!Start(active, "defend", &WowFatesExpeditionMgr::CreatureName, active.def->allyEntry))
+        return;
 
     active.held += diff;
     active.progressPct = std::min(100.0, 100.0 * double(active.held) / double(int64(active.def->holdTime) * IN_MILLISECONDS));
@@ -1380,9 +1436,10 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
 }
 
 // A wave: waveSize monsters, waveGrowth more each time, more with the players
-// in the area; together from one side of the edge, they run at the target.
-// Back from a fight with the players, they go back to it.
-void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Creature* target)
+// in the area; together from one side of the edge, they run at the target
+// (or the centre, when there is none). Back from a fight with the players,
+// they go back to it.
+void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target)
 {
     WowFatesExpeditionDef const* def = active.def;
     std::erase_if(active.summons, [map](ObjectGuid const& guid)
@@ -1394,8 +1451,10 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
     float const base = float(def->waveSize + def->waveGrowth * active.wave);
     uint32 const count = std::max<uint32>(1, uint32(std::lround(base * (1.0f + WowFatesConf().participantScaling * float(players - 1)))));
     ++active.wave;
+    active.waveMobs.clear();
 
     WowFatesSpawnPoint const& c = active.spawn;
+    Position const goal = target ? target->GetPosition() : Centre(active, map);
     float const side = frand(0.0f, 2.0f * float(M_PI));
     for (uint32 i = 0; i < count; ++i)
     {
@@ -1413,18 +1472,181 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
             break;
         summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
         summon->SetTimer(SUMMON_CORPSE_MS);
-        summon->SetHomePosition(target->GetPositionX() + frand(-4.0f, 4.0f), target->GetPositionY() + frand(-4.0f, 4.0f),
-            target->GetPositionZ(), target->GetOrientation());
+        summon->SetHomePosition(goal.GetPositionX() + frand(-4.0f, 4.0f), goal.GetPositionY() + frand(-4.0f, 4.0f),
+            goal.GetPositionZ(), goal.GetOrientation());
         summon->SetReactState(REACT_AGGRESSIVE);
-        if (summon->AI())
+        if (target && summon->AI())
             summon->AI()->AttackStart(target);
+        else
+            summon->GetMotionMaster()->MovePoint(0, goal.GetPositionX() + frand(-4.0f, 4.0f),
+                goal.GetPositionY() + frand(-4.0f, 4.0f), goal.GetPositionZ());
         active.summons.push_back(summon->GetGUID());
+        active.waveMobs.push_back(summon->GetGUID());
     }
 
     LOG_INFO("module", "mod-wow-fates: Expedition {}: wave {}, {} monsters.", def->id, active.wave, count);
     for (ObjectGuid const& guid : active.inside)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
             SendAddon(player, Acore::StringFormat("wave\t{}\t{}", def->id, active.wave));
+}
+
+// ---------------------------------------------------------------------------
+// Invocation
+
+// The altar in the centre; those who channel at it (the channel of
+// WOW_FATES_CHANNEL_SPELL, within WOW_FATES_CHANNEL_RANGE of it) fill the bar,
+// each as much, against a time that grows with the players in the area, as
+// the objective does; the bar never goes back. The waves run at one of them,
+// at the altar when nobody channels.
+void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.progressPct >= 100.0)
+        return;
+
+    GameObject* altar = active.altar ? map->GetGameObject(active.altar) : nullptr;
+    if (!altar || !altar->isSpawned())
+    {
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        Position const pos = Centre(active, map);
+        altar = new GameObject();
+        if (!altar->Create(map->GenerateLowGuid<HighGuid::GameObject>(), active.def->channelEntry, map, PHASEMASK_NORMAL,
+                pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(), G3D::Quat(), 100, GO_STATE_READY))
+        {
+            delete altar;
+            return;
+        }
+        altar->SetRespawnTime(0);
+        altar->SetSpellId(1);
+        altar->SetSpawnedByDefault(false);
+        map->AddToMap(altar);
+        active.altar = altar->GetGUID();
+    }
+
+    if (!Start(active, "invoke", &WowFatesExpeditionMgr::GameObjectName, active.def->channelEntry))
+        return;
+
+    std::vector<Player*> channeling;
+    for (auto itr = active.channelers.begin(); itr != active.channelers.end();)
+    {
+        Player* player = ObjectAccessor::FindPlayer(*itr);
+        Spell const* spell = player && player->IsInWorld() ? player->GetCurrentSpell(CURRENT_CHANNELED_SPELL) : nullptr;
+        bool const there = player && player->IsAlive() && player->GetMap() == map
+            && player->GetExactDist(altar) <= WOW_FATES_CHANNEL_RANGE + 1.0f;
+        if (!spell || spell->m_spellInfo->Id != WOW_FATES_CHANNEL_SPELL || !there)
+        {
+            // gone from the altar: the channel stops
+            if (spell && spell->m_spellInfo->Id == WOW_FATES_CHANNEL_SPELL)
+                player->InterruptSpell(CURRENT_CHANNELED_SPELL);
+            itr = active.channelers.erase(itr);
+            continue;
+        }
+        channeling.push_back(player);
+        active.contributors[player->GetGUID()].channel += diff;
+        ++itr;
+    }
+
+    if (!channeling.empty())
+    {
+        uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+        double const needed = double(active.def->holdTime) * IN_MILLISECONDS * (1.0 + WowFatesConf().participantScaling * double(players - 1));
+        active.held += int64(diff) * int64(channeling.size());
+        active.progressPct = std::min(100.0, 100.0 * double(active.held) / std::max(needed, 1.0));
+    }
+
+    active.waveTimer -= diff;
+    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    {
+        active.waveTimer = int64(active.def->waveInterval) * IN_MILLISECONDS;
+        SendWave(active, map, channeling.empty() ? nullptr : Acore::Containers::SelectRandomContainerElement(channeling));
+    }
+}
+
+// A player uses the altar: near enough, he channels at it.
+void WowFatesExpeditionMgr::OnChannel(Player* player, GameObject* go)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    for (auto& [id, active] : _active)
+    {
+        if (active.altar != go->GetGUID())
+            continue;
+        if (active.progressPct >= 100.0 || !player->IsAlive() || player->GetExactDist(go) > WOW_FATES_CHANNEL_RANGE)
+            return;
+        player->CastSpell(player, WOW_FATES_CHANNEL_SPELL, true);
+        active.channelers.insert(player->GetGUID());
+        return;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wave support
+
+// ally_count allies around the centre; the first player starts the waves.
+// A wave is pushed back when all its monsters are dead; the next one comes
+// wave_interval seconds later. The bar is the waves pushed back out of
+// wave_count; when every ally is dead, the Expedition fails.
+void WowFatesExpeditionMgr::UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+
+    if (active.allies.empty())
+    {
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        for (uint32 i = 0; i < def->allyCount; ++i)
+            if (Creature* ally = SpawnAlly(active, map, Centre(active, map, def->allyCount > 1 ? 4.0f : 0.0f)))
+                active.allies.push_back(ally->GetGUID());
+        active.allyPlayers = 1;
+        if (active.allies.empty())
+            return;
+    }
+
+    std::vector<Creature*> alive;
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    uint32 setFor = active.allyPlayers;
+    for (ObjectGuid const& guid : active.allies)
+        if (Creature* ally = map->GetCreature(guid))
+            if (ally->IsAlive())
+            {
+                setFor = active.allyPlayers;
+                ScaleHealth(ally, active.allyHealth, setFor, players);
+                alive.push_back(ally);
+            }
+    active.allyPlayers = setFor;
+    if (alive.empty())
+    {
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: its allies died, {} waves pushed back.", def->id, active.repelled);
+        active.failed = true;
+        return;
+    }
+
+    if (!Start(active, "defend", &WowFatesExpeditionMgr::CreatureName, def->allyEntry))
+        return;
+
+    // the wave on its way: pushed back when none of its monsters is left alive
+    if (!active.waveMobs.empty())
+    {
+        bool const left = std::any_of(active.waveMobs.begin(), active.waveMobs.end(), [map](ObjectGuid const& guid)
+        {
+            Creature* creature = map->GetCreature(guid);
+            return creature && creature->IsAlive();
+        });
+        if (left)
+            return;
+        active.waveMobs.clear();
+        ++active.repelled;
+        active.progressPct = std::min(100.0, 100.0 * double(active.repelled) / double(def->waveCount));
+        active.waveTimer = int64(def->waveInterval) * IN_MILLISECONDS;
+        BroadcastSet(active); // the tracker's count
+        return;
+    }
+
+    active.waveTimer -= diff;
+    if (active.waveTimer <= 0 && active.repelled < def->waveCount && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        SendWave(active, map, Acore::Containers::SelectRandomContainerElement(alive));
 }
 
 // ---------------------------------------------------------------------------
@@ -1468,7 +1690,8 @@ void WowFatesExpeditionMgr::OnHeal(Unit* healer, Unit* target, uint32 gain)
 
     std::lock_guard<std::recursive_mutex> guard(_lock);
     if (WowFatesActiveExpedition* active = FindAt(target))
-        if (IsFromPlayer(target) || target->GetGUID() == active->ally)
+        if (IsFromPlayer(target) || target->GetGUID() == active->ally
+            || std::find(active->allies.begin(), active->allies.end(), target->GetGUID()) != active->allies.end())
             active->contributors[player->GetGUID()].healing += gain;
 }
 
@@ -1498,9 +1721,9 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
         return;
     }
 
-    // A gathering's guards, a defence's waves: their kills count for the
-    // players and the pace of the monsters, not for the bar.
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER || def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
+    // A gathering's guards, the waves: their kills count for the players and
+    // the pace of the monsters, not for the bar.
+    if (def->objectiveType >= WOW_FATES_OBJECTIVE_GATHER)
     {
         ++active->contributors[player->GetGUID()].kills;
         active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);

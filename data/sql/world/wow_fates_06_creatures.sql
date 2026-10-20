@@ -8,6 +8,8 @@
 --          level 10), a Stormwind guard of faction 495 (an escortee's: friend
 --          of every player, Alliance and Horde, foe of the monsters), no
 --          gossip, no guard's script.
+--   96201  Razor Hill Veteran: the allies of the Quilboar Onslaught (Durotar,
+--          level 9), Orgrimmar grunts of the same faction 495.
 --
 -- Each is a copy of an existing creature of the game, its own values set on
 -- top, so that the file follows the columns of creature_template whatever the
@@ -29,6 +31,17 @@ UPDATE `wow_fates_creature` SET
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
 
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 3296;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96201, `name` = 'Razor Hill Veteran', `subname` = '',
+  `minlevel` = 9, `maxlevel` = 9, `rank` = 0, `faction` = 495,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0,
+  `HealthModifier` = 4, `DamageModifier` = 1.2, `ArmorModifier` = 1.5,
+  `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
 CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 68;
 UPDATE `wow_fates_creature` SET
   `entry` = 96200, `name` = 'Westbrook Sentinel', `subname` = '',
@@ -43,7 +56,8 @@ DROP TEMPORARY TABLE `wow_fates_creature`;
 DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 96100 AND 96299;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (96100, 0, 2357, 1.35, 1, 0),
-(96200, 0, 3167, 1, 1, 0);
+(96200, 0, 3167, 1, 1, 0),
+(96201, 0, 4259, 1, 1, 0);
 
 DELETE FROM `creature_template_locale` WHERE `entry` BETWEEN 96100 AND 96299;
 INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `VerifiedBuild`) VALUES
@@ -56,7 +70,12 @@ INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `Ver
 (96200, 'deDE', 'Wachposten von Westbrook', '', 0),
 (96200, 'esES', 'Centinela de Westbrook', '', 0),
 (96200, 'esMX', 'Centinela de Westbrook', '', 0),
-(96200, 'ruRU', 'Часовой Вестбрука', '', 0);
+(96200, 'ruRU', 'Часовой Вестбрука', '', 0),
+(96201, 'frFR', 'Vétéran de Razor Hill', '', 0),
+(96201, 'deDE', 'Veteran von Klingenhügel', '', 0),
+(96201, 'esES', 'Veterano de Cerrotajo', '', 0),
+(96201, 'esMX', 'Veterano de Cerrotajo', '', 0),
+(96201, 'ruRU', 'Ветеран Колючего Холма', '', 0);
 
 -- Its blows: the Bandit's Snap Kick, more often, and the Bodyguard's Disarm.
 DELETE FROM `smart_scripts` WHERE `entryorguid` BETWEEN 96100 AND 96299 AND `source_type` = 0;

@@ -146,6 +146,20 @@ public:
     }
 };
 
+// The altars of the invocations (gameobjects whose ScriptName is
+// go_wow_fates_channel): a click near it starts the channel.
+class WowFatesChannelScript : public GameObjectScript
+{
+public:
+    WowFatesChannelScript() : GameObjectScript("go_wow_fates_channel") { }
+
+    bool OnGossipHello(Player* player, GameObject* go) override
+    {
+        sWowFatesExpeditionMgr->OnChannel(player, go);
+        return true;
+    }
+};
+
 void AddSC_wow_fates_commands();
 
 void AddSC_wow_fates_scripts()
@@ -154,5 +168,6 @@ void AddSC_wow_fates_scripts()
     new WowFatesPlayerScript();
     new WowFatesUnitScript();
     new WowFatesGatherScript();
+    new WowFatesChannelScript();
     AddSC_wow_fates_commands();
 }

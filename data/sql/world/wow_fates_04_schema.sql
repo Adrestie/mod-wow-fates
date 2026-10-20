@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'English; the other languages in mod_wow_fates_expedition_locale',
   `level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Synced level: whoever is stronger than this level in the area is brought down to it',
-  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence (mod_wow_fates_objective)',
+  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence, 5 = invocation, 6 = wave support (mod_wow_fates_objective)',
   `objective_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry counted; 0 = any monster',
   `objective_count` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'kills to complete it',
   `summon_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry the Expedition brings; 0 = the monsters already there',
@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_objective` (
   `wave_interval` INT UNSIGNED NOT NULL DEFAULT 40 COMMENT 'waves: seconds between two; their monsters are summon_entry',
   `wave_size` INT UNSIGNED NOT NULL DEFAULT 3 COMMENT 'waves: monsters of the first one, for one player (more with the players, as the objective)',
   `wave_growth` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'waves: monsters added to each next one',
+  `channel_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'invocation: gameobject_template.entry of the altar to channel at (ScriptName go_wow_fates_channel); hold_time is the channel asked',
+  `ally_count` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'wave support: allies (ally_entry) around the centre, 1 to 10; the Expedition fails when all are dead',
+  `wave_count` INT UNSIGNED NOT NULL DEFAULT 5 COMMENT 'wave support: waves to push back; the next one comes wave_interval seconds after',
   `comment` VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`expedition`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -83,6 +86,33 @@ SET @wow_fates_hidden := (SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_reward' AND COLUMN_NAME = 'hidden');
 SET @wow_fates_sql := IF(@wow_fates_hidden = 0,
   'ALTER TABLE `mod_wow_fates_reward` ADD COLUMN `hidden` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''1 = shown as a red ? until given'' AFTER `item_count`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+
+-- The columns of the invocation and the wave support came after the first
+-- version of mod_wow_fates_objective: added when missing.
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'channel_entry');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `channel_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''invocation: gameobject_template.entry of the altar to channel at (ScriptName go_wow_fates_channel); hold_time is the channel asked'' AFTER `wave_growth`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'ally_count');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `ally_count` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''wave support: allies (ally_entry) around the centre, 1 to 10; the Expedition fails when all are dead'' AFTER `channel_entry`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'wave_count');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `wave_count` INT UNSIGNED NOT NULL DEFAULT 5 COMMENT ''wave support: waves to push back; the next one comes wave_interval seconds after'' AFTER `ally_count`',
   'DO 0');
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
