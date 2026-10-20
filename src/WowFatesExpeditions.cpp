@@ -1706,7 +1706,7 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
 
     // A channel broken (a blow, a move, a cast) or the player gone from the
     // altar: no more progress from him, until he clicks again. A channel that
-    // ran its ten seconds goes on by itself, a new one at once.
+    // ran its thirty seconds goes on by itself, a new one at once.
     std::vector<Player*> channeling;
     for (auto itr = active.channelers.begin(); itr != active.channelers.end();)
     {
@@ -1754,11 +1754,11 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
     }
 }
 
-// The channel's own length, ten seconds by its row.
+// The channel's own length, thirty seconds by its row.
 int64 WowFatesExpeditionMgr::ChannelDuration()
 {
     SpellInfo const* info = sSpellMgr->GetSpellInfo(WOW_FATES_CHANNEL_SPELL);
-    return info && info->GetDuration() > 0 ? int64(info->GetDuration()) : int64(10 * IN_MILLISECONDS);
+    return info && info->GetDuration() > 0 ? int64(info->GetDuration()) : int64(30 * IN_MILLISECONDS);
 }
 
 // A player uses the altar: near enough, he channels at its focus.

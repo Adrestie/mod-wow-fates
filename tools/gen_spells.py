@@ -91,7 +91,7 @@ SPELLS = [
     (96003, {"enUS": "Synced (health)"}, None, HIDDEN, ATTR1_NO_AURA_ICON, 58,
      [(MOD_INCREASE_HEALTH_PERCENT, 0), (MOD_RESISTANCE_PCT, 1), (MOD_INCREASE_ENERGY_PERCENT, 0)]),
     # The invocation's channel, cast by the player at the altar's focus (an
-    # invisible creature on it): a channel of ten seconds with the bar that
+    # invisible creature on it): a channel of thirty seconds with the bar that
     # empties, the hands raised (the look of the game's Blue Beam, visual 6500)
     # and a beam to the altar; a blow, moving or a cast breaks it. The module
     # casts it again while the player stays.
@@ -106,7 +106,7 @@ EXTRA = {
         10: 0x8,                          # AttributesEx6: may aim at the focus, immune to players
         31: 0x0F,                         # InterruptFlags
         33: 0x100F,                       # ChannelInterruptFlags: hit, damage, cast, move
-        40: 1,                            # DurationIndex: 10 s
+        40: 9,                            # DurationIndex: 30 s
         46: 7,                            # RangeIndex: 10 yards
         80: 0,                            # EffectBasePoints_1
         86: 25,                           # ImplicitTargetA_1: the unit aimed at
@@ -229,7 +229,7 @@ def main():
 --   96002  hidden: defense rating, dodge and parry ratings, expertise and
 --          armor penetration ratings
 --   96003  hidden: maximum health %, armor %, maximum mana %
---   96004  Ritual: the channel of an invocation, at the altar's focus (ten
+--   96004  Ritual: the channel of an invocation, at the altar's focus (thirty
 --          seconds, a beam, broken by a blow, moving or a cast)
 --
 -- Every amount of the Synced auras is set by the module (WowFatesSync::Apply); the -1 of the

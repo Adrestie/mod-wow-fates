@@ -86,7 +86,7 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_SUPPORT = 6  // allies pushing back a number of waves
 };
 
-// The channel of an invocation: Ritual (tools/gen_spells.py), ten seconds at
+// The channel of an invocation: Ritual (tools/gen_spells.py), thirty seconds at
 // the altar's focus, an invisible creature on it, for the beam; a blow,
 // moving or a cast breaks it.
 constexpr uint32 WOW_FATES_CHANNEL_SPELL = 96004;
