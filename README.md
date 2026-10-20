@@ -35,8 +35,10 @@ ones and rewards for those who take part.
     the players there; the bar is the time held, and the Expedition fails if
     the ally dies. The clock starts with the first player in the area.
   - *Invocation*: players channel at an altar in the centre while waves of
-    monsters come at them; the bar fills while someone channels, faster with
-    more channelers, and never goes back. Leaving the altar stops the channel.
+    monsters come at them: a true channel, with its bar, the hands raised and
+    a beam to the altar, broken by a blow, a move or leaving the altar. The
+    bar fills while someone channels, faster with more channelers, and never
+    goes back.
   - *Wave support*: allies in the centre push back a set number of waves, one
     after the other; the bar is the waves pushed back, and the Expedition
     fails when every ally is dead.
@@ -166,9 +168,11 @@ Every text the players see is in English, French, German, Spanish and Russian.
 
 The module uses tranche **96** (96000-96999) of the
 [WoW-mods registry](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md):
-spells 96000-96003 are the Synced debuff, creatures 96100-96199 the leaders
-of the assaults, 96200-96299 the allies of the defences and wave supports, gameobjects 960000-960999 the objects of the gatherings and the altars of
-the invocations.
+spells 96000-96003 are the Synced debuff and 96004 the channel of the
+invocations; creatures 96100-96199 are the leaders of the assaults,
+96200-96299 the allies of the defences and wave supports, 96300 the focus of
+the altars; gameobjects 960000-960999 are the objects of the gatherings and
+the altars of the invocations.
 
 ## License
 

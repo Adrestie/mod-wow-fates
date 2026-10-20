@@ -37,6 +37,7 @@
 #include "Random.h"
 #include "Spell.h"
 #include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "StringFormat.h"
 #include "TemporarySummon.h"
 #include "World.h"
@@ -501,8 +502,11 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
         if (active.altar)
             if (GameObject* altar = map->GetGameObject(active.altar))
                 altar->DespawnOrUnsummon();
+        if (active.focus)
+            if (Creature* focus = map->GetCreature(active.focus))
+                focus->DespawnOrUnsummon();
     }
-    for (ObjectGuid const& guid : active.channelers)
+    for (auto const& [guid, end] : active.channelers)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
             if (player->IsInWorld())
                 player->InterruptSpell(CURRENT_CHANNELED_SPELL);
@@ -1621,23 +1625,50 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
         active.altar = altar->GetGUID();
     }
 
+    // the focus of the channels' beams, a little above the altar
+    Creature* focus = active.focus ? map->GetCreature(active.focus) : nullptr;
+    if (!focus)
+    {
+        Position const pos(altar->GetPositionX(), altar->GetPositionY(), altar->GetPositionZ() + 1.0f, altar->GetOrientation());
+        if (TempSummon* summon = map->SummonCreature(WOW_FATES_ALTAR_FOCUS, pos))
+        {
+            summon->SetTempSummonType(TEMPSUMMON_MANUAL_DESPAWN);
+            summon->SetDisableGravity(true);
+            focus = summon;
+            active.focus = summon->GetGUID();
+        }
+    }
+
     if (!Start(active, "invoke", &WowFatesExpeditionMgr::GameObjectName, active.def->channelEntry))
         return;
 
+    // A channel broken (a blow, a move, a cast) or the player gone from the
+    // altar: no more progress from him, until he clicks again. A channel that
+    // ran its ten seconds goes on by itself, a new one at once.
     std::vector<Player*> channeling;
     for (auto itr = active.channelers.begin(); itr != active.channelers.end();)
     {
-        Player* player = ObjectAccessor::FindPlayer(*itr);
+        Player* player = ObjectAccessor::FindPlayer(itr->first);
         Spell const* spell = player && player->IsInWorld() ? player->GetCurrentSpell(CURRENT_CHANNELED_SPELL) : nullptr;
+        bool const ours = spell && spell->m_spellInfo->Id == WOW_FATES_CHANNEL_SPELL;
         bool const there = player && player->IsAlive() && player->GetMap() == map
             && player->GetExactDist(altar) <= WOW_FATES_CHANNEL_RANGE + 1.0f;
-        if (!spell || spell->m_spellInfo->Id != WOW_FATES_CHANNEL_SPELL || !there)
+        if (!there)
         {
-            // gone from the altar: the channel stops
-            if (spell && spell->m_spellInfo->Id == WOW_FATES_CHANNEL_SPELL)
+            if (ours)
                 player->InterruptSpell(CURRENT_CHANNELED_SPELL);
             itr = active.channelers.erase(itr);
             continue;
+        }
+        if (!ours)
+        {
+            bool const ranOut = active.elapsed >= itr->second - 500;
+            if (!ranOut || !focus || player->CastSpell(focus, WOW_FATES_CHANNEL_SPELL, false) != SPELL_CAST_OK)
+            {
+                itr = active.channelers.erase(itr);
+                continue;
+            }
+            itr->second = active.elapsed + ChannelDuration();
         }
         channeling.push_back(player);
         active.contributors[player->GetGUID()].channel += diff;
@@ -1661,7 +1692,14 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
     }
 }
 
-// A player uses the altar: near enough, he channels at it.
+// The channel's own length, ten seconds by its row.
+int64 WowFatesExpeditionMgr::ChannelDuration()
+{
+    SpellInfo const* info = sSpellMgr->GetSpellInfo(WOW_FATES_CHANNEL_SPELL);
+    return info && info->GetDuration() > 0 ? int64(info->GetDuration()) : int64(10 * IN_MILLISECONDS);
+}
+
+// A player uses the altar: near enough, he channels at its focus.
 void WowFatesExpeditionMgr::OnChannel(Player* player, GameObject* go)
 {
     std::lock_guard<std::recursive_mutex> guard(_lock);
@@ -1672,8 +1710,10 @@ void WowFatesExpeditionMgr::OnChannel(Player* player, GameObject* go)
             continue;
         if (active.progressPct >= 100.0 || !player->IsAlive() || player->GetExactDist(go) > WOW_FATES_CHANNEL_RANGE)
             return;
-        player->CastSpell(player, WOW_FATES_CHANNEL_SPELL, true);
-        active.channelers.insert(player->GetGUID());
+        Creature* focus = active.focus ? go->GetMap()->GetCreature(active.focus) : nullptr;
+        if (!focus || player->CastSpell(focus, WOW_FATES_CHANNEL_SPELL, false) != SPELL_CAST_OK)
+            return;
+        active.channelers[player->GetGUID()] = active.elapsed + ChannelDuration();
         return;
     }
 }

@@ -86,9 +86,11 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_SUPPORT = 6  // allies pushing back a number of waves
 };
 
-// The channel of an invocation: Quillboar Channeling, a self channel of the
-// game with no effect but its look, no script on it.
-constexpr uint32 WOW_FATES_CHANNEL_SPELL = 7083;
+// The channel of an invocation: Ritual (tools/gen_spells.py), ten seconds at
+// the altar's focus, an invisible creature on it, for the beam; a blow,
+// moving or a cast breaks it.
+constexpr uint32 WOW_FATES_CHANNEL_SPELL = 96004;
+constexpr uint32 WOW_FATES_ALTAR_FOCUS = 96300;
 constexpr float WOW_FATES_CHANNEL_RANGE = 6.0f; // yards from the altar
 
 struct WowFatesExpeditionDef
@@ -207,7 +209,8 @@ struct WowFatesActiveExpedition
 
     // Invocation
     ObjectGuid altar;
-    std::unordered_set<ObjectGuid> channelers;
+    ObjectGuid focus;           // what the channels aim at
+    std::unordered_map<ObjectGuid, int64> channelers; // when each one's channel ends (elapsed)
 
     // Wave support
     std::vector<ObjectGuid> allies;
@@ -279,6 +282,7 @@ private:
     bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);
     Position Centre(WowFatesActiveExpedition const& active, Map* map, float spread = 0.0f) const;
     void UpdateInvoke(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    static int64 ChannelDuration();
     void UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
