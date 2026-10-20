@@ -25,6 +25,8 @@ ones and rewards for those who take part.
   - *Assault and boss*: kill monsters until the bar reaches a set point (70 %
     by default), then their leader appears in the centre with a banner; its
     health is the rest of the bar and grows with the players in the area.
+  - *Gathering*: pick up objects spread over the area, put back as they are
+    taken, while monsters guard them; a click counts, nothing goes in the bags.
 - **An objective that grows with the crowd.** Players see a percentage, never a
   count: the more players in the area, the more work each percent takes.
 - **Monsters that keep up.** An Expedition brings its own monsters. The faster
@@ -84,15 +86,18 @@ By hand: copy the module into `modules/`, copy `data/lua/WowFates` into the
 ALE scripts folder, copy `conf/mod-wow-fates.conf.dist` to `configs/modules/`
 as `mod-wow-fates.conf`, rebuild, and add the client patch with the installer.
 
-Four example Expeditions come with it: Kobold Uprising (Elwynn Forest,
+Five example Expeditions come with it: Kobold Uprising (Elwynn Forest,
 level 7), Razormane Raid (Durotar, level 8), Restless Dead (Icecrown,
-level 80) and Defias Assault (Elwynn Forest, level 10, assault and boss: the
-Defias Ringleader). Expeditions, spawn points and rewards live in the world
+level 80), Defias Assault (Elwynn Forest, level 10, assault and boss: the
+Defias Ringleader) and Kul Tiras Supplies (Durotar, level 7, gathering: supply
+crates by Tiragarde Keep). Expeditions, spawn points and rewards live in the world
 database (`mod_wow_fates_expedition`, `mod_wow_fates_expedition_locale`,
 `mod_wow_fates_spawn`, `mod_wow_fates_reward`), and the settings of the
 objectives other than kills in `mod_wow_fates_objective` (for an assault, the
-leader's creature and the percent at which it appears); give your own ids 100
-and up.
+leader's creature and the percent at which it appears; for a gathering, the
+gameobject, how many are out at once and how soon one comes back); give your
+own ids 100 and up. A gathering's gameobject must have the ScriptName
+`go_wow_fates_gather`.
 
 ## Configuration
 
@@ -140,7 +145,7 @@ Every text the players see is in English, French, German, Spanish and Russian.
 The module uses tranche **96** (96000-96999) of the
 [WoW-mods registry](https://github.com/Adrestie/WoW-mods/blob/main/ID_RANGES.md):
 spells 96000-96003 are the Synced debuff, creatures 96100-96199 the leaders
-of the assaults.
+of the assaults, gameobjects 960000-960999 the objects of the gatherings.
 
 ## License
 

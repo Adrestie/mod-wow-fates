@@ -23,6 +23,7 @@
 #include "WowFatesExpeditions.h"
 #include "WowFatesSync.h"
 
+#include "GameObject.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 
@@ -131,6 +132,20 @@ public:
     }
 };
 
+// The objects of the gatherings (gameobjects whose ScriptName is
+// go_wow_fates_gather): a click counts for the Expedition, nothing else.
+class WowFatesGatherScript : public GameObjectScript
+{
+public:
+    WowFatesGatherScript() : GameObjectScript("go_wow_fates_gather") { }
+
+    bool OnGossipHello(Player* player, GameObject* go) override
+    {
+        sWowFatesExpeditionMgr->OnGather(player, go);
+        return true;
+    }
+};
+
 void AddSC_wow_fates_commands();
 
 void AddSC_wow_fates_scripts()
@@ -138,5 +153,6 @@ void AddSC_wow_fates_scripts()
     new WowFatesWorldScript();
     new WowFatesPlayerScript();
     new WowFatesUnitScript();
+    new WowFatesGatherScript();
     AddSC_wow_fates_commands();
 }

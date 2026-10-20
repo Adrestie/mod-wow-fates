@@ -24,6 +24,7 @@
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
+#include "GameObject.h"
 #include "Item.h"
 #include "Log.h"
 #include "Mail.h"
@@ -121,7 +122,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
 
-            if (def.objectiveType != WOW_FATES_OBJECTIVE_KILL && def.objectiveType != WOW_FATES_OBJECTIVE_ASSAULT)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_GATHER)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -142,7 +143,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
     }
 
     // The settings of each type of objective.
-    if (QueryResult result = WorldDatabase.Query("SELECT `expedition`, `boss_entry`, `boss_at` FROM `mod_wow_fates_objective`"))
+    if (QueryResult result = WorldDatabase.Query(
+        "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn` FROM `mod_wow_fates_objective`"))
     {
         do
         {
@@ -152,6 +154,9 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 continue;
             itr->second.bossEntry = f[1].Get<uint32>();
             itr->second.bossAt = std::clamp<uint8>(f[2].Get<uint8>(), 10, 95);
+            itr->second.gatherEntry = f[3].Get<uint32>();
+            itr->second.gatherCount = std::max<uint32>(f[4].Get<uint32>(), 1);
+            itr->second.gatherRespawn = f[5].Get<uint32>();
         } while (result->NextRow());
     }
 
@@ -161,6 +166,11 @@ void WowFatesExpeditionMgr::LoadFromDB()
         if (def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
+            itr = _defs.erase(itr);
+        }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_GATHER && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a gathering whose object, gameobject {}, does not exist; skipped.", def.id, def.gatherEntry);
             itr = _defs.erase(itr);
         }
         else
@@ -265,9 +275,22 @@ std::string WowFatesExpeditionMgr::CreatureName(uint32 entry, WorldSession* sess
     return name;
 }
 
+std::string WowFatesExpeditionMgr::GameObjectName(uint32 entry, WorldSession* session) const
+{
+    std::string name;
+    if (GameObjectTemplate const* go = sObjectMgr->GetGameObjectTemplate(entry))
+        name = go->name;
+    if (session)
+        if (GameObjectLocale const* locale = sObjectMgr->GetGameObjectLocale(entry))
+            ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
+    return name;
+}
+
 std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -417,6 +440,11 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
                     creature->DespawnOrUnsummon();
                 }
     active.summons.clear();
+    if (map)
+        for (ObjectGuid const& guid : active.objects)
+            if (GameObject* go = map->GetGameObject(guid))
+                go->DespawnOrUnsummon();
+    active.objects.clear();
     if (map && active.boss)
         if (Creature* boss = map->GetCreature(active.boss))
             if (boss->IsAlive())
@@ -599,6 +627,8 @@ std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& activ
 std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -606,9 +636,10 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
     return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->objectiveEntry, session));
 }
 
-// None: nothing done. Light: a kill or any damage or healing. Medium and
-// strong: MediumShare and StrongShare of the average of those who did any,
-// counted twice, on damage and healing and on kills, the better kept: alone,
+// None: nothing done. Light: a kill, an object gathered, or any damage or
+// healing. Medium and strong: MediumShare and StrongShare of the average of
+// those who did any, counted twice, on damage and healing and on kills and
+// objects gathered, the better kept: alone,
 // a player is the average (strong), even when his blows were not counted (an
 // instant kill deals no damage).
 WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedition const& active, ObjectGuid guid) const
@@ -638,9 +669,9 @@ WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedit
             totalValue += v;
             ++withValue;
         }
-        if (o.kills)
+        if (uint32 const actions = o.kills + o.picks)
         {
-            totalKills += o.kills;
+            totalKills += actions;
             ++withKills;
         }
     }
@@ -648,7 +679,7 @@ WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedit
     WowFatesContribution const& own = contribution->second;
     WowFatesParticipation const byValue = tier(double(own.damage + own.healing),
         withValue ? double(totalValue) / double(withValue) : 0.0);
-    WowFatesParticipation const byKills = tier(double(own.kills),
+    WowFatesParticipation const byKills = tier(double(own.kills + own.picks),
         withKills ? double(totalKills) / double(withKills) : 0.0);
     return std::max(byValue, byKills);
 }
@@ -769,6 +800,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
     {
         active.remaining -= diff;
         active.summonTimer -= diff;
+        active.gatherTimer -= diff;
 
         if (areaTick)
         {
@@ -777,6 +809,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateSummons(active, map, diff);
             if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
                 UpdateBoss(active, map);
+            else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+                UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
             if (pct != active.sentProgress && pct < 100)
@@ -1159,6 +1193,81 @@ void WowFatesExpeditionMgr::SpawnBoss(WowFatesActiveExpedition& active, Map* map
 }
 
 // ---------------------------------------------------------------------------
+// Gathering
+
+// The objects of a gathering: gather_count of them out, at random points of
+// the area as the monsters; one taken is put back after gather_respawn
+// seconds, all at once at the start and when none is left.
+void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* map)
+{
+    if (!map)
+        return;
+
+    std::erase_if(active.objects, [map](ObjectGuid const& guid)
+    {
+        GameObject* go = map->GetGameObject(guid);
+        return !go || !go->isSpawned();
+    });
+
+    WowFatesExpeditionDef const* def = active.def;
+    if (active.objects.size() >= def->gatherCount || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        return;
+    bool const all = active.objects.empty();
+    if (!all && active.gatherTimer > 0)
+        return;
+
+    uint32 const wanted = all ? def->gatherCount - uint32(active.objects.size()) : 1;
+    for (uint32 i = 0; i < wanted; ++i)
+    {
+        Position const pos = SpawnPoint(active, map);
+        GameObject* go = new GameObject();
+        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), def->gatherEntry, map, PHASEMASK_NORMAL,
+                pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(),
+                G3D::Quat(), 100, GO_STATE_READY))
+        {
+            delete go;
+            break;
+        }
+        // Summoned, as a spell's: deleted when it is taken, not put back.
+        go->SetRespawnTime(0);
+        go->SetSpellId(1);
+        go->SetSpawnedByDefault(false);
+        map->AddToMap(go);
+        active.objects.push_back(go->GetGUID());
+    }
+    active.gatherTimer = int64(def->gatherRespawn) * IN_MILLISECONDS;
+}
+
+// An object taken: the share of an objective that grows with the players in
+// the area, as a kill does; it goes, another comes back in its time.
+void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    for (auto& [id, active] : _active)
+    {
+        auto itr = std::find(active.objects.begin(), active.objects.end(), go->GetGUID());
+        if (itr == active.objects.end())
+            continue;
+
+        active.objects.erase(itr);
+        go->DespawnOrUnsummon();
+        if (active.progressPct >= 100.0)
+            return;
+
+        ++active.progress;
+        active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
+        ++active.contributors[player->GetGUID()].picks;
+        if (active.gatherTimer <= 0)
+            active.gatherTimer = int64(active.def->gatherRespawn) * IN_MILLISECONDS;
+        return;
+    }
+
+    // left over from an Expedition that ended
+    go->DespawnOrUnsummon();
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -1224,6 +1333,15 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     {
         active->progressPct = 100.0;
         ++active->contributors[player->GetGUID()].kills;
+        return;
+    }
+
+    // A gathering's guards: their kills count for the players and the pace of
+    // the monsters, not for the bar.
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+    {
+        ++active->contributors[player->GetGUID()].kills;
+        active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);
         return;
     }
 

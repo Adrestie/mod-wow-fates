@@ -30,7 +30,9 @@
  *   1 kill: a number of monsters in the area (one entry, or any);
  *   2 assault and boss: the same up to boss_at percent, then a leader appears
  *     in the centre, whose health is the rest of the bar (its own settings in
- *     mod_wow_fates_objective).
+ *     mod_wow_fates_objective);
+ *   3 gathering: objects to pick up, spread over the area and put back as
+ *     they are taken; a click counts, nothing goes in the bags.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -59,6 +61,7 @@
 
 class ChatHandler;
 class Creature;
+class GameObject;
 class Map;
 class Player;
 class Unit;
@@ -67,7 +70,8 @@ class WorldSession;
 enum WowFatesObjective : uint8
 {
     WOW_FATES_OBJECTIVE_KILL    = 1,
-    WOW_FATES_OBJECTIVE_ASSAULT = 2  // kills, then a boss
+    WOW_FATES_OBJECTIVE_ASSAULT = 2, // kills, then a boss
+    WOW_FATES_OBJECTIVE_GATHER  = 3  // objects to pick up
 };
 
 struct WowFatesExpeditionDef
@@ -89,6 +93,9 @@ struct WowFatesExpeditionDef
     // mod_wow_fates_objective, by type
     uint32 bossEntry = 0;                              // assault: the leader
     uint8 bossAt = 70;                                 // assault: percent at which it appears
+    uint32 gatherEntry = 0;                            // gathering: the gameobject
+    uint32 gatherCount = 8;                            // gathering: of them out at once
+    uint32 gatherRespawn = 5;                          // gathering: s before a taken one is put back
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -127,6 +134,7 @@ struct WowFatesContribution
     uint64 damage = 0;
     uint64 healing = 0;
     uint32 kills = 0;
+    uint32 picks = 0;     // objects gathered
 };
 
 struct WowFatesActiveExpedition
@@ -152,6 +160,10 @@ struct WowFatesActiveExpedition
     ObjectGuid boss;
     uint32 bossHealth = 0;      // its maximum health for one player
     uint32 bossPlayers = 1;     // the players its health was set for
+
+    // Gathering
+    std::vector<ObjectGuid> objects; // out in the area
+    int64 gatherTimer = 0;      // ms before the next one is put back
 };
 
 class WowFatesExpeditionMgr
@@ -181,6 +193,8 @@ public:
     void OnDamage(Unit* attacker, Unit* victim, uint32 damage);
     void OnHeal(Unit* healer, Unit* target, uint32 gain);
     void OnDeath(Unit* victim, Unit* killer);
+    // A gathering's object used, from its map's thread.
+    void OnGather(Player* player, GameObject* go);
 
     void OnLogout(Player* player);
 
@@ -203,7 +217,9 @@ private:
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
     void UpdateBoss(WowFatesActiveExpedition& active, Map* map);
     void SpawnBoss(WowFatesActiveExpedition& active, Map* map);
+    void UpdateGather(WowFatesActiveExpedition& active, Map* map);
     std::string CreatureName(uint32 entry, WorldSession* session) const;
+    std::string GameObjectName(uint32 entry, WorldSession* session) const;
     double Needed(WowFatesActiveExpedition const& active) const;
     void Finish(WowFatesActiveExpedition& active, bool success);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
