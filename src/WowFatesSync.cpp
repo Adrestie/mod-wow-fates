@@ -256,6 +256,10 @@ float WowFatesSync::Apply(Player* player, uint8 level) const
         }
     }
 
+    // A fresh aura comes with its base amounts (-1): back to 0 before the
+    // health and armor are read.
+    Neutralize(player);
+
     float const gap = 1.0f - ratio;
     uint32 const healthBare = player->GetMaxHealth();
     uint32 const armorBare = player->GetArmor();

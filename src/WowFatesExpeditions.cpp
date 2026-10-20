@@ -400,7 +400,8 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 
     WorldSession* session = player->GetSession();
     std::string const name = Name(active.def, session);
-    Tell(player, WOW_FATES_STR_REWARD, name);
+    if (!rows.empty())
+        Tell(player, WOW_FATES_STR_REWARD, name);
 
     for (WowFatesReward const* reward : rows)
     {
