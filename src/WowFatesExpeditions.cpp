@@ -944,11 +944,11 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
                 UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
-            int32 const guard = active.alliesAlive * 1000 + active.allyHealthPct;
-            if ((pct != active.sentProgress && pct < 100) || guard != active.sentGuard)
+            int32 const guarded = active.alliesAlive * 1000 + active.allyHealthPct;
+            if ((pct != active.sentProgress && pct < 100) || guarded != active.sentGuard)
             {
                 active.sentProgress = pct;
-                active.sentGuard = guard;
+                active.sentGuard = guarded;
                 BroadcastSet(active);
             }
             SendStatus(active);
