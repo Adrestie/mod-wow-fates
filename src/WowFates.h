@@ -68,6 +68,8 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_OBJECTIVE_KILL     = 21,
     WOW_FATES_STR_TRACKER_KILL_ANY   = 22,  // the tracker's short line
     WOW_FATES_STR_TRACKER_KILL       = 23,
+    WOW_FATES_STR_OBJECTIVE_ASSAULT_ANY = 24, // then their leader
+    WOW_FATES_STR_OBJECTIVE_ASSAULT  = 25,
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,

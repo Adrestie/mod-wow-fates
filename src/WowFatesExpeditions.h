@@ -26,8 +26,12 @@
  * area of an Expedition is a circle around its point; whoever stands in it is
  * synced to its level.
  *
- * Objective, first type: kill a number of monsters in the area (one entry, or
- * any). The Expedition may bring its own monsters, kept at a number alive.
+ * Objectives, by type:
+ *   1 kill: a number of monsters in the area (one entry, or any);
+ *   2 assault and boss: the same up to boss_at percent, then a leader appears
+ *     in the centre, whose health is the rest of the bar (its own settings in
+ *     mod_wow_fates_objective).
+ * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
  * worth a share of the average contribution. Standing there earns nothing.
@@ -62,8 +66,8 @@ class WorldSession;
 
 enum WowFatesObjective : uint8
 {
-    WOW_FATES_OBJECTIVE_KILL = 1
-    // 2 collect, 3 escort: later
+    WOW_FATES_OBJECTIVE_KILL    = 1,
+    WOW_FATES_OBJECTIVE_ASSAULT = 2  // kills, then a boss
 };
 
 struct WowFatesExpeditionDef
@@ -82,6 +86,9 @@ struct WowFatesExpeditionDef
     uint32 duration = 900;                             // s
     uint32 cooldown = 0;                               // s, 0 = WowFates.Expedition.Cooldown
     uint32 weight = 1;                                 // 0 = only by command
+    // mod_wow_fates_objective, by type
+    uint32 bossEntry = 0;                              // assault: the leader
+    uint8 bossAt = 70;                                 // assault: percent at which it appears
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -139,6 +146,12 @@ struct WowFatesActiveExpedition
     std::unordered_map<ObjectGuid, WowFatesContribution> contributors;
     std::unordered_set<ObjectGuid> inside; // players in the area, synced to it
     std::unordered_map<ObjectGuid, uint32> sentStatus; // kills x 4 + participation, last sent
+
+    // Assault and boss
+    bool bossOut = false;       // the leader has appeared
+    ObjectGuid boss;
+    uint32 bossHealth = 0;      // its maximum health for one player
+    uint32 bossPlayers = 1;     // the players its health was set for
 };
 
 class WowFatesExpeditionMgr
@@ -188,6 +201,10 @@ private:
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
+    void UpdateBoss(WowFatesActiveExpedition& active, Map* map);
+    void SpawnBoss(WowFatesActiveExpedition& active, Map* map);
+    std::string CreatureName(uint32 entry, WorldSession* session) const;
+    double Needed(WowFatesActiveExpedition const& active) const;
     void Finish(WowFatesActiveExpedition& active, bool success);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;

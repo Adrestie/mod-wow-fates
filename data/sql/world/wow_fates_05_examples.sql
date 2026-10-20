@@ -1,10 +1,13 @@
--- mod-wow-fates — three example Expeditions, with the rewards every
+-- mod-wow-fates — four example Expeditions, with the rewards every
 -- Expedition gives by default. Ids 1 to 99 of the module's tables are the
 -- module's own: give yours 100 and up, an update writes these rows again.
 --
 --   1  Kobold Uprising, Elwynn Forest, level 7: Fargodeep or Jasperlode Mine
 --   2  Razormane Raid, Durotar, level 8: the Razormane grounds by Razor Hill
 --   3  Restless Dead, Icecrown, level 80: the ghouls of central-east Icecrown (64, 45)
+--   4  Defias Assault, Elwynn Forest, level 10, assault and boss: the Defias
+--      Bandits of the Brackwell Pumpkin Patch, then their leader, the Defias
+--      Ringleader (creature 96100, wow_fates_06_creatures.sql), at 70 %
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -19,7 +22,12 @@ DELETE FROM `mod_wow_fates_expedition` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`, `objective_entry`, `objective_count`, `summon_entry`, `summon_count`, `summon_respawn`, `radius`, `duration`, `cooldown`, `weight`, `enabled`, `comment`) VALUES
 (1, 'Kobold Uprising',  7, 1,    40, 15,    40, 6, 15, 45, 900, 0, 1, 1, 'Elwynn Forest: Kobold Miner'),
 (2, 'Razormane Raid',   8, 1,  3111, 15,  3111, 6, 15, 50, 900, 0, 1, 1, 'Durotar: Razormane Quilboar'),
-(3, 'Restless Dead',   80, 1, 31812, 25, 31812, 8, 10, 50, 900, 0, 1, 1, 'Icecrown: Decomposed Ghoul');
+(3, 'Restless Dead',   80, 1, 31812, 25, 31812, 8, 10, 50, 900, 0, 1, 1, 'Icecrown: Decomposed Ghoul'),
+(4, 'Defias Assault',  10, 2,   116, 12,   116, 6, 15, 45, 900, 0, 1, 1, 'Elwynn Forest: Defias Bandit, then the Defias Ringleader');
+
+DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
+INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `comment`) VALUES
+(4, 96100, 70, 'Defias Assault: the Defias Ringleader at 70 %');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`) VALUES
@@ -37,7 +45,12 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`) VALUES
 (3, 'deDE', 'Ruhelose Tote'),
 (3, 'esES', 'Muertos sin descanso'),
 (3, 'esMX', 'Muertos sin descanso'),
-(3, 'ruRU', 'Неупокоенные мертвецы');
+(3, 'ruRU', 'Неупокоенные мертвецы'),
+(4, 'frFR', 'Assaut défias'),
+(4, 'deDE', 'Angriff der Defias'),
+(4, 'esES', 'Asalto Defias'),
+(4, 'esMX', 'Asalto Defias'),
+(4, 'ruRU', 'Штурм Братства Справедливости');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -45,7 +58,9 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (2, 1,   0, -9256.03,  -707.889,  63.1122, 0, 'Jasperlode Mine, outside'),
 (3, 2,   1,  92.7794, -4557.56,   54.6971, 0, 'Razormane grounds, south'),
 (4, 2,   1,  80.3499, -4406.12,   43.5863, 0, 'Razormane grounds, north'),
-(5, 3, 571,  7547.05,  1417.36,  324.996,  0, 'Icecrown, central-east (map 64, 45)');
+(5, 3, 571,  7547.05,  1417.36,  324.996,  0, 'Icecrown, central-east (map 64, 45)'),
+(6, 4,   0, -9776.18, -1574.37,   41.901,  0, 'Brackwell Pumpkin Patch'),
+(7, 4,   0, -9738.45,  -834.382,  40.3696, 0, 'Defias Bandit camp, southern Elwynn');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES

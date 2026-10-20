@@ -48,9 +48,11 @@
 
     Messages (addon message "WowFates", from the module): "reset"; "set" with
     id, map, x, y, radius, level, progress, count, seconds left, name,
-    objective, tracker line, duration; "del" with id; "enter" and "leave"
+    objective, tracker line, duration, type of objective (1 extermination,
+    2 assault and boss: the map's icon); "del" with id; "enter" and "leave"
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
-    (0 none, 1 not enough yet, 2 enough); "sync" with level and percent kept.
+    (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name
+    (a banner); "sync" with level and percent kept.
     Positions are world coordinates. WowFatesBounds
     (WowFates_Bounds_Client.lua, from WorldMapArea.dbc) gives each map's edges
     in world coordinates: an Expedition's map fraction, and the player's world
@@ -93,35 +95,35 @@ local TRACKER_TEXTS = {
         leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
         part0 = "Participation: none", part1 = "Participation: light", part2 = "Participation: medium", part3 = "Participation: strong",
         expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards:", bravo = "Well done!", earned = "You earned:", done = "Expedition complete", xp = "%d XP",
-        kills = "Your kills: %d", synced = "Synced to level %d: you keep %d%% of your power.",
+        kills = "Your kills: %d", types = { "Extermination", "Assault and boss" }, boss = "%s appears!", synced = "Synced to level %d: you keep %d%% of your power.",
     },
     frFR = {
         title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
         leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
         part0 = "Participation : aucune", part1 = "Participation : légère", part2 = "Participation : moyenne", part3 = "Participation : forte",
         expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses :", bravo = "Bravo !", earned = "Vous avez gagné :", done = "Expédition terminée", xp = "%d XP",
-        kills = "Vos victimes : %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
+        kills = "Vos victimes : %d", types = { "Extermination", "Assaut et chef" }, boss = "%s apparaît !", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
     },
     deDE = {
         title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
         leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
         part0 = "Teilnahme: keine", part1 = "Teilnahme: gering", part2 = "Teilnahme: mittel", part3 = "Teilnahme: stark",
         expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen:", bravo = "Gut gemacht!", earned = "Ihr habt erhalten:", done = "Expedition abgeschlossen", xp = "%d EP",
-        kills = "Eure Siege: %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
+        kills = "Eure Siege: %d", types = { "Vernichtung", "Angriff und Anführer" }, boss = "%s erscheint!", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
     },
     esES = {
         title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
         leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
         part0 = "Participación: ninguna", part1 = "Participación: leve", part2 = "Participación: media", part3 = "Participación: fuerte",
         expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas:", bravo = "¡Bien hecho!", earned = "Has ganado:", done = "Expedición terminada", xp = "%d de experiencia",
-        kills = "Tus víctimas: %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
+        kills = "Tus víctimas: %d", types = { "Exterminio", "Asalto y líder" }, boss = "¡%s aparece!", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
     },
     ruRU = {
         title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
         leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
         part0 = "Участие: нет", part1 = "Участие: слабое", part2 = "Участие: среднее", part3 = "Участие: сильное",
         expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды:", bravo = "Отлично!", earned = "Вы получили:", done = "Экспедиция завершена", xp = "%d ед. опыта",
-        kills = "Ваши победы: %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
+        kills = "Ваши победы: %d", types = { "Истребление", "Штурм и главарь" }, boss = "Появляется %s!", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
     },
 }
 for locale, t in pairs(TRACKER_TEXTS) do
@@ -160,7 +162,7 @@ local function onMessage(message)
             id = id, map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
             level = tonumber(f[7]), progress = tonumber(f[8]), count = tonumber(f[9]),
             ends = GetTime() + (tonumber(f[10]) or 0), name = f[11], objective = f[12],
-            label = f[13], duration = tonumber(f[14]),
+            label = f[13], duration = tonumber(f[14]), type = tonumber(f[15]) or 1,
         }
         track.update(expeditions[id])
     elseif command == "del" and id then
@@ -187,6 +189,8 @@ local function onMessage(message)
             items[#items + 1] = { entry = tonumber(entry), count = tonumber(count) }
         end
         track.won(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0, items)
+    elseif command == "boss" and id then
+        track.boss(id, f[3] or "")
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -300,6 +304,7 @@ end
 local function tooltipLines(tooltip, e)
     tooltip:AddLine(e.name or "", TITLE_COLOR[1], TITLE_COLOR[2], TITLE_COLOR[3])
     tooltip:AddLine(string.format(L.level, e.level or 0), 1, 0.82, 0)
+    if L.types[e.type or 1] then tooltip:AddLine(L.types[e.type or 1], 0.9, 0.9, 0.9) end
     if e.objective and e.objective ~= "" then
         tooltip:AddLine(string.format(L.progress, e.objective, e.progress or 0), 1, 1, 1, true)
     end
@@ -325,7 +330,15 @@ end
 -- WORLD MAP
 -- ---------------------------------------------------------------------------
 
-local world = { textures = {}, hovered = false }
+local world = { textures = {}, icons = {}, hovered = false }
+
+-- The icon of each type of objective, in the centre of its areas on the world map:
+-- { texture, inset of the texture's border }
+local TYPE_ICON = {
+    [1] = { "Interface\\Icons\\Ability_DualWield", 0.08 },
+    [2] = { "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", 0 },
+}
+local ICON_SIZE = 18
 
 local function worldTooltip()
     return WorldMapTooltip or GameTooltip
@@ -362,6 +375,15 @@ local function worldTexture(i)
     return t
 end
 
+local function worldIcon(i)
+    local t = world.icons[i]
+    if not t then
+        t = world.frame:CreateTexture(nil, "OVERLAY")
+        world.icons[i] = t
+    end
+    return t
+end
+
 -- Lays the areas out on the map as it is now, cropped to the view; returns the shown ones, for
 -- the hover test: { e, cx, cy, rw, rh } in the frame's units, y downward
 local placed = {}
@@ -369,7 +391,7 @@ local placed = {}
 local function layoutWorld()
     local f = world.frame
     for k in pairs(placed) do placed[k] = nil end
-    local used = 0
+    local used, icons = 0, 0
     local b = currentBounds()
     local W, H = f:GetWidth(), f:GetHeight()
     local clip = worldClip()
@@ -398,12 +420,28 @@ local function layoutWorld()
                     tex:Show()
                     placed[#placed + 1] = { e = e, cx = cx, cy = cy, rw = rw, rh = rh,
                                             vl = vl, vr = vr, vt = vt, vb = vb }
+                    local icon = TYPE_ICON[e.type or 1]
+                    local half = ICON_SIZE / 2
+                    if icon and cx - half >= vl and cx + half <= vr and cy - half >= vt and cy + half <= vb then
+                        icons = icons + 1
+                        local it = worldIcon(icons)
+                        it:SetTexture(icon[1])
+                        it:SetTexCoord(icon[2], 1 - icon[2], icon[2], 1 - icon[2])
+                        it:ClearAllPoints()
+                        it:SetPoint("CENTER", f, "TOPLEFT", cx, -cy)
+                        it:SetWidth(ICON_SIZE)
+                        it:SetHeight(ICON_SIZE)
+                        it:Show()
+                    end
                 end
             end
         end
     end
     for i = used + 1, #world.textures do
         world.textures[i]:Hide()
+    end
+    for i = icons + 1, #world.icons do
+        world.icons[i]:Hide()
     end
 end
 
@@ -1000,6 +1038,12 @@ function track.finish(id, success)
         showBanner(L.failed, track.copy and track.copy.name or "", "Sound\\Interface\\iQuestLogCloseA.wav")
     end
     relayout()
+end
+
+function track.boss(id, name)
+    if track.id ~= id or track.result then return end
+    showBanner(string.format(L.boss, name), track.copy and track.copy.name or "",
+        "Sound\\Interface\\RaidWarning.wav")
 end
 
 function track.status(id, kills, part, pct)

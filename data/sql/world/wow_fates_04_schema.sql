@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'English; the other languages in mod_wow_fates_expedition_locale',
   `level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Synced level: whoever is stronger than this level in the area is brought down to it',
-  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area',
+  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss (mod_wow_fates_objective)',
   `objective_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry counted; 0 = any monster',
   `objective_count` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'kills to complete it',
   `summon_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry the Expedition brings; 0 = the monsters already there',
@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_spawn` (
   KEY `expedition` (`expedition`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='WowFates: the points where each Expedition may appear, one picked at random';
+
+CREATE TABLE IF NOT EXISTS `mod_wow_fates_objective` (
+  `expedition` INT UNSIGNED NOT NULL COMMENT 'mod_wow_fates_expedition.id',
+  `boss_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'assault: creature_template.entry of the leader, out in the centre',
+  `boss_at` TINYINT UNSIGNED NOT NULL DEFAULT 70 COMMENT 'assault: percent the kills bring before the leader appears (10 to 95); its health is the rest',
+  `comment` VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`expedition`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='WowFates: the settings of the objectives other than kills, one row per Expedition';
 
 CREATE TABLE IF NOT EXISTS `mod_wow_fates_reward` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,

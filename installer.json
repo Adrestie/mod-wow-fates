@@ -49,6 +49,22 @@
           "where": "spell_id IN ({ids:Spell.dbc})"
         },
         {
+          "table": "creature_template",
+          "where": "entry BETWEEN 96000 AND 96999"
+        },
+        {
+          "table": "creature_template_model",
+          "where": "CreatureID BETWEEN 96000 AND 96999"
+        },
+        {
+          "table": "creature_template_locale",
+          "where": "entry BETWEEN 96000 AND 96999"
+        },
+        {
+          "table": "smart_scripts",
+          "where": "source_type = 0 AND entryorguid BETWEEN 96000 AND 96999"
+        },
+        {
           "table": "updates",
           "where": "name IN ({sql_files:world})"
         }
@@ -57,12 +73,14 @@
         "mod_wow_fates_expedition",
         "mod_wow_fates_expedition_locale",
         "mod_wow_fates_spawn",
+        "mod_wow_fates_objective",
         "mod_wow_fates_reward"
       ],
       "kept_on_update": [
         "mod_wow_fates_expedition",
         "mod_wow_fates_expedition_locale",
         "mod_wow_fates_spawn",
+        "mod_wow_fates_objective",
         "mod_wow_fates_reward"
       ]
     }

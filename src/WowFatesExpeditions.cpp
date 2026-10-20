@@ -121,7 +121,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
 
-            if (def.objectiveType != WOW_FATES_OBJECTIVE_KILL)
+            if (def.objectiveType != WOW_FATES_OBJECTIVE_KILL && def.objectiveType != WOW_FATES_OBJECTIVE_ASSAULT)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -139,6 +139,32 @@ void WowFatesExpeditionMgr::LoadFromDB()
 
             _defs[def.id] = std::move(def);
         } while (result->NextRow());
+    }
+
+    // The settings of each type of objective.
+    if (QueryResult result = WorldDatabase.Query("SELECT `expedition`, `boss_entry`, `boss_at` FROM `mod_wow_fates_objective`"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            auto itr = _defs.find(f[0].Get<uint32>());
+            if (itr == _defs.end())
+                continue;
+            itr->second.bossEntry = f[1].Get<uint32>();
+            itr->second.bossAt = std::clamp<uint8>(f[2].Get<uint8>(), 10, 95);
+        } while (result->NextRow());
+    }
+
+    for (auto itr = _defs.begin(); itr != _defs.end();)
+    {
+        WowFatesExpeditionDef const& def = itr->second;
+        if (def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
+            itr = _defs.erase(itr);
+        }
+        else
+            ++itr;
     }
 
     if (QueryResult result = WorldDatabase.Query("SELECT `id`, `locale`, `name` FROM `mod_wow_fates_expedition_locale`"))
@@ -228,19 +254,32 @@ std::string WowFatesExpeditionMgr::Name(WowFatesExpeditionDef const* def, WorldS
     return def->name;
 }
 
+std::string WowFatesExpeditionMgr::CreatureName(uint32 entry, WorldSession* session) const
+{
+    std::string name;
+    if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(entry))
+        name = creature->Name;
+    if (session)
+        if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(entry))
+            ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
+    return name;
+}
+
 std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
+    {
+        std::string const boss = CreatureName(def->bossEntry, session);
+        if (!def->objectiveEntry)
+            return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_ASSAULT_ANY), boss);
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_ASSAULT),
+            CreatureName(def->objectiveEntry, session), boss);
+    }
+
     if (!def->objectiveEntry)
         return WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL_ANY);
-
-    std::string name;
-    if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(def->objectiveEntry))
-        name = creature->Name;
-    if (session)
-        if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(def->objectiveEntry))
-            ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
-    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), name);
+    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), CreatureName(def->objectiveEntry, session));
 }
 
 bool WowFatesExpeditionMgr::Inside(WowFatesActiveExpedition const& active, Unit const* unit, float rangeFactor) const
@@ -378,6 +417,13 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
                     creature->DespawnOrUnsummon();
                 }
     active.summons.clear();
+    if (map && active.boss)
+        if (Creature* boss = map->GetCreature(active.boss))
+            if (boss->IsAlive())
+            {
+                boss->CombatStop(true);
+                boss->DespawnOrUnsummon();
+            }
 
     for (ObjectGuid const& guid : active.inside)
         Leave(guid, true);
@@ -535,32 +581,29 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 // The clients' map
 
 // "set", id, map, x, y, radius, level, progress in percent, 100, seconds left, name,
-// objective, tracker line, duration: the texts in the player's language.
+// objective, tracker line, duration, type of objective (the map's icon): the
+// texts in the player's language.
 std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
-    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+    return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
         std::min<uint32>(uint32(active.progressPct), 100), 100u,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
         Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
-        def->duration);
+        def->duration, uint32(def->objectiveType));
 }
 
-// The objective as the tracker shows it, the count apart: "Kobold Miner slain".
+// The objective as the tracker shows it, the count apart: "Kobold Miner slain";
+// once the leader of an assault is out, "Defias Ringleader slain".
 std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
         return WowFatesText(session, WOW_FATES_STR_TRACKER_KILL_ANY);
-
-    std::string name;
-    if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(def->objectiveEntry))
-        name = creature->Name;
-    if (session)
-        if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(def->objectiveEntry))
-            ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
-    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), name);
+    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->objectiveEntry, session));
 }
 
 // None: nothing done. Light: a kill or any damage or healing. Medium and
@@ -732,6 +775,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
             UpdateArea(active, map);
             UpdateSummons(active, map, diff);
+            if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
+                UpdateBoss(active, map);
 
             uint32 const pct = uint32(active.progressPct);
             if (pct != active.sentProgress && pct < 100)
@@ -1026,6 +1071,94 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
 }
 
 // ---------------------------------------------------------------------------
+// Assault and boss
+
+// The leader of an assault: out when the kills reach boss_at, in the centre;
+// back if it went away alive (a grid unloaded). Its health grows with the
+// players in the area, as the objective does, and never shrinks; the bar shows
+// the health it lost, and never goes back, even when it heals after a fight.
+void WowFatesExpeditionMgr::UpdateBoss(WowFatesActiveExpedition& active, Map* map)
+{
+    if (!map || active.progressPct >= 100.0)
+        return;
+
+    WowFatesExpeditionDef const* def = active.def;
+    if (!active.bossOut)
+    {
+        if (active.progressPct + 0.001 >= double(def->bossAt))
+            SpawnBoss(active, map);
+        return;
+    }
+
+    Creature* boss = active.boss ? map->GetCreature(active.boss) : nullptr;
+    if (!boss)
+    {
+        if (map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            SpawnBoss(active, map);
+        return;
+    }
+    if (!boss->IsAlive())
+    {
+        // killed by no player (a guard): the Expedition is done all the same
+        active.progressPct = 100.0;
+        return;
+    }
+
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    if (players > active.bossPlayers)
+    {
+        float const pct = boss->GetHealthPct();
+        uint32 const health = uint32(float(active.bossHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
+        boss->SetCreateHealth(health);
+        boss->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
+        boss->UpdateMaxHealth();
+        boss->SetHealth(std::max<uint32>(1, uint32(float(boss->GetMaxHealth()) * pct / 100.0f)));
+        active.bossPlayers = players;
+    }
+
+    double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
+    double const pct = double(def->bossAt) + (100.0 - double(def->bossAt)) * lost;
+    active.progressPct = std::max(active.progressPct, std::min(pct, 99.0));
+}
+
+void WowFatesExpeditionMgr::SpawnBoss(WowFatesActiveExpedition& active, Map* map)
+{
+    WowFatesSpawnPoint const& c = active.spawn;
+    float z = map->GetHeight(PHASEMASK_NORMAL, c.x, c.y, c.z + 5.0f, true, 20.0f);
+    if (z <= INVALID_HEIGHT)
+        z = c.z;
+    Position const pos(c.x, c.y, z, c.o);
+    TempSummon* boss = map->SummonCreature(active.def->bossEntry, pos);
+    if (!boss)
+        return;
+
+    boss->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
+    boss->SetTimer(SUMMON_CORPSE_MS);
+    boss->SetHomePosition(pos);
+    boss->SetWanderDistance(5.0f);
+    boss->SetDefaultMovementType(RANDOM_MOTION_TYPE);
+    boss->GetMotionMaster()->Initialize();
+
+    bool const first = !active.bossOut;
+    active.boss = boss->GetGUID();
+    active.bossOut = true;
+    active.bossHealth = boss->GetMaxHealth();
+    active.bossPlayers = 1;
+    UpdateBoss(active, map); // its health for the players already there
+
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: its leader appears ({} health).", active.def->id, boss->GetMaxHealth());
+    if (!first)
+        return;
+
+    // The tracker's line changes; those inside see a banner with its name.
+    BroadcastSet(active);
+    for (ObjectGuid const& guid : active.inside)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            SendAddon(player, Acore::StringFormat("boss\t{}\t{}", active.def->id,
+                Clean(CreatureName(active.def->bossEntry, player->GetSession()))));
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -1082,19 +1215,43 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
 
     std::lock_guard<std::recursive_mutex> guard(_lock);
     WowFatesActiveExpedition* active = FindAt(victim);
-    if (!active || active->def->objectiveType != WOW_FATES_OBJECTIVE_KILL)
+    if (!active)
         return;
-    if (active->def->objectiveEntry && creature->GetEntry() != active->def->objectiveEntry)
+    WowFatesExpeditionDef const* def = active->def;
+
+    // The leader of an assault: the end of the bar.
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active->bossOut && creature->GetGUID() == active->boss)
+    {
+        active->progressPct = 100.0;
+        ++active->contributors[player->GetGUID()].kills;
+        return;
+    }
+
+    if (def->objectiveEntry && creature->GetEntry() != def->objectiveEntry)
         return;
 
     // Each kill brings the share of an objective that grows with the players
     // in the area at that moment: nothing is taken back when one comes or goes.
+    // An assault's kills fill the bar up to where its leader appears; past it,
+    // they still count for the players and the pace of the monsters.
     ++active->progress;
-    float const players = float(std::max<std::size_t>(active->inside.size(), 1));
-    double const needed = double(active->def->objectiveCount) * (1.0 + WowFatesConf().participantScaling * (players - 1.0f));
-    active->progressPct = std::min(100.0, active->progressPct + 100.0 / std::max(needed, 1.0));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
+    {
+        if (!active->bossOut)
+            active->progressPct = std::min<double>(def->bossAt, active->progressPct + double(def->bossAt) / Needed(*active));
+    }
+    else
+        active->progressPct = std::min(100.0, active->progressPct + 100.0 / Needed(*active));
     ++active->contributors[player->GetGUID()].kills;
-    active->killTimes.push_back(int64(active->def->duration) * IN_MILLISECONDS - active->remaining);
+    active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);
+}
+
+// The kills the objective asks for, with the players in the area now.
+double WowFatesExpeditionMgr::Needed(WowFatesActiveExpedition const& active) const
+{
+    float const players = float(std::max<std::size_t>(active.inside.size(), 1));
+    double const needed = double(active.def->objectiveCount) * (1.0 + WowFatesConf().participantScaling * (players - 1.0f));
+    return std::max(needed, 1.0);
 }
 
 void WowFatesExpeditionMgr::OnLogout(Player* player)

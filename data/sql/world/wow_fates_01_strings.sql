@@ -4,7 +4,7 @@
 -- falling back on English.
 --
 --   1 to 19     messages to the players of an Expedition
---   20 to 29    objectives, inserted into the messages
+--   20 to 29    objectives, inserted into the messages and the tracker
 --   101 to 199  answers of the GM commands (.fates)
 --
 -- Regenerable: the module's rows are deleted before being written again, so
@@ -30,6 +30,8 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  21, 'defeat: {}'),
 ('mod-wow-fates',  22, 'Monsters slain'),
 ('mod-wow-fates',  23, '{} slain'),
+('mod-wow-fates',  24, 'defeat the monsters, then their leader, {}'),
+('mod-wow-fates',  25, 'defeat: {}, then their leader, {}'),
 ('mod-wow-fates', 101, 'Active Expeditions: {}.'),
 ('mod-wow-fates', 102, '#{} {} (level {}), spawn point {}: map {} ({}, {}, {}), {}% ({} kills), {} s left, {} inside, {} contributors.'),
 ('mod-wow-fates', 103, 'No Expedition is active.'),
@@ -66,6 +68,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  21, 'frFR', 'vaincre : {}'),
 ('mod-wow-fates',  22, 'frFR', 'Monstres vaincus'),
 ('mod-wow-fates',  23, 'frFR', '{} vaincu'),
+('mod-wow-fates',  24, 'frFR', 'vaincre les monstres, puis leur chef, {}'),
+('mod-wow-fates',  25, 'frFR', 'vaincre : {}, puis leur chef, {}'),
 ('mod-wow-fates', 101, 'frFR', 'Expéditions actives : {}.'),
 ('mod-wow-fates', 102, 'frFR', '#{} {} (niveau {}), point {} : carte {} ({}, {}, {}), {} % ({} victimes), {} s restantes, {} présents, {} contributeurs.'),
 ('mod-wow-fates', 103, 'frFR', 'Aucune Expédition n''est active.'),
@@ -100,6 +104,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  21, 'deDE', 'besiegt: {}'),
 ('mod-wow-fates',  22, 'deDE', 'Monster besiegt'),
 ('mod-wow-fates',  23, 'deDE', '{} besiegt'),
+('mod-wow-fates',  24, 'deDE', 'besiegt die Monster, dann ihren Anführer, {}'),
+('mod-wow-fates',  25, 'deDE', 'besiegt: {}, dann ihren Anführer, {}'),
 ('mod-wow-fates', 101, 'deDE', 'Aktive Expeditionen: {}.'),
 ('mod-wow-fates', 102, 'deDE', '#{} {} (Stufe {}), Punkt {}: Karte {} ({}, {}, {}), {} % ({} Siege), noch {} s, {} anwesend, {} Beitragende.'),
 ('mod-wow-fates', 103, 'deDE', 'Keine Expedition ist aktiv.'),
@@ -134,6 +140,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  21, 'esES', 'derrota: {}'),
 ('mod-wow-fates',  22, 'esES', 'Monstruos derrotados'),
 ('mod-wow-fates',  23, 'esES', '{} derrotado'),
+('mod-wow-fates',  24, 'esES', 'derrota a los monstruos y luego a su líder, {}'),
+('mod-wow-fates',  25, 'esES', 'derrota: {}, y luego a su líder, {}'),
 ('mod-wow-fates', 101, 'esES', 'Expediciones activas: {}.'),
 ('mod-wow-fates', 102, 'esES', '#{} {} (nivel {}), punto {}: mapa {} ({}, {}, {}), {} % ({} víctimas), quedan {} s, {} presentes, {} participantes.'),
 ('mod-wow-fates', 103, 'esES', 'Ninguna Expedición está activa.'),
@@ -168,6 +176,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  21, 'ruRU', 'победите: {}'),
 ('mod-wow-fates',  22, 'ruRU', 'Монстров убито'),
 ('mod-wow-fates',  23, 'ruRU', '{}: убито'),
+('mod-wow-fates',  24, 'ruRU', 'победите монстров, а затем их главаря: {}'),
+('mod-wow-fates',  25, 'ruRU', 'победите: {}, а затем их главаря: {}'),
 ('mod-wow-fates', 101, 'ruRU', 'Активные экспедиции: {}.'),
 ('mod-wow-fates', 102, 'ruRU', '#{} {} (уровень {}), точка {}: карта {} ({}, {}, {}), {}% (убито {}), осталось {} с, внутри {}, участников {}.'),
 ('mod-wow-fates', 103, 'ruRU', 'Активных экспедиций нет.'),
