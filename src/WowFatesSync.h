@@ -103,7 +103,10 @@ public:
     void SyncControlled(Player* player) const;
 
 private:
-    void ApplyToUnit(Unit* unit, WowFatesShares const& shares) const;
+    // Puts the debuff on a pet or a guardian and sets it bare (every amount
+    // at 0); false if the auras could not be put.
+    bool PrepareUnit(Unit* unit) const;
+    void ApplyToUnit(Unit* unit, WowFatesShares const& shares, uint32 healthBare, uint32 manaBare, uint32 armorBare) const;
     void RemoveFromUnit(Unit* unit) const;
 
     mutable std::mutex _sharesLock;

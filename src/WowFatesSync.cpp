@@ -101,6 +101,28 @@ namespace
                     SetAmount(aura, e, amounts[s][e]);
     }
 
+    // What a pet or a guardian takes from its master (part of his stamina,
+    // intellect, armor, attack and spell power) comes from its own passive
+    // scaling auras, which the core only recalculates on their next tick:
+    // done at once, so that a change of the master's stats shows now.
+    void RecalculateInherited(Unit* unit)
+    {
+        std::vector<AuraEffect*> effects;
+        for (auto const& [spellId, application] : unit->GetAppliedAuras())
+        {
+            Aura* aura = application->GetBase();
+            if (!aura->IsPassive() || aura->GetCasterGUID() != unit->GetGUID()
+                || std::find(SYNC_SPELLS.begin(), SYNC_SPELLS.end(), spellId) != SYNC_SPELLS.end())
+                continue;
+            for (uint8 e = 0; e < MAX_SPELL_EFFECTS; ++e)
+                if (AuraEffect* effect = aura->GetEffect(e))
+                    if (effect->CanBeRecalculated())
+                        effects.push_back(effect);
+        }
+        for (AuraEffect* effect : effects)
+            effect->RecalculateAmount();
+    }
+
     // The reference curve at a level: a straight line between its points, and
     // past its ends from the two nearest.
     float CurveAt(std::vector<std::pair<uint32, float>> const& curve, uint32 level)
@@ -399,16 +421,43 @@ void WowFatesSync::SyncControlled(Player* player) const
     }
 
     // A copy: applying an aura must not touch the set while it is walked.
-    std::vector<Unit*> const units(player->m_Controlled.begin(), player->m_Controlled.end());
-    for (Unit* unit : units)
+    std::vector<Unit*> units;
+    std::vector<float> healthPct;
+    for (Unit* unit : std::vector<Unit*>(player->m_Controlled.begin(), player->m_Controlled.end()))
         if (unit && unit->IsInWorld() && unit->IsAlive() && !unit->IsPlayer())
-            ApplyToUnit(unit, shares);
+        {
+            float const pct = unit->GetMaxHealth() ? float(unit->GetHealth()) / float(unit->GetMaxHealth()) : 1.0f;
+            if (PrepareUnit(unit))
+            {
+                units.push_back(unit);
+                healthPct.push_back(pct);
+            }
+        }
+    if (units.empty())
+        return;
+
+    // Bare, a pet would still have the part of its master's stamina that the
+    // master's debuff took, and its share of health would then come on top of
+    // that cut. So it is measured with its master bare too, for a moment: it
+    // then keeps exactly the same share of its health as its master.
+    std::vector<std::array<uint32, 3>> bare;
+    Amounts const owner = Neutralize(player);
+    for (Unit* unit : units)
+    {
+        RecalculateInherited(unit);
+        bare.push_back({ unit->GetMaxHealth(), unit->GetMaxPower(POWER_MANA), unit->GetArmor() });
+    }
+    Restore(player, owner);
+
+    for (std::size_t i = 0; i < units.size(); ++i)
+    {
+        RecalculateInherited(units[i]);
+        ApplyToUnit(units[i], shares, bare[i][0], bare[i][1], bare[i][2]);
+        units[i]->SetHealth(std::max<uint32>(1, uint32(float(units[i]->GetMaxHealth()) * healthPct[i] + 0.5f)));
+    }
 }
 
-// A pet or a guardian: the owner's cuts of stats, damage and healing as they
-// are, and his share of maximum health, mana and armor on its own, so that a
-// level 80's pet in a level 7 Expedition matches its master.
-void WowFatesSync::ApplyToUnit(Unit* unit, WowFatesShares const& shares) const
+bool WowFatesSync::PrepareUnit(Unit* unit) const
 {
     Aura* main = unit->GetAura(SPELL_WOW_FATES_SYNCED);
     if (!main)
@@ -419,17 +468,27 @@ void WowFatesSync::ApplyToUnit(Unit* unit, WowFatesShares const& shares) const
     if (!main || !pools)
     {
         RemoveFromUnit(unit);
-        return;
+        return false;
     }
 
-    // Bare first: the health aura last on, first off (it keeps the percentage).
+    // The health aura first off: it keeps the percentage.
     SetAmount(pools, EFFECT_0, 0);
     SetAmount(pools, EFFECT_1, 0);
     SetAmount(pools, EFFECT_2, 0);
     SetAmount(main, EFFECT_0, 0);
-    uint32 const healthBare = unit->GetMaxHealth();
-    uint32 const manaBare = unit->GetMaxPower(POWER_MANA);
-    uint32 const armorBare = unit->GetArmor();
+    return true;
+}
+
+// A pet or a guardian: the owner's cuts of stats, damage and healing as they
+// are, and his share of maximum health, mana and armor on its own, so that a
+// level 80's pet in a level 7 Expedition matches its master.
+void WowFatesSync::ApplyToUnit(Unit* unit, WowFatesShares const& shares,
+    uint32 healthBare, uint32 manaBare, uint32 armorBare) const
+{
+    Aura* main = unit->GetAura(SPELL_WOW_FATES_SYNCED);
+    Aura* pools = unit->GetAura(SPELL_WOW_FATES_SYNCED_HEALTH);
+    if (!main || !pools)
+        return;
 
     SetAmount(main, EFFECT_0, shares.statsPct);
     SetAmount(main, EFFECT_1, shares.damagePct);
