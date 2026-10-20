@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'English; the other languages in mod_wow_fates_expedition_locale',
   `level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Synced level: whoever is stronger than this level in the area is brought down to it',
-  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering (mod_wow_fates_objective)',
+  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence (mod_wow_fates_objective)',
   `objective_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry counted; 0 = any monster',
   `objective_count` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'kills to complete it',
   `summon_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry the Expedition brings; 0 = the monsters already there',
@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_objective` (
   `gather_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'gathering: gameobject_template.entry to pick up (ScriptName go_wow_fates_gather); objective_count of them',
   `gather_count` INT UNSIGNED NOT NULL DEFAULT 8 COMMENT 'gathering: of them out at once, at random points of the area',
   `gather_respawn` INT UNSIGNED NOT NULL DEFAULT 5 COMMENT 'gathering: seconds before one taken is put back',
+  `ally_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'defence: creature_template.entry of the ally in the centre (faction 495: friend of all players, foe of monsters); the Expedition fails when it dies',
+  `hold_time` INT UNSIGNED NOT NULL DEFAULT 240 COMMENT 'defence: seconds to hold out, counted from the first player in the area',
+  `wave_interval` INT UNSIGNED NOT NULL DEFAULT 40 COMMENT 'waves: seconds between two; their monsters are summon_entry',
+  `wave_size` INT UNSIGNED NOT NULL DEFAULT 3 COMMENT 'waves: monsters of the first one, for one player (more with the players, as the objective)',
+  `wave_growth` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'waves: monsters added to each next one',
   `comment` VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`expedition`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

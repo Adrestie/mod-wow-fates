@@ -32,7 +32,10 @@
  *     in the centre, whose health is the rest of the bar (its own settings in
  *     mod_wow_fates_objective);
  *   3 gathering: objects to pick up, spread over the area and put back as
- *     they are taken; a click counts, nothing goes in the bags.
+ *     they are taken; a click counts, nothing goes in the bags;
+ *   4 defence: an ally in the centre holds out for hold_time seconds against
+ *     waves of monsters from the edge of the area; the bar is the time held,
+ *     the Expedition fails when the ally dies.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -71,7 +74,8 @@ enum WowFatesObjective : uint8
 {
     WOW_FATES_OBJECTIVE_KILL    = 1,
     WOW_FATES_OBJECTIVE_ASSAULT = 2, // kills, then a boss
-    WOW_FATES_OBJECTIVE_GATHER  = 3  // objects to pick up
+    WOW_FATES_OBJECTIVE_GATHER  = 3, // objects to pick up
+    WOW_FATES_OBJECTIVE_DEFENCE = 4  // an ally to keep alive against waves
 };
 
 struct WowFatesExpeditionDef
@@ -96,6 +100,11 @@ struct WowFatesExpeditionDef
     uint32 gatherEntry = 0;                            // gathering: the gameobject
     uint32 gatherCount = 8;                            // gathering: of them out at once
     uint32 gatherRespawn = 5;                          // gathering: s before a taken one is put back
+    uint32 allyEntry = 0;                              // defence: the ally in the centre
+    uint32 holdTime = 240;                             // defence: s to hold out
+    uint32 waveInterval = 40;                          // waves: s between two
+    uint32 waveSize = 3;                               // waves: monsters of the first, for one player
+    uint32 waveGrowth = 1;                             // waves: more in each next one
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -164,6 +173,16 @@ struct WowFatesActiveExpedition
     // Gathering
     std::vector<ObjectGuid> objects; // out in the area
     int64 gatherTimer = 0;      // ms before the next one is put back
+
+    // Defence and its waves
+    ObjectGuid ally;
+    uint32 allyHealth = 0;      // its maximum health for one player
+    uint32 allyPlayers = 1;     // the players its health was set for
+    bool started = false;       // a player came: the clock and the waves run
+    int64 held = 0;             // ms held
+    int64 waveTimer = 0;        // ms before the next wave
+    uint32 wave = 0;            // waves sent
+    bool failed = false;        // the ally died
 };
 
 class WowFatesExpeditionMgr
@@ -218,6 +237,10 @@ private:
     void UpdateBoss(WowFatesActiveExpedition& active, Map* map);
     void SpawnBoss(WowFatesActiveExpedition& active, Map* map);
     void UpdateGather(WowFatesActiveExpedition& active, Map* map);
+    void UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map);
+    void SendWave(WowFatesActiveExpedition& active, Map* map, Creature* target);
+    void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;
     double Needed(WowFatesActiveExpedition const& active) const;

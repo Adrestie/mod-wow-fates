@@ -49,10 +49,11 @@
     Messages (addon message "WowFates", from the module): "reset"; "set" with
     id, map, x, y, radius, level, progress, count, seconds left, name,
     objective, tracker line, duration, type of objective (1 extermination,
-    2 assault and boss, 3 gathering: the map's icon); "del" with id; "enter" and "leave"
+    2 assault and boss, 3 gathering, 4 defence: the map's icon); "del" with id; "enter" and "leave"
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
-    (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name
-    (a banner); "sync" with level and percent kept.
+    (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
+    "defend" with id and the ally's name, "wave" with id and its number (a
+    banner each); "sync" with level and percent kept.
     Positions are world coordinates. WowFatesBounds
     (WowFates_Bounds_Client.lua, from WorldMapArea.dbc) gives each map's edges
     in world coordinates: an Expedition's map fraction, and the player's world
@@ -95,35 +96,35 @@ local TRACKER_TEXTS = {
         leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
         part0 = "Participation: none", part1 = "Participation: light", part2 = "Participation: medium", part3 = "Participation: strong",
         expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards:", bravo = "Well done!", earned = "You earned:", done = "Expedition complete", xp = "%d XP",
-        kills = "Your kills: %d", types = { "Extermination", "Assault and boss", "Gathering" }, boss = "%s appears!", synced = "Synced to level %d: you keep %d%% of your power.",
+        kills = "Your kills: %d", types = { "Extermination", "Assault and boss", "Gathering", "Defence" }, boss = "%s appears!", defend = "Protect %s!", wave = "Wave %d", synced = "Synced to level %d: you keep %d%% of your power.",
     },
     frFR = {
         title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
         leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
         part0 = "Participation : aucune", part1 = "Participation : légère", part2 = "Participation : moyenne", part3 = "Participation : forte",
         expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses :", bravo = "Bravo !", earned = "Vous avez gagné :", done = "Expédition terminée", xp = "%d XP",
-        kills = "Vos victimes : %d", types = { "Extermination", "Assaut et chef", "Collecte" }, boss = "%s apparaît !", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
+        kills = "Vos victimes : %d", types = { "Extermination", "Assaut et chef", "Collecte", "Défense" }, boss = "%s apparaît !", defend = "Protégez %s !", wave = "Vague %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
     },
     deDE = {
         title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
         leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
         part0 = "Teilnahme: keine", part1 = "Teilnahme: gering", part2 = "Teilnahme: mittel", part3 = "Teilnahme: stark",
         expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen:", bravo = "Gut gemacht!", earned = "Ihr habt erhalten:", done = "Expedition abgeschlossen", xp = "%d EP",
-        kills = "Eure Siege: %d", types = { "Vernichtung", "Angriff und Anführer", "Sammeln" }, boss = "%s erscheint!", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
+        kills = "Eure Siege: %d", types = { "Vernichtung", "Angriff und Anführer", "Sammeln", "Verteidigung" }, boss = "%s erscheint!", defend = "Beschützt %s!", wave = "Welle %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
     },
     esES = {
         title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
         leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
         part0 = "Participación: ninguna", part1 = "Participación: leve", part2 = "Participación: media", part3 = "Participación: fuerte",
         expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas:", bravo = "¡Bien hecho!", earned = "Has ganado:", done = "Expedición terminada", xp = "%d de experiencia",
-        kills = "Tus víctimas: %d", types = { "Exterminio", "Asalto y líder", "Recolección" }, boss = "¡%s aparece!", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
+        kills = "Tus víctimas: %d", types = { "Exterminio", "Asalto y líder", "Recolección", "Defensa" }, boss = "¡%s aparece!", defend = "¡Protege a %s!", wave = "Oleada %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
     },
     ruRU = {
         title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
         leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
         part0 = "Участие: нет", part1 = "Участие: слабое", part2 = "Участие: среднее", part3 = "Участие: сильное",
         expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды:", bravo = "Отлично!", earned = "Вы получили:", done = "Экспедиция завершена", xp = "%d ед. опыта",
-        kills = "Ваши победы: %d", types = { "Истребление", "Штурм и главарь", "Сбор" }, boss = "Появляется %s!", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
+        kills = "Ваши победы: %d", types = { "Истребление", "Штурм и главарь", "Сбор", "Оборона" }, boss = "Появляется %s!", defend = "Защитите: %s!", wave = "Волна %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
     },
 }
 for locale, t in pairs(TRACKER_TEXTS) do
@@ -190,7 +191,11 @@ local function onMessage(message)
         end
         track.won(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0, items)
     elseif command == "boss" and id then
-        track.boss(id, f[3] or "")
+        track.alert(id, string.format(L.boss, f[3] or ""))
+    elseif command == "defend" and id then
+        track.alert(id, string.format(L.defend, f[3] or ""))
+    elseif command == "wave" and id then
+        track.alert(id, string.format(L.wave, tonumber(f[3]) or 0))
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -338,6 +343,7 @@ local TYPE_ICON = {
     [1] = { "Interface\\Icons\\Ability_DualWield", 0.08 },
     [2] = { "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", 0 },
     [3] = { "Interface\\Icons\\INV_Crate_01", 0.08 },
+    [4] = { "Interface\\Icons\\INV_Shield_06", 0.08 },
 }
 local ICON_SIZE = 18
 
@@ -1041,10 +1047,10 @@ function track.finish(id, success)
     relayout()
 end
 
-function track.boss(id, name)
+-- A boss out, a defence begun, a wave coming: a banner with a raid warning's sound
+function track.alert(id, title)
     if track.id ~= id or track.result then return end
-    showBanner(string.format(L.boss, name), track.copy and track.copy.name or "",
-        "Sound\\Interface\\RaidWarning.wav")
+    showBanner(title, track.copy and track.copy.name or "", "Sound\\Interface\\RaidWarning.wav")
 end
 
 function track.status(id, kills, part, pct)

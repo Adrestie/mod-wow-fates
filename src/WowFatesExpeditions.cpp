@@ -22,6 +22,7 @@
 #include "Chat.h"
 #include "Containers.h"
 #include "Creature.h"
+#include "CreatureAI.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "GameObject.h"
@@ -122,7 +123,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
 
-            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_GATHER)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_DEFENCE)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -144,7 +145,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
 
     // The settings of each type of objective.
     if (QueryResult result = WorldDatabase.Query(
-        "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn` FROM `mod_wow_fates_objective`"))
+        "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`, "
+        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth` FROM `mod_wow_fates_objective`"))
     {
         do
         {
@@ -157,6 +159,11 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.gatherEntry = f[3].Get<uint32>();
             itr->second.gatherCount = std::max<uint32>(f[4].Get<uint32>(), 1);
             itr->second.gatherRespawn = f[5].Get<uint32>();
+            itr->second.allyEntry = f[6].Get<uint32>();
+            itr->second.holdTime = std::max<uint32>(f[7].Get<uint32>(), 30);
+            itr->second.waveInterval = std::max<uint32>(f[8].Get<uint32>(), 5);
+            itr->second.waveSize = std::max<uint32>(f[9].Get<uint32>(), 1);
+            itr->second.waveGrowth = f[10].Get<uint32>();
         } while (result->NextRow());
     }
 
@@ -166,6 +173,13 @@ void WowFatesExpeditionMgr::LoadFromDB()
         if (def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
+            itr = _defs.erase(itr);
+        }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_DEFENCE
+            && (!sObjectMgr->GetCreatureTemplate(def.allyEntry) || !sObjectMgr->GetCreatureTemplate(def.summonEntry)))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a defence whose ally (creature {}) or monsters (summon_entry {}) do not exist; skipped.",
+                def.id, def.allyEntry, def.summonEntry);
             itr = _defs.erase(itr);
         }
         else if (def.objectiveType == WOW_FATES_OBJECTIVE_GATHER && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
@@ -291,6 +305,9 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
     WowFatesExpeditionDef const* def = active.def;
     if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_GATHER), GameObjectName(def->gatherEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_DEFENCE), CreatureName(def->allyEntry, session),
+            (def->holdTime + 59) / 60);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -445,6 +462,13 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
             if (GameObject* go = map->GetGameObject(guid))
                 go->DespawnOrUnsummon();
     active.objects.clear();
+    // The ally is never left behind, its corpse after a while.
+    if (map && active.ally)
+        if (Creature* ally = map->GetCreature(active.ally))
+        {
+            ally->CombatStop(true);
+            ally->DespawnOrUnsummon(ally->IsAlive() ? 0ms : Milliseconds(SUMMON_CORPSE_MS));
+        }
     if (map && active.boss)
         if (Creature* boss = map->GetCreature(active.boss))
             if (boss->IsAlive())
@@ -629,6 +653,8 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
     WowFatesExpeditionDef const* def = active.def;
     if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_DEFENCE), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -801,6 +827,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
         active.remaining -= diff;
         active.summonTimer -= diff;
         active.gatherTimer -= diff;
+        if (active.def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
+            UpdateDefence(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -823,7 +851,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
 
         if (active.progressPct >= 100.0)
             ended.emplace_back(id, true);
-        else if (active.remaining <= 0)
+        else if (active.remaining <= 0 || active.failed)
             ended.emplace_back(id, false);
     }
 
@@ -1138,17 +1166,7 @@ void WowFatesExpeditionMgr::UpdateBoss(WowFatesActiveExpedition& active, Map* ma
         return;
     }
 
-    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
-    if (players > active.bossPlayers)
-    {
-        float const pct = boss->GetHealthPct();
-        uint32 const health = uint32(float(active.bossHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
-        boss->SetCreateHealth(health);
-        boss->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
-        boss->UpdateMaxHealth();
-        boss->SetHealth(std::max<uint32>(1, uint32(float(boss->GetMaxHealth()) * pct / 100.0f)));
-        active.bossPlayers = players;
-    }
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, uint32(std::max<std::size_t>(active.inside.size(), 1)));
 
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
     double const pct = double(def->bossAt) + (100.0 - double(def->bossAt)) * lost;
@@ -1268,6 +1286,148 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
 }
 
 // ---------------------------------------------------------------------------
+// Defence, and the waves
+
+// The health of a creature for the players in the area, as the objective
+// grows: never lowered, its share of health kept.
+void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const
+{
+    if (players <= setFor)
+        return;
+    float const pct = creature->GetHealthPct();
+    uint32 const health = uint32(float(baseHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
+    creature->SetCreateHealth(health);
+    creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
+    creature->UpdateMaxHealth();
+    creature->SetHealth(std::max<uint32>(1, uint32(float(creature->GetMaxHealth()) * pct / 100.0f)));
+    setFor = players;
+}
+
+Creature* WowFatesExpeditionMgr::SpawnAlly(WowFatesActiveExpedition& active, Map* map)
+{
+    WowFatesSpawnPoint const& c = active.spawn;
+    float z = map->GetHeight(PHASEMASK_NORMAL, c.x, c.y, c.z + 5.0f, true, 20.0f);
+    if (z <= INVALID_HEIGHT)
+        z = c.z;
+    Position const pos(c.x, c.y, z, c.o);
+    TempSummon* ally = map->SummonCreature(active.def->allyEntry, pos);
+    if (!ally)
+        return nullptr;
+
+    ally->SetTempSummonType(TEMPSUMMON_MANUAL_DESPAWN);
+    // Its faction (an escortee's, friend of all players, foe of monsters) is
+    // flagged for PvP: healing it would flag the healer.
+    ally->SetPvP(false);
+    ally->SetHomePosition(pos);
+    ally->SetDefaultMovementType(IDLE_MOTION_TYPE);
+    ally->GetMotionMaster()->Initialize();
+    active.ally = ally->GetGUID();
+    active.allyHealth = ally->GetMaxHealth();
+    active.allyPlayers = 1;
+    return ally;
+}
+
+// The ally waits in the centre; the first player who comes starts the clock
+// and the waves (the first one at once). Its health grows with the players
+// in the area, as the waves do. Gone alive (a grid unloaded), it comes back;
+// dead, the Expedition fails.
+void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0)
+        return;
+
+    Creature* ally = active.ally ? map->GetCreature(active.ally) : nullptr;
+    if (ally && !ally->IsAlive())
+    {
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died after {} s and {} waves.",
+            active.def->id, active.held / IN_MILLISECONDS, active.wave);
+        active.failed = true;
+        return;
+    }
+    if (!ally)
+    {
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        ally = SpawnAlly(active, map);
+        if (!ally)
+            return;
+    }
+
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
+
+    if (!active.started)
+    {
+        if (active.inside.empty())
+            return;
+        active.started = true;
+        active.waveTimer = 0;
+        for (ObjectGuid const& guid : active.inside)
+            if (Player* player = ObjectAccessor::FindPlayer(guid))
+                SendAddon(player, Acore::StringFormat("defend\t{}\t{}", active.def->id,
+                    Clean(CreatureName(active.def->allyEntry, player->GetSession()))));
+    }
+
+    active.held += diff;
+    active.progressPct = std::min(100.0, 100.0 * double(active.held) / double(int64(active.def->holdTime) * IN_MILLISECONDS));
+
+    active.waveTimer -= diff;
+    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    {
+        active.waveTimer = int64(active.def->waveInterval) * IN_MILLISECONDS;
+        SendWave(active, map, ally);
+    }
+}
+
+// A wave: waveSize monsters, waveGrowth more each time, more with the players
+// in the area; together from one side of the edge, they run at the target.
+// Back from a fight with the players, they go back to it.
+void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Creature* target)
+{
+    WowFatesExpeditionDef const* def = active.def;
+    std::erase_if(active.summons, [map](ObjectGuid const& guid)
+    {
+        return !map->GetCreature(guid);
+    });
+
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    float const base = float(def->waveSize + def->waveGrowth * active.wave);
+    uint32 const count = std::max<uint32>(1, uint32(std::lround(base * (1.0f + WowFatesConf().participantScaling * float(players - 1)))));
+    ++active.wave;
+
+    WowFatesSpawnPoint const& c = active.spawn;
+    float const side = frand(0.0f, 2.0f * float(M_PI));
+    for (uint32 i = 0; i < count; ++i)
+    {
+        float const angle = side + frand(-0.4f, 0.4f);
+        float const dist = def->radius * frand(0.8f, 0.95f);
+        float const x = c.x + dist * std::cos(angle);
+        float const y = c.y + dist * std::sin(angle);
+        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
+        Position pos = (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
+            ? SpawnPoint(active, map) : Position(x, y, z, 0.0f);
+        pos.SetOrientation(std::atan2(c.y - pos.GetPositionY(), c.x - pos.GetPositionX()));
+
+        TempSummon* summon = map->SummonCreature(def->summonEntry, pos);
+        if (!summon)
+            break;
+        summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
+        summon->SetTimer(SUMMON_CORPSE_MS);
+        summon->SetHomePosition(target->GetPositionX() + frand(-4.0f, 4.0f), target->GetPositionY() + frand(-4.0f, 4.0f),
+            target->GetPositionZ(), target->GetOrientation());
+        summon->SetReactState(REACT_AGGRESSIVE);
+        if (summon->AI())
+            summon->AI()->AttackStart(target);
+        active.summons.push_back(summon->GetGUID());
+    }
+
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: wave {}, {} monsters.", def->id, active.wave, count);
+    for (ObjectGuid const& guid : active.inside)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            SendAddon(player, Acore::StringFormat("wave\t{}\t{}", def->id, active.wave));
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -1299,7 +1459,8 @@ void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32 damage
 void WowFatesExpeditionMgr::OnHeal(Unit* healer, Unit* target, uint32 gain)
 {
     // Healing counts in a fight only: topping up idle friends earns nothing.
-    if (!_activeCount || !gain || !healer || !target || !target->IsInCombat() || !IsFromPlayer(target))
+    // A defence's ally counts as a friend.
+    if (!_activeCount || !gain || !healer || !target || !target->IsInCombat())
         return;
     Player* player = healer->GetCharmerOrOwnerPlayerOrPlayerItself();
     if (!player)
@@ -1307,7 +1468,8 @@ void WowFatesExpeditionMgr::OnHeal(Unit* healer, Unit* target, uint32 gain)
 
     std::lock_guard<std::recursive_mutex> guard(_lock);
     if (WowFatesActiveExpedition* active = FindAt(target))
-        active->contributors[player->GetGUID()].healing += gain;
+        if (IsFromPlayer(target) || target->GetGUID() == active->ally)
+            active->contributors[player->GetGUID()].healing += gain;
 }
 
 void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
@@ -1336,9 +1498,9 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
         return;
     }
 
-    // A gathering's guards: their kills count for the players and the pace of
-    // the monsters, not for the bar.
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+    // A gathering's guards, a defence's waves: their kills count for the
+    // players and the pace of the monsters, not for the bar.
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER || def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
     {
         ++active->contributors[player->GetGUID()].kills;
         active->killTimes.push_back(int64(def->duration) * IN_MILLISECONDS - active->remaining);
