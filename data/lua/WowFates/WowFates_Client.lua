@@ -664,13 +664,14 @@ local function shown()
 end
 
 -- WatchFrame's handler (WatchFrame_Update): lineFrame, the offset reached (negative), the
--- frame's height and width; returns the height used and the width
+-- frame's height and width; returns the height used, the width and the number of objectives,
+-- always three numbers: 3.3.5 adds up the third (WatchFrame.lua, totalObjectives)
 local function handler(lineFrame, offset, maxHeight, frameWidth)
     local b = buildBlock()
-    if not b then return 0, 0 end
+    if not b then return 0, 0, 0 end
     if not shown() then
         b:Hide()
-        return 0, 0
+        return 0, 0, 0
     end
     -- ForeverUI's tracker is 260 wide; the game's may be narrower: the block is scaled down
     local width = (ForeverUI and ForeverUI.ObjectiveTracker and ForeverUI.ObjectiveTracker.header) and 260
@@ -682,7 +683,7 @@ local function handler(lineFrame, offset, maxHeight, frameWidth)
     fillBlock()
     b:Show()
     tickBlock()
-    return b.height * scale, BLOCK_W * scale
+    return b.height * scale, BLOCK_W * scale, 1
 end
 
 local function relayout()
