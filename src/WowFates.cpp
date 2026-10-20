@@ -91,7 +91,8 @@ void WowFatesLoadConfig()
     c.reduceDamage = Share("WowFates.Synced.Reduce.Damage", 1.0f);
     c.reduceHealing = Share("WowFates.Synced.Reduce.Healing", 1.0f);
     c.reduceMana = Share("WowFates.Synced.Reduce.Mana", 1.0f);
-    c.damageLevelExponent = Positive("WowFates.Synced.DamageLevelExponent", 1.4f);
+    c.damageLevelExponent = Positive("WowFates.Synced.DamageLevelExponent", 1.0f);
+    c.poolBonus = std::max(sConfigMgr->GetOption<float>("WowFates.Synced.PoolBonus", 1.15f), 0.1f);
     c.syncAnnounce = sConfigMgr->GetOption<bool>("WowFates.Synced.Announce", true);
 
     c.primaryWeight = Positive("WowFates.Score.PrimaryWeight", 1.0f);

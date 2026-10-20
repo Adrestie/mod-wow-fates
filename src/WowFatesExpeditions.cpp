@@ -590,34 +590,50 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
 }
 
 // None: nothing done. Light: a kill or any damage or healing. Medium and
-// strong: damage and healing worth MediumShare and StrongShare of the average
-// of those who did any (alone, a player is the average: strong).
+// strong: MediumShare and StrongShare of the average of those who did any,
+// counted twice, on damage and healing and on kills, the better kept: alone,
+// a player is the average (strong), even when his blows were not counted (an
+// instant kill deals no damage).
 WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedition const& active, ObjectGuid guid) const
 {
     auto contribution = active.contributors.find(guid);
     if (contribution == active.contributors.end())
         return WOW_FATES_PART_NONE;
 
-    uint64 const value = contribution->second.damage + contribution->second.healing;
-    if (!value)
-        return contribution->second.kills ? WOW_FATES_PART_LIGHT : WOW_FATES_PART_NONE;
-
-    uint64 total = 0;
-    uint32 counted = 0;
-    for (auto const& [other, c] : active.contributors)
-        if (uint64 const v = c.damage + c.healing)
-        {
-            total += v;
-            ++counted;
-        }
-    double const average = counted ? double(total) / double(counted) : 0.0;
-
     WowFatesConfig const& c = WowFatesConf();
-    if (double(value) >= average * double(c.strongShare))
-        return WOW_FATES_PART_STRONG;
-    if (double(value) >= average * double(c.mediumShare))
-        return WOW_FATES_PART_MEDIUM;
-    return WOW_FATES_PART_LIGHT;
+    auto tier = [&c](double value, double average)
+    {
+        if (value <= 0.0)
+            return WOW_FATES_PART_NONE;
+        if (value >= average * double(c.strongShare))
+            return WOW_FATES_PART_STRONG;
+        if (value >= average * double(c.mediumShare))
+            return WOW_FATES_PART_MEDIUM;
+        return WOW_FATES_PART_LIGHT;
+    };
+
+    uint64 totalValue = 0, totalKills = 0;
+    uint32 withValue = 0, withKills = 0;
+    for (auto const& [other, o] : active.contributors)
+    {
+        if (uint64 const v = o.damage + o.healing)
+        {
+            totalValue += v;
+            ++withValue;
+        }
+        if (o.kills)
+        {
+            totalKills += o.kills;
+            ++withKills;
+        }
+    }
+
+    WowFatesContribution const& own = contribution->second;
+    WowFatesParticipation const byValue = tier(double(own.damage + own.healing),
+        withValue ? double(totalValue) / double(withValue) : 0.0);
+    WowFatesParticipation const byKills = tier(double(own.kills),
+        withKills ? double(totalKills) / double(withKills) : 0.0);
+    return std::max(byValue, byKills);
 }
 
 // "me", id, kills, participation (0 none, 1 light, 2 medium, 3 strong) and

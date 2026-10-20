@@ -101,7 +101,8 @@ struct WowFatesConfig
     float reduceDamage = 1.0f;
     float reduceHealing = 1.0f;
     float reduceMana = 1.0f;
-    float damageLevelExponent = 1.4f; // damage by level: the creatures' base damage curve, to this power
+    float damageLevelExponent = 1.0f; // damage by level: the creatures' base damage curve, to this power
+    float poolBonus = 1.15f;          // the reference health and mana, times this
     bool syncAnnounce = true;
 
     // Power score

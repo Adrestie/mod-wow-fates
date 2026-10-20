@@ -55,9 +55,13 @@ WowFates.Enable                         = 1
 #        of it, down to the target).
 #
 #    WowFates.Synced.DamageLevelExponent
-#        The power of the level's damage share. 1.4: a level 80 deals about
-#        2 % of his damage in a level 7 Expedition (the most cut is 99 %).
-#        Lower it if synced players hit too softly.
+#        The power of the level's damage share. 1.0: a level 80 deals about
+#        1.7 % of his damage in a level 7 Expedition (the most cut is 99 %).
+#        Lower it if synced players hit too softly, raise it if too hard.
+#
+#    WowFates.Synced.PoolBonus
+#        The target health and mana, times this. 1.15: a level 80 in a level 7
+#        Expedition keeps about 245 health, 15 % above a level 7 of his class.
 #
 #    WowFates.Synced.Announce
 #        1 = a message when a player gets synced, and when he no longer is.
@@ -73,7 +77,8 @@ WowFates.Synced.Reduce.Mana             = 1.0
 WowFates.Synced.Reduce.Armor            = 1.0
 WowFates.Synced.Reduce.Damage           = 1.0
 WowFates.Synced.Reduce.Healing          = 1.0
-WowFates.Synced.DamageLevelExponent     = 1.4
+WowFates.Synced.DamageLevelExponent     = 1.0
+WowFates.Synced.PoolBonus               = 1.15
 WowFates.Synced.Announce                = 1
 
 ###############################################################################
@@ -158,6 +163,9 @@ WowFates.Expedition.Announce            = 1
 #      light    a kill, or any damage or healing      WowFates.Reward.LightPct
 #      medium   MediumShare of the average or more    WowFates.Reward.MediumPct
 #      strong   StrongShare of the average or more    every reward
+#
+#    Kills are measured the same way against the average of those who
+#    killed; the better of the two counts.
 #
 #    He must also be within RewardRange times the radius when it ends.
 #

@@ -258,7 +258,7 @@ std::pair<float, float> WowFatesSync::ReferencePools(Player const* player, uint8
     auto const [baseHealth, baseMana] = BaseHealthMana(player, level);
     float const health = baseHealth + HealthFromStamina(float(info.stats[STAT_STAMINA]) * gear);
     float const mana = baseMana > 0.0f ? baseMana + ManaFromIntellect(float(info.stats[STAT_INTELLECT]) * gear) : 0.0f;
-    return { health, mana };
+    return { health * c.poolBonus, mana * c.poolBonus };
 }
 
 // How much of his damage and healing a player of his level keeps at that
