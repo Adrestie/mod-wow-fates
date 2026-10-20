@@ -379,15 +379,16 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
             Tell(player, WOW_FATES_STR_NOT_ELIGIBLE, name);
     }
 
-    // Its monsters go with it, alive or dead, in a fight or far away.
+    // Its living monsters go with it, in a fight or far away; the corpses go
+    // by themselves, when their time is up (SUMMON_CORPSE_MS).
     if (map)
         for (ObjectGuid const& guid : active.summons)
             if (Creature* creature = map->GetCreature(guid))
-            {
                 if (creature->IsAlive())
+                {
                     creature->CombatStop(true);
-                creature->DespawnOrUnsummon();
-            }
+                    creature->DespawnOrUnsummon();
+                }
     active.summons.clear();
 
     for (ObjectGuid const& guid : active.inside)
