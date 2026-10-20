@@ -147,32 +147,39 @@ WowFates.Expedition.Announce            = 1
 #
 #    PARTICIPATION
 #
-#    Standing in the area earns nothing. A player is rewarded when the
-#    Expedition is complete if he is within RewardRange times its radius and
-#    took an active part: MinKills kills of its monsters, or damage done in
-#    the area plus healing done to players fighting there worth MinShare of
-#    the average of those who did any.
+#    Standing in the area earns nothing. Each player's part is his damage
+#    done in the area plus his healing of players fighting there, against
+#    the average of those who did any (alone, a player is the average):
 #
-#    WowFates.Participation.MinKills
-#        0 = kills alone never suffice.
+#      none     nothing done                          no reward
+#      light    a kill, or any damage or healing      WowFates.Reward.LightPct
+#      medium   MediumShare of the average or more    WowFates.Reward.MediumPct
+#      strong   StrongShare of the average or more    every reward
 #
-#    WowFates.Participation.MinShare
-#        0.25 = a quarter of the average contribution.
+#    He must also be within RewardRange times the radius when it ends.
+#
+#    WowFates.Participation.MediumShare
+#    WowFates.Participation.StrongShare
+#        0.5 = half the average contribution, 1.0 = the average.
 #
 #    WowFates.Participation.RewardRange
 #        Times the radius of the Expedition. 1 at least.
 #
 
-WowFates.Participation.MinKills         = 1
-WowFates.Participation.MinShare         = 0.25
+WowFates.Participation.MediumShare      = 0.5
+WowFates.Participation.StrongShare      = 1.0
 WowFates.Participation.RewardRange      = 2.0
 
 ###############################################################################
 #
 #    REWARDS
 #
-#    Every row of mod_wow_fates_reward that matches the level is given: the
-#    Expedition's own rows, else those of expedition 0.
+#    Every row of mod_wow_fates_reward that matches the level is given: those
+#    of expedition 0 and the Expedition's own. By participation: light and
+#    medium give that share of each amount (money, experience, number of
+#    items), rounded up; strong gives everything. An item given alone
+#    (item_count 1) goes to a strong participation only. A hidden row shows
+#    as a red "?" on the map and in the tracker until it is given.
 #
 #    WowFates.Reward.LevelMargin
 #        -1 = the rewards of the player's level.
@@ -181,3 +188,12 @@ WowFates.Participation.RewardRange      = 2.0
 #
 
 WowFates.Reward.LevelMargin             = -1
+
+#
+#    WowFates.Reward.LightPct
+#    WowFates.Reward.MediumPct
+#        The share of each reward for a light and a medium participation.
+#
+
+WowFates.Reward.LightPct                = 33
+WowFates.Reward.MediumPct               = 66

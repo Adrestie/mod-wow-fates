@@ -35,6 +35,7 @@
 #include "Random.h"
 #include "StringFormat.h"
 #include "TemporarySummon.h"
+#include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
@@ -191,7 +192,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
     }
 
     if (QueryResult result = WorldDatabase.Query(
-        "SELECT `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count` FROM `mod_wow_fates_reward`"))
+        "SELECT `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden` FROM `mod_wow_fates_reward`"))
     {
         do
         {
@@ -204,6 +205,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             reward.xp = f[4].Get<uint32>();
             reward.item = f[5].Get<uint32>();
             reward.itemCount = std::max<uint32>(f[6].Get<uint32>(), 1);
+            reward.hidden = f[7].Get<uint8>() != 0;
 
             if (reward.item && !sObjectMgr->GetItemTemplate(reward.item))
             {
@@ -300,7 +302,7 @@ void WowFatesExpeditionMgr::StartLocked(WowFatesExpeditionDef const* def, WowFat
     LOG_INFO("module", "mod-wow-fates: Expedition {} ({}) starts at spawn point {} (map {}, zone {}).",
         def->id, def->name, spawn->id, spawn->map, active.zone);
 
-    BroadcastSet(active);
+    BroadcastSet(active, true);
 
     if (WowFatesConf().announce)
         AnnounceZone(active, WOW_FATES_STR_STARTED);
@@ -369,10 +371,10 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
         if (!success)
             continue;
 
-        auto contribution = active.contributors.find(guid);
+        WowFatesParticipation const part = Participation(active, guid);
         bool const inRange = Inside(active, player, std::max(c.rewardRange, 1.0f));
-        if (contribution != active.contributors.end() && inRange && Eligible(active, contribution->second))
-            Reward(active, player);
+        if (part != WOW_FATES_PART_NONE && inRange)
+            Reward(active, player, part);
         else
             Tell(player, WOW_FATES_STR_NOT_ELIGIBLE, name);
     }
@@ -393,24 +395,74 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
         --_activeCount;
 }
 
-void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Player* player)
+namespace
 {
-    // The rewards of the player's level, or of the Expedition's when the
-    // configuration keeps strong players from farming low Expeditions.
+    // A share of an amount, rounded up: 33 % of 2 potions is 1.
+    uint32 Share(uint32 amount, uint32 pct)
+    {
+        return uint32((uint64(amount) * pct + 99) / 100);
+    }
+
+    uint32 PartPct(WowFatesParticipation part)
+    {
+        WowFatesConfig const& c = WowFatesConf();
+        switch (part)
+        {
+            case WOW_FATES_PART_LIGHT:  return c.lightPct;
+            case WOW_FATES_PART_MEDIUM: return c.mediumPct;
+            case WOW_FATES_PART_STRONG: return 100;
+            default:                    return 0;
+        }
+    }
+}
+
+// The rows of the player's level (or of the Expedition's, when the
+// configuration keeps strong players from farming low Expeditions): the
+// Expedition's own and those of every Expedition.
+std::vector<WowFatesReward const*> WowFatesExpeditionMgr::RewardRows(WowFatesActiveExpedition const& active, Player const* player) const
+{
     int32 const margin = WowFatesConf().rewardLevelMargin;
     uint8 level = player->GetLevel();
     if (margin >= 0)
         level = uint8(std::min<int32>(level, int32(active.def->level) + margin));
-    uint32 const id = active.def->id;
 
     std::vector<WowFatesReward const*> rows;
     for (WowFatesReward const& reward : _rewards)
-        if (reward.expedition == id && level >= reward.minLevel && level <= reward.maxLevel)
+        if ((reward.expedition == active.def->id || reward.expedition == 0) && level >= reward.minLevel && level <= reward.maxLevel)
             rows.push_back(&reward);
-    if (rows.empty())
-        for (WowFatesReward const& reward : _rewards)
-            if (reward.expedition == 0 && level >= reward.minLevel && level <= reward.maxLevel)
-                rows.push_back(&reward);
+    return rows;
+}
+
+// "rew", id, money, xp, items: what the player gets with a strong
+// participation, for the map's tooltip and the tracker. Items are "entry,
+// count,hidden,single" separated by ";"; a hidden row shows neither its item
+// nor its amounts ("0,0,1,single").
+std::string WowFatesExpeditionMgr::RewardLine(WowFatesActiveExpedition const& active, Player const* player) const
+{
+    bool const maxLevel = player->GetLevel() >= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
+    uint32 money = 0, xp = 0;
+    std::string items;
+    for (WowFatesReward const* reward : RewardRows(active, player))
+    {
+        bool const single = reward->item && reward->itemCount == 1;
+        if (reward->hidden)
+        {
+            items += Acore::StringFormat("{}0,0,1,{}", items.empty() ? "" : ";", single ? 1 : 0);
+            continue;
+        }
+        money += reward->money;
+        if (!maxLevel)
+            xp += reward->xp;
+        if (reward->item)
+            items += Acore::StringFormat("{}{},{},0,{}", items.empty() ? "" : ";", reward->item, reward->itemCount, single ? 1 : 0);
+    }
+    return Acore::StringFormat("rew\t{}\t{}\t{}\t{}", active.def->id, money, xp, items);
+}
+
+void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part)
+{
+    std::vector<WowFatesReward const*> const rows = RewardRows(active, player);
+    uint32 const pct = PartPct(part);
 
     WorldSession* session = player->GetSession();
     std::string const name = Name(active.def, session);
@@ -419,20 +471,23 @@ void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Playe
 
     for (WowFatesReward const* reward : rows)
     {
-        if (reward->money)
+        if (uint32 const money = Share(reward->money, pct))
         {
-            player->ModifyMoney(int32(reward->money));
-            Tell(player, WOW_FATES_STR_REWARD_MONEY, reward->money / GOLD, (reward->money % GOLD) / SILVER, reward->money % SILVER);
+            player->ModifyMoney(int32(money));
+            Tell(player, WOW_FATES_STR_REWARD_MONEY, money / GOLD, (money % GOLD) / SILVER, money % SILVER);
         }
 
-        if (reward->xp)
-            player->GiveXP(reward->xp, nullptr);
+        if (uint32 const xp = Share(reward->xp, pct))
+            player->GiveXP(xp, nullptr);
 
-        if (!reward->item)
+        // A single item goes to a strong participation only.
+        if (!reward->item || (reward->itemCount == 1 && part != WOW_FATES_PART_STRONG))
             continue;
 
         // In the bags what fits, by mail the rest.
-        uint32 count = reward->itemCount;
+        uint32 count = Share(reward->itemCount, pct);
+        if (!count)
+            continue;
         uint32 noSpace = 0;
         ItemPosCountVec dest;
         InventoryResult const msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, reward->item, count, &noSpace);
@@ -534,32 +589,40 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
     return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), name);
 }
 
-// Took part enough: a kill, or damage and healing worth a share of the
-// average of those who did any.
-bool WowFatesExpeditionMgr::Eligible(WowFatesActiveExpedition const& active, WowFatesContribution const& contribution) const
+// None: nothing done. Light: a kill or any damage or healing. Medium and
+// strong: damage and healing worth MediumShare and StrongShare of the average
+// of those who did any (alone, a player is the average: strong).
+WowFatesParticipation WowFatesExpeditionMgr::Participation(WowFatesActiveExpedition const& active, ObjectGuid guid) const
 {
-    WowFatesConfig const& c = WowFatesConf();
-    if (c.minKills && contribution.kills >= c.minKills)
-        return true;
+    auto contribution = active.contributors.find(guid);
+    if (contribution == active.contributors.end())
+        return WOW_FATES_PART_NONE;
 
-    uint64 const value = contribution.damage + contribution.healing;
+    uint64 const value = contribution->second.damage + contribution->second.healing;
     if (!value)
-        return false;
+        return contribution->second.kills ? WOW_FATES_PART_LIGHT : WOW_FATES_PART_NONE;
 
     uint64 total = 0;
     uint32 counted = 0;
-    for (auto const& [guid, other] : active.contributors)
-        if (uint64 const v = other.damage + other.healing)
+    for (auto const& [other, c] : active.contributors)
+        if (uint64 const v = c.damage + c.healing)
         {
             total += v;
             ++counted;
         }
     double const average = counted ? double(total) / double(counted) : 0.0;
-    return double(value) >= average * double(c.minShare);
+
+    WowFatesConfig const& c = WowFatesConf();
+    if (double(value) >= average * double(c.strongShare))
+        return WOW_FATES_PART_STRONG;
+    if (double(value) >= average * double(c.mediumShare))
+        return WOW_FATES_PART_MEDIUM;
+    return WOW_FATES_PART_LIGHT;
 }
 
-// "me", id, kills, participation (0 nothing yet, 1 not enough, 2 enough): to
-// each player inside or who helped, when it changes.
+// "me", id, kills, participation (0 none, 1 light, 2 medium, 3 strong) and
+// the share of the rewards it gives: to each player inside or who helped,
+// when it changes.
 void WowFatesExpeditionMgr::SendStatus(WowFatesActiveExpedition& active)
 {
     std::unordered_set<ObjectGuid> concerned(active.inside.begin(), active.inside.end());
@@ -569,32 +632,33 @@ void WowFatesExpeditionMgr::SendStatus(WowFatesActiveExpedition& active)
     for (ObjectGuid const& guid : concerned)
     {
         uint32 kills = 0;
-        uint32 state = 0;
         auto contribution = active.contributors.find(guid);
         if (contribution != active.contributors.end())
-        {
             kills = contribution->second.kills;
-            state = Eligible(active, contribution->second) ? 2 : 1;
-        }
+        WowFatesParticipation const part = Participation(active, guid);
 
-        uint32 const packed = kills * 4 + state;
+        uint32 const packed = kills * 4 + part;
         auto sent = active.sentStatus.find(guid);
         if (sent != active.sentStatus.end() && sent->second == packed)
             continue;
 
         if (Player* player = ObjectAccessor::FindPlayer(guid))
         {
-            SendAddon(player, Acore::StringFormat("me\t{}\t{}\t{}", active.def->id, kills, state));
+            SendAddon(player, Acore::StringFormat("me\t{}\t{}\t{}\t{}", active.def->id, kills, uint32(part), PartPct(part)));
             active.sentStatus[guid] = packed;
         }
     }
 }
 
-void WowFatesExpeditionMgr::BroadcastSet(WowFatesActiveExpedition const& active)
+void WowFatesExpeditionMgr::BroadcastSet(WowFatesActiveExpedition const& active, bool withRewards)
 {
     for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
         if (player && player->IsInWorld())
+        {
             SendAddon(player, MapLine(active, player->GetSession()));
+            if (withRewards)
+                SendAddon(player, RewardLine(active, player));
+        }
 }
 
 void WowFatesExpeditionMgr::BroadcastDel(uint32 id)
@@ -613,7 +677,10 @@ void WowFatesExpeditionMgr::SendList(Player* player)
     if (!WowFatesConf().enable)
         return;
     for (auto const& [id, active] : _active)
+    {
         SendAddon(player, MapLine(active, player->GetSession()));
+        SendAddon(player, RewardLine(active, player));
+    }
 }
 
 // The client asks for the list when its map code is loaded (after the
@@ -768,6 +835,7 @@ void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* ma
                     Objective(active, player->GetSession()), active.progress, active.def->objectiveCount);
                 // the banner and the tracker of the client
                 SendAddon(player, MapLine(active, player->GetSession()));
+                SendAddon(player, RewardLine(active, player));
                 SendAddon(player, Acore::StringFormat("enter\t{}", active.def->id));
                 active.sentStatus.erase(guid);
             }

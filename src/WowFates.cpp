@@ -75,11 +75,13 @@ void WowFatesLoadConfig()
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
     c.announce = sConfigMgr->GetOption<bool>("WowFates.Expedition.Announce", true);
 
-    c.minKills = sConfigMgr->GetOption<uint32>("WowFates.Participation.MinKills", 1);
-    c.minShare = Positive("WowFates.Participation.MinShare", 0.25f);
+    c.mediumShare = Positive("WowFates.Participation.MediumShare", 0.5f);
+    c.strongShare = std::max(Positive("WowFates.Participation.StrongShare", 1.0f), c.mediumShare);
     c.rewardRange = std::max(sConfigMgr->GetOption<float>("WowFates.Participation.RewardRange", 2.0f), 1.0f);
 
     c.rewardLevelMargin = std::max(sConfigMgr->GetOption<int32>("WowFates.Reward.LevelMargin", -1), -1);
+    c.lightPct = std::min<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Reward.LightPct", 33), 100);
+    c.mediumPct = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Reward.MediumPct", 66), c.lightPct, 100);
 
     sConfig = c;
 }

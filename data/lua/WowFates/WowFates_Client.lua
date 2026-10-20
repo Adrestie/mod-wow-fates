@@ -91,31 +91,36 @@ local TRACKER_TEXTS = {
     enUS = {
         title = "%s - Level %d", banner = "Expedition: %s", bannerLevel = "Level %d",
         leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
-        part0 = "Participation: none yet", part1 = "Participation: not enough yet", part2 = "Participation: confirmed",
+        part0 = "Participation: none", part1 = "Participation: light", part2 = "Participation: medium", part3 = "Participation: strong",
+        expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards (strong participation):", needStrong = "Strong participation required", xp = "%d XP",
         kills = "Your kills: %d", synced = "Synced to level %d: you keep %d%% of your power.",
     },
     frFR = {
         title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
         leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
-        part0 = "Participation : aucune pour l'instant", part1 = "Participation : pas encore suffisante", part2 = "Participation : validée",
+        part0 = "Participation : aucune", part1 = "Participation : légère", part2 = "Participation : moyenne", part3 = "Participation : forte",
+        expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses (participation forte) :", needStrong = "Participation forte requise", xp = "%d XP",
         kills = "Vos victimes : %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
     },
     deDE = {
         title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
         leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
-        part0 = "Teilnahme: noch keine", part1 = "Teilnahme: noch nicht genug", part2 = "Teilnahme: bestätigt",
+        part0 = "Teilnahme: keine", part1 = "Teilnahme: gering", part2 = "Teilnahme: mittel", part3 = "Teilnahme: stark",
+        expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen (starke Teilnahme):", needStrong = "Starke Teilnahme erforderlich", xp = "%d EP",
         kills = "Eure Siege: %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
     },
     esES = {
         title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
         leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
-        part0 = "Participación: ninguna aún", part1 = "Participación: aún insuficiente", part2 = "Participación: confirmada",
+        part0 = "Participación: ninguna", part1 = "Participación: leve", part2 = "Participación: media", part3 = "Participación: fuerte",
+        expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas (participación fuerte):", needStrong = "Se requiere participación fuerte", xp = "%d de experiencia",
         kills = "Tus víctimas: %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
     },
     ruRU = {
         title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
         leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
-        part0 = "Участие: пока нет", part1 = "Участие: пока недостаточно", part2 = "Участие: засчитано",
+        part0 = "Участие: нет", part1 = "Участие: слабое", part2 = "Участие: среднее", part3 = "Участие: сильное",
+        expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды (сильное участие):", needStrong = "Требуется сильное участие", xp = "%d ед. опыта",
         kills = "Ваши победы: %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
     },
 }
@@ -130,6 +135,7 @@ local L = TEXTS[GetLocale()] or TEXTS.enUS
 -- ---------------------------------------------------------------------------
 
 local expeditions = {}                      -- id -> { map, x, y, r, level, progress, count, ends, name, objective }
+local rewards = {}                          -- id -> { money, xp, items = { entry, count, hidden, single } }, strong
 
 local function split(text)
     local out = {}
@@ -165,7 +171,14 @@ local function onMessage(message)
     elseif command == "end" and id then
         track.finish(id, f[3] == "1")
     elseif command == "me" and id then
-        track.status(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0)
+        track.status(id, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0)
+    elseif command == "rew" and id then
+        local items = {}
+        for entry, count, hidden, single in string.gmatch(f[5] or "", "(%d+),(%d+),(%d),(%d)") do
+            items[#items + 1] = { entry = tonumber(entry), count = tonumber(count), hidden = hidden == "1",
+                                  single = single == "1" }
+        end
+        rewards[id] = { money = tonumber(f[3]) or 0, xp = tonumber(f[4]) or 0, items = items }
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -202,6 +215,80 @@ local function playerPosition(b)
     return b[4] - py * (b[4] - b[5]), b[2] - px * (b[2] - b[3])
 end
 
+-- ---------------------------------------------------------------------------
+-- REWARDS
+-- ---------------------------------------------------------------------------
+
+local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
+local TIER_COLOR = {
+    [0] = { 0.6, 0.6, 0.6 }, [1] = { 1, 0.5, 0.25 }, [2] = { 1, 0.82, 0 }, [3] = { 0.1, 1, 0.1 },
+}
+
+-- Asks the client for an item it has not seen, so that its name and icon come
+local scan
+local function request(entry)
+    if not scan then
+        scan = CreateFrame("GameTooltip", "WowFatesScanTooltip", nil, "GameTooltipTemplate")
+        scan:SetOwner(WorldFrame or UIParent, "ANCHOR_NONE")
+    end
+    scan:SetHyperlink("item:" .. entry .. ":0:0:0:0:0:0:0")
+end
+
+local function itemInfo(entry)
+    local name, _, quality, _, _, _, _, _, _, icon = GetItemInfo(entry)
+    if not name then request(entry) end
+    icon = icon or (GetItemIcon and GetItemIcon(entry)) or QUESTION
+    return name, icon, quality
+end
+
+local function coins(copper)
+    copper = math.floor(copper or 0)
+    local g, sv, c = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
+    local parts = {}
+    if g > 0 then parts[#parts + 1] = g .. "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t" end
+    if sv > 0 then parts[#parts + 1] = sv .. "|TInterface\\MoneyFrame\\UI-SilverIcon:12:12:2:0|t" end
+    if c > 0 or #parts == 0 then parts[#parts + 1] = c .. "|TInterface\\MoneyFrame\\UI-CopperIcon:12:12:2:0|t" end
+    return table.concat(parts, " ")
+end
+
+-- What a participation gives out of the strong rewards: the share of each amount, rounded up;
+-- a single item to a strong participation only. Items: { entry, count, hidden, granted }
+local function shareOf(rw, tier, pct)
+    local out = { money = 0, xp = 0, items = {} }
+    if not rw then return out end
+    if tier > 0 then
+        out.money = math.floor((rw.money * pct + 99) / 100)
+        out.xp = math.floor((rw.xp * pct + 99) / 100)
+    end
+    for _, it in ipairs(rw.items) do
+        local granted = tier > 0 and not (it.single and tier < 3)
+        local count = it.single and 1 or math.floor((it.count * pct + 99) / 100)
+        out.items[#out.items + 1] = { entry = it.entry, count = granted and count or it.count,
+                                      hidden = it.hidden, granted = granted }
+    end
+    return out
+end
+
+local function rewardLines(tooltip, rw)
+    if not rw or (rw.money == 0 and rw.xp == 0 and #rw.items == 0) then return end
+    tooltip:AddLine(L.fullRewards, 1, 0.82, 0)
+    local amounts = {}
+    if rw.money > 0 then amounts[#amounts + 1] = coins(rw.money) end
+    if rw.xp > 0 then amounts[#amounts + 1] = string.format(L.xp, rw.xp) end
+    if #amounts > 0 then tooltip:AddLine(table.concat(amounts, "   "), 1, 1, 1) end
+    for _, it in ipairs(rw.items) do
+        if it.hidden then
+            tooltip:AddLine("|T" .. QUESTION .. ":16:16:0:0|t |cffff2020???|r")
+        else
+            local name, icon, quality = itemInfo(it.entry)
+            local r, g, b = 1, 1, 1
+            if quality and GetItemQualityColor then r, g, b = GetItemQualityColor(quality) end
+            tooltip:AddLine(string.format("|T%s:16:16:0:0|t %s%s", icon, name or ("#" .. it.entry),
+                it.count > 1 and (" x" .. it.count) or ""), r, g, b)
+        end
+    end
+end
+
 local function tooltipLines(tooltip, e)
     tooltip:AddLine(e.name or "", TITLE_COLOR[1], TITLE_COLOR[2], TITLE_COLOR[3])
     tooltip:AddLine(string.format(L.level, e.level or 0), 1, 0.82, 0)
@@ -214,6 +301,7 @@ local function tooltipLines(tooltip, e)
     else
         tooltip:AddLine(L.soon, 0.7, 0.7, 0.7)
     end
+    rewardLines(tooltip, rewards[e.id])
 end
 
 local function showTooltip(tooltip, owner, list)
@@ -534,7 +622,7 @@ end
 -- LINGER seconds
 track.id = nil
 track.copy = nil                            -- the Expedition's last values (it may be gone)
-track.kills, track.part = 0, 0
+track.kills, track.part, track.pct = 0, 0, 0
 track.result = nil                          -- "success", "failed" or "left"
 track.untilTime = nil
 track.syncLevel, track.syncPct = 0, 100
@@ -608,11 +696,96 @@ local function buildBlock()
     kills:SetPoint("TOPLEFT", part, "BOTTOMLEFT", 0, -2)
     kills:SetTextColor(0.7, 0.7, 0.7)
 
+    -- what the participation reached gives: amounts, then the items
+    local rewHeader = text(b, 12)
+    rewHeader:SetPoint("TOPLEFT", kills, "BOTTOMLEFT", 0, -6)
+    rewHeader:SetTextColor(1, 0.82, 0)
+    rewHeader:SetText(L.expected)
+    local rewText = text(b, 12)
+    rewText:SetPoint("TOPLEFT", rewHeader, "BOTTOMLEFT", 0, -3)
+    rewText:SetWidth(BLOCK_W - 24)
+    rewText:SetTextColor(1, 1, 1)
+
     b.timer, b.fill, b.title, b.timeLeft = timer, fill, title, timeLeft
     b.objective, b.bar, b.barText, b.part, b.kills = objective, bar, barText, part, kills
-    b.height = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 14 + 2 + 12 + 6
+    b.rewHeader, b.rewText, b.items = rewHeader, rewText, {}
+    b.baseHeight = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 14 + 2 + 12 + 6 + 15 + 15
+    b.height = b.baseHeight
     block = b
     return b
+end
+
+local ITEM_SIDE, ITEM_GAP = 24, 4
+
+local function itemButton(b, i)
+    local btn = b.items[i]
+    if btn then return btn end
+    btn = CreateFrame("Button", nil, b)
+    btn:SetWidth(ITEM_SIDE)
+    btn:SetHeight(ITEM_SIDE)
+    btn.icon = btn:CreateTexture(nil, "ARTWORK")
+    btn.icon:SetAllPoints(btn)
+    btn.count = btn:CreateFontString(nil, "OVERLAY")
+    btn.count:SetFont(FONT, 11, "OUTLINE")
+    btn.count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
+    btn.cross = btn:CreateTexture(nil, "OVERLAY")
+    btn.cross:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+    btn.cross:SetWidth(14)
+    btn.cross:SetHeight(14)
+    btn.cross:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 2, 2)
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if self.hidden then
+            GameTooltip:SetText("???", 1, 0.13, 0.13)
+        else
+            GameTooltip:SetHyperlink("item:" .. self.entry .. ":0:0:0:0:0:0:0")
+        end
+        if not self.granted then GameTooltip:AddLine(L.needStrong, 1, 0.13, 0.13) end
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b.items[i] = btn
+    return btn
+end
+
+-- The rewards rows; returns the block's height
+local function fillRewards(b)
+    local tier = track.part or 0
+    local got = shareOf(rewards[track.id], tier, track.pct or 0)
+    local amounts = {}
+    if got.money > 0 then amounts[#amounts + 1] = coins(got.money) end
+    if got.xp > 0 then amounts[#amounts + 1] = string.format(L.xp, got.xp) end
+    local anyItem = false
+    for _, it in ipairs(got.items) do if it.granted then anyItem = true end end
+    if #amounts == 0 and not anyItem then
+        b.rewText:SetText(L.noReward)
+        b.rewText:SetTextColor(0.6, 0.6, 0.6)
+    else
+        b.rewText:SetText(table.concat(amounts, "   "))
+        b.rewText:SetTextColor(1, 1, 1)
+    end
+    for i, it in ipairs(got.items) do
+        local btn = itemButton(b, i)
+        btn.entry, btn.hidden, btn.granted = it.entry, it.hidden, it.granted
+        if it.hidden then
+            btn.icon:SetTexture(QUESTION)
+            btn.icon:SetVertexColor(1, 0.25, 0.25)
+            btn.count:SetText("")
+        else
+            local _, icon = itemInfo(it.entry)
+            btn.icon:SetTexture(icon)
+            btn.icon:SetVertexColor(1, 1, 1)
+            btn.count:SetText(it.count > 1 and it.count or "")
+        end
+        if btn.icon.SetDesaturated then btn.icon:SetDesaturated(not it.granted) end
+        btn:SetAlpha(it.granted and 1 or 0.6)
+        if it.granted then btn.cross:Hide() else btn.cross:Show() end
+        btn:ClearAllPoints()
+        btn:SetPoint("TOPLEFT", b.rewText, "BOTTOMLEFT", (i - 1) * (ITEM_SIDE + ITEM_GAP), -4)
+        btn:Show()
+    end
+    for i = #got.items + 1, #b.items do b.items[i]:Hide() end
+    return b.baseHeight + (#got.items > 0 and (ITEM_SIDE + 6) or 0)
 end
 
 local function color(fs, c)
@@ -635,9 +808,15 @@ local function fillBlock()
         b.part:SetText(L.failed) color(b.part, RED)
     else
         b.part:SetText(L["part" .. (track.part or 0)])
-        color(b.part, track.part == 2 and GREEN or (track.part == 1 and ORANGE or GREY))
+        color(b.part, TIER_COLOR[track.part or 0] or GREY)
     end
     b.kills:SetText(string.format(L.kills, track.kills or 0))
+    -- a new height lays the tracker out again
+    local height = fillRewards(b)
+    if height ~= b.height then
+        b.height = height
+        return true
+    end
 end
 
 -- The timer: every frame while shown, without laying the tracker out again
@@ -767,13 +946,13 @@ end
 function track.update(e)
     if track.id == e.id then
         track.copy = copy(e)
-        if block and block:IsShown() then fillBlock() end
+        if block and block:IsShown() and fillBlock() then relayout() end
     end
 end
 
 function track.enter(id)
     local e = expeditions[id]
-    if track.id ~= id then track.kills, track.part = 0, 0 end
+    if track.id ~= id then track.kills, track.part, track.pct = 0, 0, 0 end
     track.id, track.result, track.untilTime = id, nil, nil
     if e then track.copy = copy(e) end
     local c = track.copy
@@ -804,10 +983,10 @@ function track.finish(id, success)
     relayout()
 end
 
-function track.status(id, kills, part)
+function track.status(id, kills, part, pct)
     if track.id ~= id then return end
-    track.kills, track.part = kills, part
-    if block and block:IsShown() then fillBlock() end
+    track.kills, track.part, track.pct = kills, part, pct
+    if block and block:IsShown() and fillBlock() then relayout() end
 end
 
 function track.sync(level, pct)

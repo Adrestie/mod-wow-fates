@@ -47,15 +47,26 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_spawn` (
 
 CREATE TABLE IF NOT EXISTS `mod_wow_fates_reward` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `expedition` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'mod_wow_fates_expedition.id; 0 = every Expedition without rows of its own for that level',
+  `expedition` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'mod_wow_fates_expedition.id; 0 = every Expedition, on top of its own rows',
   `min_level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'level of the player',
   `max_level` TINYINT UNSIGNED NOT NULL DEFAULT 255,
   `money` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'copper',
   `xp` INT UNSIGNED NOT NULL DEFAULT 0,
   `item` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'item_template.entry; by mail when the bags are full',
   `item_count` INT UNSIGNED NOT NULL DEFAULT 1,
+  `hidden` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '1 = shown as a red ? until given',
   `comment` VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `expedition` (`expedition`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='WowFates: the rewards by level of the player; every row that matches is given';
+  COMMENT='WowFates: the rewards by level of the player; every row that matches is given, by participation';
+
+-- `hidden` came after the first version of the table: added when missing.
+SET @wow_fates_hidden := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_reward' AND COLUMN_NAME = 'hidden');
+SET @wow_fates_sql := IF(@wow_fates_hidden = 0,
+  'ALTER TABLE `mod_wow_fates_reward` ADD COLUMN `hidden` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''1 = shown as a red ? until given'' AFTER `item_count`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;

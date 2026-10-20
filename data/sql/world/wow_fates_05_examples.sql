@@ -9,6 +9,10 @@
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
 --
+-- Rewards: rows of expedition 0 go to every Expedition, by the player's level;
+-- an Expedition's own rows come on top. Kobold Uprising adds a hidden one, a
+-- bag shown as a red "?" until given (a single item: strong participation only).
+--
 -- Idempotent: the module's rows are deleted before being written again.
 
 DELETE FROM `mod_wow_fates_expedition` WHERE `id` BETWEEN 1 AND 99;
@@ -44,10 +48,11 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (5, 3, 571,  7547.05,  1417.36,  324.996,  0, 'Icecrown, central-east (map 64, 45)');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
-INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `comment`) VALUES
-(1, 0,  1,  19,    500,   400,   858, 2, 'Lesser Healing Potion'),
-(2, 0, 20,  39,   3000,  2500,   929, 3, 'Healing Potion'),
-(3, 0, 40,  59,  10000,  9000,  1710, 3, 'Greater Healing Potion'),
-(4, 0, 60,  69,  30000, 25000,  1710, 5, 'Greater Healing Potion'),
-(5, 0, 70,  79,  60000, 60000, 33447, 3, 'Runic Healing Potion'),
-(6, 0, 80, 255, 150000,     0, 47241, 1, 'Emblem of Triumph');
+INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES
+(1, 0,  1,  19,    500,   400,   858, 2, 0, 'Lesser Healing Potion'),
+(2, 0, 20,  39,   3000,  2500,   929, 3, 0, 'Healing Potion'),
+(3, 0, 40,  59,  10000,  9000,  1710, 3, 0, 'Greater Healing Potion'),
+(4, 0, 60,  69,  30000, 25000,  1710, 5, 0, 'Greater Healing Potion'),
+(5, 0, 70,  79,  60000, 60000, 33447, 3, 0, 'Runic Healing Potion'),
+(6, 0, 80, 255, 150000,     0, 47241, 1, 0, 'Emblem of Triumph'),
+(7, 1,  1, 255,      0,     0,  4496, 1, 1, 'Kobold Uprising, hidden: Small Brown Pouch');

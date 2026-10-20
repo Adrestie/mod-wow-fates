@@ -119,12 +119,14 @@ struct WowFatesConfig
     bool announce = true;
 
     // Participation
-    uint32 minKills = 1;
-    float minShare = 0.25f;
+    float mediumShare = 0.5f;        // of the average contribution
+    float strongShare = 1.0f;
     float rewardRange = 2.0f;        // times the radius
 
     // Rewards
     int32 rewardLevelMargin = -1;    // -1 = the player's level; N = at most the Expedition's level + N
+    uint32 lightPct = 33;            // share of the rewards by participation
+    uint32 mediumPct = 66;
 };
 
 WowFatesConfig const& WowFatesConf();

@@ -91,15 +91,26 @@ struct WowFatesSpawnPoint
     float x = 0.0f, y = 0.0f, z = 0.0f, o = 0.0f;
 };
 
+// How much a player took part, from his damage and healing against the
+// average of those who did any (WowFates.Participation.*).
+enum WowFatesParticipation : uint8
+{
+    WOW_FATES_PART_NONE   = 0, // nothing done: no reward
+    WOW_FATES_PART_LIGHT  = 1, // something: WowFates.Reward.LightPct of each reward
+    WOW_FATES_PART_MEDIUM = 2, // MediumShare of the average: WowFates.Reward.MediumPct
+    WOW_FATES_PART_STRONG = 3  // StrongShare of the average: everything, single items included
+};
+
 struct WowFatesReward
 {
-    uint32 expedition = 0; // 0 = every Expedition without rows of its own for that level
+    uint32 expedition = 0; // 0 = every Expedition, added to its own rows
     uint8 minLevel = 1;
     uint8 maxLevel = 255;
     uint32 money = 0;      // copper
     uint32 xp = 0;
     uint32 item = 0;
     uint32 itemCount = 1;
+    bool hidden = false;   // shown as "?" until given
 };
 
 struct WowFatesContribution
@@ -173,17 +184,19 @@ private:
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void Finish(WowFatesActiveExpedition& active, bool success);
-    void Reward(WowFatesActiveExpedition const& active, Player* player);
+    void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
     void AnnounceZone(WowFatesActiveExpedition const& active, uint32 text);
     void AnnounceParticipants(WowFatesActiveExpedition const& active, uint32 text, uint32 a = 0, uint32 b = 0);
     std::string Objective(WowFatesActiveExpedition const& active, WorldSession* session) const;
     void Leave(ObjectGuid guid, bool announce);
     std::string MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const;
     std::string TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const;
-    bool Eligible(WowFatesActiveExpedition const& active, WowFatesContribution const& contribution) const;
+    WowFatesParticipation Participation(WowFatesActiveExpedition const& active, ObjectGuid guid) const;
+    std::vector<WowFatesReward const*> RewardRows(WowFatesActiveExpedition const& active, Player const* player) const;
+    std::string RewardLine(WowFatesActiveExpedition const& active, Player const* player) const;
     void SendStatus(WowFatesActiveExpedition& active);
     void LeaveArea(WowFatesActiveExpedition const& active, ObjectGuid guid);
-    void BroadcastSet(WowFatesActiveExpedition const& active);
+    void BroadcastSet(WowFatesActiveExpedition const& active, bool withRewards = false);
     void BroadcastDel(uint32 id);
 
     std::map<uint32, WowFatesExpeditionDef> _defs;
