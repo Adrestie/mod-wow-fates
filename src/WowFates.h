@@ -135,6 +135,10 @@ struct WowFatesConfig
 
     // The objective grows with the players in the area: base x (1 + this x (players - 1))
     float participantScaling = 0.6f;
+    float wavePerCharacter = 1.0f;   // times wave_size, per character in the area
+    float wavePaceFast = 0.5f;       // a wave killed within this share of the interval is fast
+    float wavePaceStep = 0.25f;      // the pace factor's move after each wave
+    float wavePaceMax = 2.0f;        // the pace factor's cap
 
     // Monsters of an Expedition: brought back faster, and more of them, when
     // the area is cleared fast

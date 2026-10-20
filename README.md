@@ -31,8 +31,9 @@ ones and rewards for those who take part.
   - *Gathering*: pick up objects spread over the area, put back as they are
     taken, while monsters guard them; a click counts, nothing goes in the bags.
   - *Defence*: an ally in the centre must hold out for a few minutes against
-    waves of monsters from the edge of the area, bigger each time and with
-    the players there; the bar is the time held, and the Expedition fails if
+    waves of monsters coming from two to four sides of the area, bigger each
+    time, with each character there (bots too) and when the last wave was
+    killed fast; the bar is the time held, and the Expedition fails if
     the ally dies. The clock starts with the first player in the area.
   - *Invocation*: players channel at an altar in the centre while waves of
     monsters come at them: a true channel, with its bar, the hands raised and
@@ -132,6 +133,8 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Rotation.CountBots` | 0 | whether bots make a zone "with players" (they may take part either way) |
 | `WowFates.Rotation.IdleExpire` | 900 | seconds without activity before an Expedition goes (never while players are at it) |
 | `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
+| `WowFates.Waves.PerCharacter` | 1.0 | monsters of a wave per character in the area, times wave_size |
+| `WowFates.Waves.PaceFast` / `PaceStep` / `PaceMax` | 0.5 / 0.25 / 2.0 | a wave killed within half the interval makes the next ones a quarter bigger, twice at most |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
 | `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |

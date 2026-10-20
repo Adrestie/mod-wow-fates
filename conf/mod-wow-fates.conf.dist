@@ -165,6 +165,21 @@ WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000
 
 #
+#    WowFates.Waves.PerCharacter
+#        The monsters of a wave (defence, invocation, wave support): wave_size
+#        times this for each character in the area, players and bots alike,
+#        then wave_growth more for each wave already sent. 1 = wave_size per
+#        character.
+#
+#    WowFates.Waves.PaceFast
+#    WowFates.Waves.PaceStep
+#    WowFates.Waves.PaceMax
+#        The pace of the kills: a wave all killed within PaceFast of
+#        wave_interval (0.5 = half of it) raises the next waves by PaceStep
+#        (0.25 = a quarter more), PaceMax times at most; a wave killed slower,
+#        or not all killed when the next one comes, brings them PaceStep back
+#        toward their own size. It multiplies the characters' part.
+#
 #    WowFates.Expedition.ParticipantScaling
 #        The players see a percentage, not a count: each kill brings 100 % /
 #        (objective_count x (1 + ParticipantScaling x (players in the area - 1))),
@@ -172,6 +187,10 @@ WowFates.Expedition.AreaInterval        = 1000
 #        two players, 1.6 times as many; four, 2.8 times.
 #
 
+WowFates.Waves.PerCharacter             = 1.0
+WowFates.Waves.PaceFast                 = 0.5
+WowFates.Waves.PaceStep                 = 0.25
+WowFates.Waves.PaceMax                  = 2.0
 WowFates.Expedition.ParticipantScaling  = 0.6
 
 #

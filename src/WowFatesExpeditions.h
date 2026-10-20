@@ -215,6 +215,9 @@ struct WowFatesActiveExpedition
     // Wave support
     std::vector<ObjectGuid> allies;
     std::vector<ObjectGuid> waveMobs; // the wave on its way
+    int64 waveSentAt = 0;       // elapsed, when it came
+    int64 waveClearedAt = -1;   // elapsed, when its last monster died; -1 while some live
+    float pace = 1.0f;          // the waves' size for the pace of the kills, 1 to PaceMax
     uint32 repelled = 0;        // waves pushed back
 };
 
@@ -279,6 +282,7 @@ private:
     void UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map, Position const& pos);
     void SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target);
+    bool EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const;
     bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);
     Position Centre(WowFatesActiveExpedition const& active, Map* map, float spread = 0.0f) const;
     void UpdateInvoke(WowFatesActiveExpedition& active, Map* map, uint32 diff);

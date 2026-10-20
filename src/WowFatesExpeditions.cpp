@@ -914,6 +914,15 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
             UpdateArea(active, map);
             UpdateSummons(active, map, diff);
+            // when the wave on its way was all killed, for the pace of the next
+            if (map && !active.waveMobs.empty() && active.waveClearedAt < 0
+                && std::none_of(active.waveMobs.begin(), active.waveMobs.end(), [map](ObjectGuid const& guid)
+                {
+                    Creature* creature = map->GetCreature(guid);
+                    return creature && creature->IsAlive();
+                }))
+                active.waveClearedAt = active.elapsed;
+
             if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
                 UpdateBoss(active, map);
             else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
@@ -1537,10 +1546,38 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
     }
 }
 
-// A wave: waveSize monsters, waveGrowth more each time, more with the players
-// in the area; together from one side of the edge, they run at the target
-// (or the centre, when there is none). Back from a fight with the players,
-// they go back to it.
+// A point of the edge of the area near an angle, for a wave to come from: the
+// ground there, seen from the centre and not much higher or lower, as the
+// monsters' points; a few angles around it, else none.
+bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const
+{
+    WowFatesSpawnPoint const& c = active.spawn;
+    for (uint32 attempt = 0; attempt < 8; ++attempt)
+    {
+        float const a = angle + (attempt ? frand(-0.35f, 0.35f) : 0.0f);
+        float const dist = active.def->radius * frand(0.8f, 0.95f);
+        float const x = c.x + dist * std::cos(a);
+        float const y = c.y + dist * std::sin(a);
+        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
+        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
+            continue;
+        if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
+                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+            continue;
+        out.Relocate(x, y, z, std::atan2(c.y - y, c.x - x));
+        return true;
+    }
+    return false;
+}
+
+// A wave: wave_size monsters for each character in the area, players and bots
+// alike (WowFates.Waves.PerCharacter times), times the pace of the kills, and
+// wave_growth more for each wave already sent. The pace: the last wave killed
+// within PaceFast of the interval raises it by PaceStep, PaceMax at most;
+// killed slower, or not all killed, it goes PaceStep back toward 1. It comes from two to four points of the edge, at angles
+// drawn again for each wave and at least a quarter turn over their number
+// apart, and runs at the target (or the centre, when there is none). Back
+// from a fight with the players, they go back to it.
 void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target)
 {
     WowFatesExpeditionDef const* def = active.def;
@@ -1549,25 +1586,49 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         return !map->GetCreature(guid);
     });
 
-    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
-    float const base = float(def->waveSize + def->waveGrowth * active.wave);
-    uint32 const count = std::max<uint32>(1, uint32(std::lround(base * (1.0f + WowFatesConf().participantScaling * float(players - 1)))));
+    WowFatesConfig const& c = WowFatesConf();
+    if (active.wave)
+    {
+        bool const fast = active.waveClearedAt >= 0
+            && active.waveClearedAt - active.waveSentAt <= int64(c.wavePaceFast * float(def->waveInterval) * IN_MILLISECONDS);
+        active.pace = fast ? std::min(c.wavePaceMax, active.pace + c.wavePaceStep)
+            : std::max(1.0f, active.pace - c.wavePaceStep);
+    }
+
+    uint32 const characters = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    uint32 const count = std::max<uint32>(1, uint32(std::lround(c.wavePerCharacter * float(def->waveSize) * float(characters) * active.pace))
+        + def->waveGrowth * active.wave);
     ++active.wave;
     active.waveMobs.clear();
+    active.waveSentAt = active.elapsed;
+    active.waveClearedAt = -1;
 
-    WowFatesSpawnPoint const& c = active.spawn;
+    // the points of entry: evenly around, each moved by up to a quarter of the
+    // gap, so that two are always at least half a gap apart
+    uint32 const sides = std::clamp<uint32>((count + 2) / 3, std::min<uint32>(count, 2), 4);
+    float const gap = 2.0f * float(M_PI) / float(sides);
+    float const start = frand(0.0f, 2.0f * float(M_PI));
+    std::vector<Position> entries;
+    for (uint32 i = 0; i < sides; ++i)
+    {
+        Position pos;
+        if (EdgePoint(active, map, start + gap * float(i) + frand(-0.25f, 0.25f) * gap, pos))
+            entries.push_back(pos);
+    }
+    if (entries.empty())
+        entries.push_back(SpawnPoint(active, map));
+
+    WowFatesSpawnPoint const& centre = active.spawn;
     Position const goal = target ? target->GetPosition() : Centre(active, map);
-    float const side = frand(0.0f, 2.0f * float(M_PI));
     for (uint32 i = 0; i < count; ++i)
     {
-        float const angle = side + frand(-0.4f, 0.4f);
-        float const dist = def->radius * frand(0.8f, 0.95f);
-        float const x = c.x + dist * std::cos(angle);
-        float const y = c.y + dist * std::sin(angle);
-        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
-        Position pos = (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
-            ? SpawnPoint(active, map) : Position(x, y, z, 0.0f);
-        pos.SetOrientation(std::atan2(c.y - pos.GetPositionY(), c.x - pos.GetPositionX()));
+        Position const& entry = entries[i % entries.size()];
+        float const x = entry.GetPositionX() + frand(-3.0f, 3.0f);
+        float const y = entry.GetPositionY() + frand(-3.0f, 3.0f);
+        float z = map->GetHeight(PHASEMASK_NORMAL, x, y, entry.GetPositionZ() + 5.0f, true, 20.0f);
+        if (z <= INVALID_HEIGHT)
+            z = entry.GetPositionZ();
+        Position const pos(x, y, z, std::atan2(centre.y - y, centre.x - x));
 
         TempSummon* summon = map->SummonCreature(def->summonEntry, pos);
         if (!summon)
@@ -1586,7 +1647,8 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         active.waveMobs.push_back(summon->GetGUID());
     }
 
-    LOG_INFO("module", "mod-wow-fates: Expedition {}: wave {}, {} monsters.", def->id, active.wave, count);
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: wave {}, {} monsters for {} characters at pace {:.2f}, from {} sides.",
+        def->id, active.wave, count, characters, active.pace, entries.size());
     for (ObjectGuid const& guid : active.inside)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
             SendAddon(player, Acore::StringFormat("wave\t{}\t{}", def->id, active.wave));
@@ -1775,6 +1837,8 @@ void WowFatesExpeditionMgr::UpdateSupport(WowFatesActiveExpedition& active, Map*
         });
         if (left)
             return;
+        if (active.waveClearedAt < 0)
+            active.waveClearedAt = active.elapsed;
         active.waveMobs.clear();
         ++active.repelled;
         active.progressPct = std::min(100.0, 100.0 * double(active.repelled) / double(def->waveCount));
