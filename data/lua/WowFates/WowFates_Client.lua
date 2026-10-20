@@ -703,7 +703,7 @@ local function buildBlock()
     barText:SetJustifyH("CENTER")
     barText:SetTextColor(1, 1, 1)
 
-    -- the player: participation and kills, or the result
+    -- the result, at the end, over the rewards (no participation shown)
     local part = text(b, 12)
     part:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -10, -14)
     part:SetWidth(BLOCK_W - 24)
@@ -713,7 +713,7 @@ local function buildBlock()
 
     -- what the participation reached gives: amounts, then the items
     local rewHeader = text(b, 12)
-    rewHeader:SetPoint("TOPLEFT", kills, "BOTTOMLEFT", 0, -6)
+    rewHeader:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -10, -14)
     rewHeader:SetTextColor(1, 0.82, 0)
     rewHeader:SetText(L.expected)
     local rewText = text(b, 12)
@@ -724,7 +724,7 @@ local function buildBlock()
     b.timer, b.fill, b.title, b.timeLeft = timer, fill, title, timeLeft
     b.objective, b.bar, b.barText, b.part, b.kills = objective, bar, barText, part, kills
     b.rewHeader, b.rewText, b.items = rewHeader, rewText, {}
-    b.baseHeight = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 14 + 2 + 12 + 6 + 15 + 15
+    b.baseHeight = BLOCK_H + 4 + 14 + 12 + BAR_H + 14 + 15 + 15
     b.height = b.baseHeight
     block = b
     return b
@@ -817,15 +817,18 @@ local function fillBlock()
     local pct = count > 0 and math.floor(progress * 100 / count) or 0
     b.bar:SetValue(pct)
     b.barText:SetText(pct .. "%")
-    if track.result == "success" then
-        b.part:SetText(L.success) color(b.part, GREEN)
-    elseif track.result == "failed" then
-        b.part:SetText(L.failed) color(b.part, RED)
+    -- the objective, the progress and the rewards only: the participation is not shown;
+    -- at the end, the result takes the rewards' header line
+    b.kills:Hide()
+    if track.result == "success" or track.result == "failed" then
+        b.part:SetText(track.result == "success" and L.success or L.failed)
+        color(b.part, track.result == "success" and GREEN or RED)
+        b.part:Show()
+        b.rewHeader:Hide()
     else
-        b.part:SetText(L["part" .. (track.part or 0)])
-        color(b.part, TIER_COLOR[track.part or 0] or GREY)
+        b.part:Hide()
+        b.rewHeader:Show()
     end
-    b.kills:SetText(string.format(L.kills, track.kills or 0))
     -- a new height lays the tracker out again
     local height = fillRewards(b)
     if height ~= b.height then
