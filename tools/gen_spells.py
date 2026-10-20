@@ -186,9 +186,15 @@ def main():
 
 DELETE FROM `spell_dbc` WHERE `ID` IN ({ids});
 """
+    footer = f"""
+-- Never saved with a character or a pet (SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED):
+-- the area puts the debuff back while the Expedition lasts.
+DELETE FROM `spell_custom_attr` WHERE `spell_id` IN ({ids});
+INSERT INTO `spell_custom_attr` (`spell_id`, `attributes`) VALUES
+""" + ",\n".join(f"({s[0]}, 16777216)" for s in SPELLS) + ";\n"
     path = os.path.join(ROOT, "data", "sql", "world", "wow_fates_03_spells.sql")
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(header + "\n".join(sql_rows()) + "\n")
+        f.write(header + "\n".join(sql_rows()) + "\n" + footer)
 
     path = os.path.join(ROOT, "installer.json")
     with open(path, encoding="utf-8") as f:

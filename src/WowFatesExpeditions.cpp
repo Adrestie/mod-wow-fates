@@ -878,7 +878,19 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
     {
         state.timer -= diff;
         if (state.timer > 0)
+        {
+            // A pet or a guardian summoned since the last measure: synced at once.
+            if (Player* player = ObjectAccessor::FindPlayer(guid))
+                if (player->IsInWorld() && state.ratio < 1.0f)
+                    for (Unit* unit : player->m_Controlled)
+                        if (unit && unit->IsInWorld() && unit->IsAlive() && !unit->IsPlayer()
+                            && !unit->HasAura(SPELL_WOW_FATES_SYNCED))
+                        {
+                            sWowFatesSync->SyncControlled(player);
+                            break;
+                        }
             continue;
+        }
         state.timer = c.syncInterval;
 
         auto active = _active.find(state.expedition);

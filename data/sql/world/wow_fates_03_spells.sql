@@ -27,3 +27,12 @@ INSERT INTO `spell_dbc` (`ID`, `Attributes`, `AttributesEx`, `AttributesEx2`, `A
 VALUES (96002, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1, -2, 1, 189, 2, 1.0, 6, 1, -2, 1, 189, 12, 1.0, 6, 1, -2, 1, 189, 25165824, 1.0, 'Synced (defense)', 16712190, 16712190, 16712190, 16712190);
 INSERT INTO `spell_dbc` (`ID`, `Attributes`, `AttributesEx`, `AttributesEx2`, `AttributesEx3`, `CastingTimeIndex`, `ProcChance`, `DurationIndex`, `RangeIndex`, `EquippedItemClass`, `SpellIconID`, `SchoolMask`, `Effect_1`, `EffectDieSides_1`, `EffectBasePoints_1`, `ImplicitTargetA_1`, `EffectAura_1`, `EffectMiscValue_1`, `EffectChainAmplitude_1`, `Effect_2`, `EffectDieSides_2`, `EffectBasePoints_2`, `ImplicitTargetA_2`, `EffectAura_2`, `EffectMiscValue_2`, `EffectChainAmplitude_2`, `Effect_3`, `EffectDieSides_3`, `EffectBasePoints_3`, `ImplicitTargetA_3`, `EffectAura_3`, `EffectMiscValue_3`, `EffectChainAmplitude_3`, `Name_Lang_enUS`, `Name_Lang_Mask`, `NameSubtext_Lang_Mask`, `Description_Lang_Mask`, `AuraDescription_Lang_Mask`)
 VALUES (96003, 2684354688, 268435456, 1, 1048576, 1, 101, 21, 1, -1, 58, 1, 6, 1, -2, 1, 133, 0, 1.0, 6, 1, -2, 1, 101, 1, 1.0, 6, 1, -2, 1, 132, 0, 1.0, 'Synced (health)', 16712190, 16712190, 16712190, 16712190);
+
+-- Never saved with a character or a pet (SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED):
+-- the area puts the debuff back while the Expedition lasts.
+DELETE FROM `spell_custom_attr` WHERE `spell_id` IN (96000, 96001, 96002, 96003);
+INSERT INTO `spell_custom_attr` (`spell_id`, `attributes`) VALUES
+(96000, 16777216),
+(96001, 16777216),
+(96002, 16777216),
+(96003, 16777216);

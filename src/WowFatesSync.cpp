@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 
 namespace
 {
@@ -78,7 +79,7 @@ namespace
     // health aura goes first and comes back last: it keeps the health
     // percentage when it changes, the stats do not, so that order gives the
     // player back exactly the health he had.
-    Amounts Neutralize(Player* player)
+    Amounts Neutralize(Unit* player)
     {
         Amounts previous{};
         for (std::size_t s = SYNC_SPELLS.size(); s-- > 0;)
@@ -92,7 +93,7 @@ namespace
         return previous;
     }
 
-    void Restore(Player* player, Amounts const& amounts)
+    void Restore(Unit* player, Amounts const& amounts)
     {
         for (std::size_t s = 0; s < SYNC_SPELLS.size(); ++s)
             if (Aura* aura = player->GetAura(SYNC_SPELLS[s]))
@@ -347,6 +348,21 @@ float WowFatesSync::Apply(Player* player, uint8 level) const
     if (auras[0]->GetCharges() != level)
         auras[0]->SetCharges(level);
 
+    // What was taken, for his pets and guardians.
+    WowFatesShares shares;
+    shares.level = level;
+    shares.statsPct = auras[0]->GetEffect(EFFECT_0) ? auras[0]->GetEffect(EFFECT_0)->GetAmount() : 0;
+    shares.damagePct = auras[0]->GetEffect(EFFECT_1) ? auras[0]->GetEffect(EFFECT_1)->GetAmount() : 0;
+    shares.healingPct = auras[0]->GetEffect(EFFECT_2) ? auras[0]->GetEffect(EFFECT_2)->GetAmount() : 0;
+    shares.healthShare = healthBare ? float(player->GetMaxHealth()) / float(healthBare) : 1.0f;
+    shares.manaShare = manaBare ? float(player->GetMaxPower(POWER_MANA)) / float(manaBare) : 1.0f;
+    shares.armorShare = armorBare ? float(player->GetArmor()) / float(armorBare) : 1.0f;
+    {
+        std::lock_guard<std::mutex> guard(_sharesLock);
+        _shares[player->GetGUID()] = shares;
+    }
+    SyncControlled(player);
+
     // Synced by his level alone, he still is: below 1.
     return std::min(ratio, 0.99f);
 }
@@ -355,6 +371,76 @@ void WowFatesSync::Remove(Player* player) const
 {
     for (uint32 spell : SYNC_SPELLS)
         player->RemoveAurasDueToSpell(spell);
+    for (Unit* unit : player->m_Controlled)
+        if (unit)
+            RemoveFromUnit(unit);
+    if (Unit* pet = player->GetGuardianPet())
+        RemoveFromUnit(pet);
+
+    std::lock_guard<std::mutex> guard(_sharesLock);
+    _shares.erase(player->GetGUID());
+}
+
+void WowFatesSync::RemoveFromUnit(Unit* unit) const
+{
+    for (uint32 spell : SYNC_SPELLS)
+        unit->RemoveAurasDueToSpell(spell);
+}
+
+void WowFatesSync::SyncControlled(Player* player) const
+{
+    WowFatesShares shares;
+    {
+        std::lock_guard<std::mutex> guard(_sharesLock);
+        auto itr = _shares.find(player->GetGUID());
+        if (itr == _shares.end())
+            return;
+        shares = itr->second;
+    }
+
+    // A copy: applying an aura must not touch the set while it is walked.
+    std::vector<Unit*> const units(player->m_Controlled.begin(), player->m_Controlled.end());
+    for (Unit* unit : units)
+        if (unit && unit->IsInWorld() && unit->IsAlive() && !unit->IsPlayer())
+            ApplyToUnit(unit, shares);
+}
+
+// A pet or a guardian: the owner's cuts of stats, damage and healing as they
+// are, and his share of maximum health, mana and armor on its own, so that a
+// level 80's pet in a level 7 Expedition matches its master.
+void WowFatesSync::ApplyToUnit(Unit* unit, WowFatesShares const& shares) const
+{
+    Aura* main = unit->GetAura(SPELL_WOW_FATES_SYNCED);
+    if (!main)
+        main = unit->AddAura(SPELL_WOW_FATES_SYNCED, unit);
+    Aura* pools = unit->GetAura(SPELL_WOW_FATES_SYNCED_HEALTH);
+    if (!pools)
+        pools = unit->AddAura(SPELL_WOW_FATES_SYNCED_HEALTH, unit);
+    if (!main || !pools)
+    {
+        RemoveFromUnit(unit);
+        return;
+    }
+
+    // Bare first: the health aura last on, first off (it keeps the percentage).
+    SetAmount(pools, EFFECT_0, 0);
+    SetAmount(pools, EFFECT_1, 0);
+    SetAmount(pools, EFFECT_2, 0);
+    SetAmount(main, EFFECT_0, 0);
+    uint32 const healthBare = unit->GetMaxHealth();
+    uint32 const manaBare = unit->GetMaxPower(POWER_MANA);
+    uint32 const armorBare = unit->GetArmor();
+
+    SetAmount(main, EFFECT_0, shares.statsPct);
+    SetAmount(main, EFFECT_1, shares.damagePct);
+    SetAmount(main, EFFECT_2, shares.healingPct);
+    SetAmount(pools, EFFECT_0, PctToward(float(healthBare) * shares.healthShare, float(unit->GetMaxHealth())));
+    SetAmount(pools, EFFECT_1, PctToward(float(armorBare) * shares.armorShare, float(unit->GetArmor())));
+    if (manaBare)
+        SetAmount(pools, EFFECT_2, PctToward(float(manaBare) * shares.manaShare, float(unit->GetMaxPower(POWER_MANA))));
+
+    if (main->GetCharges() != shares.level)
+        main->SetCharges(shares.level);
 }
 
 bool WowFatesSync::IsSynced(Player const* player) const

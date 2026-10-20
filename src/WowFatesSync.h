@@ -36,10 +36,26 @@
 #define MOD_WOW_FATES_SYNC_H
 
 #include "Define.h"
+#include "ObjectGuid.h"
 
+#include <mutex>
+#include <unordered_map>
 #include <utility>
 
 class Player;
+class Unit;
+
+// What the debuff took from a player, passed on to his pets and guardians.
+struct WowFatesShares
+{
+    uint8 level = 0;
+    int32 statsPct = 0;     // the amounts of the visible aura
+    int32 damagePct = 0;
+    int32 healingPct = 0;
+    float healthShare = 1.0f; // maximum health kept, over the bare one
+    float manaShare = 1.0f;
+    float armorShare = 1.0f;
+};
 
 struct WowFatesScore
 {
@@ -76,8 +92,22 @@ public:
     // ratio applied, 1 when none.
     float Apply(Player* player, uint8 level) const;
 
+    // The player's debuff and that of every unit he controls (pets, guardians,
+    // minions, totems).
     void Remove(Player* player) const;
     bool IsSynced(Player const* player) const;
+
+    // The pets and guardians of a synced player: the same cuts as his, on
+    // their own health, armor, stats, damage and healing. Called after each
+    // Apply, and between two measures for those summoned since.
+    void SyncControlled(Player* player) const;
+
+private:
+    void ApplyToUnit(Unit* unit, WowFatesShares const& shares) const;
+    void RemoveFromUnit(Unit* unit) const;
+
+    mutable std::mutex _sharesLock;
+    mutable std::unordered_map<ObjectGuid, WowFatesShares> _shares; // by player
 };
 
 #define sWowFatesSync WowFatesSync::instance()

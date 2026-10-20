@@ -45,6 +45,10 @@
           "where": "ID IN ({ids:Spell.dbc})"
         },
         {
+          "table": "spell_custom_attr",
+          "where": "spell_id IN ({ids:Spell.dbc})"
+        },
+        {
           "table": "updates",
           "where": "name IN ({sql_files:world})"
         }
