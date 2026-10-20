@@ -242,7 +242,7 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
 {
     WowFatesExpeditionDef const* def = active.def;
     if (!def->objectiveEntry)
-        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL_ANY), def->objectiveCount);
+        return WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL_ANY);
 
     std::string name;
     if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(def->objectiveEntry))
@@ -250,7 +250,7 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
     if (session)
         if (CreatureLocale const* locale = sObjectMgr->GetCreatureLocale(def->objectiveEntry))
             ObjectMgr::GetLocaleString(locale->Name, session->GetSessionDbLocaleIndex(), name);
-    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), def->objectiveCount, name);
+    return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), name);
 }
 
 bool WowFatesExpeditionMgr::Inside(WowFatesActiveExpedition const& active, Unit const* unit, float rangeFactor) const
@@ -330,6 +330,7 @@ bool WowFatesExpeditionMgr::Complete(uint32 id)
         return false;
 
     itr->second.progress = itr->second.def->objectiveCount;
+    itr->second.progressPct = 100.0;
     Finish(itr->second, true);
     _active.erase(itr);
     return true;
@@ -349,8 +350,8 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
     WowFatesConfig const& c = WowFatesConf();
     Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
 
-    LOG_INFO("module", "mod-wow-fates: Expedition {} ends, {} ({}/{}, {} contributors).",
-        active.def->id, success ? "complete" : "failed", active.progress, active.def->objectiveCount, active.contributors.size());
+    LOG_INFO("module", "mod-wow-fates: Expedition {} ends, {} ({} %, {} kills, {} contributors).",
+        active.def->id, success ? "complete" : "failed", uint32(active.progressPct), active.progress, active.contributors.size());
 
     BroadcastDel(active.def->id);
 
@@ -565,14 +566,14 @@ void WowFatesExpeditionMgr::AnnounceParticipants(WowFatesActiveExpedition const&
 // ---------------------------------------------------------------------------
 // The clients' map
 
-// "set", id, map, x, y, radius, level, progress, count, seconds left, name,
+// "set", id, map, x, y, radius, level, progress in percent, 100, seconds left, name,
 // objective, tracker line, duration: the texts in the player's language.
 std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
     return Acore::StringFormat("set\t{}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
-        std::min(active.progress, def->objectiveCount), def->objectiveCount,
+        std::min<uint32>(uint32(active.progressPct), 100), 100u,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
         Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
         def->duration);
@@ -764,24 +765,25 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateArea(active, map);
             UpdateSummons(active, map, diff);
 
-            if (active.progress != active.sentProgress && active.progress < active.def->objectiveCount)
+            uint32 const pct = uint32(active.progressPct);
+            if (pct != active.sentProgress && pct < 100)
             {
-                active.sentProgress = active.progress;
+                active.sentProgress = pct;
                 BroadcastSet(active);
             }
             SendStatus(active);
         }
 
-        uint32 const count = active.def->objectiveCount;
-        uint8 const quarter = uint8(std::min<uint32>(active.progress, count) * 4 / count);
+        uint32 const pct = std::min<uint32>(uint32(active.progressPct), 100);
+        uint8 const quarter = uint8(pct / 25);
         if (quarter > active.announcedQuarter)
         {
             active.announcedQuarter = quarter;
             if (quarter < 4)
-                AnnounceParticipants(active, WOW_FATES_STR_PROGRESS, active.progress, count);
+                AnnounceParticipants(active, WOW_FATES_STR_PROGRESS, pct);
         }
 
-        if (active.progress >= count)
+        if (active.progressPct >= 100.0)
             ended.emplace_back(id, true);
         else if (active.remaining <= 0)
             ended.emplace_back(id, false);
@@ -853,7 +855,7 @@ void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* ma
                 _synced[guid].expedition = active.def->id;
                 _pendingUnsync.erase(guid);
                 Tell(player, WOW_FATES_STR_ENTERED, Name(active.def, player->GetSession()), uint32(active.def->level),
-                    Objective(active, player->GetSession()), active.progress, active.def->objectiveCount);
+                    Objective(active, player->GetSession()), uint32(active.progressPct));
                 // the banner and the tracker of the client
                 SendAddon(player, MapLine(active, player->GetSession()));
                 SendAddon(player, RewardLine(active, player));
@@ -1093,8 +1095,12 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     if (active->def->objectiveEntry && creature->GetEntry() != active->def->objectiveEntry)
         return;
 
-    if (active->progress < active->def->objectiveCount)
-        ++active->progress;
+    // Each kill brings the share of an objective that grows with the players
+    // in the area at that moment: nothing is taken back when one comes or goes.
+    ++active->progress;
+    float const players = float(std::max<std::size_t>(active->inside.size(), 1));
+    double const needed = double(active->def->objectiveCount) * (1.0 + WowFatesConf().participantScaling * (players - 1.0f));
+    active->progressPct = std::min(100.0, active->progressPct + 100.0 / std::max(needed, 1.0));
     ++active->contributors[player->GetGUID()].kills;
     active->killTimes.push_back(int64(active->def->duration) * IN_MILLISECONDS - active->remaining);
 }
@@ -1129,7 +1135,7 @@ void WowFatesExpeditionMgr::List(ChatHandler* handler)
         handler->SendSysMessage(handler->PGetParseModuleString(WOW_FATES_MODULE, WOW_FATES_STR_CMD_LIST_LINE,
             id, Name(active.def, handler->GetSession()), uint32(active.def->level), active.spawn.id, active.spawn.map,
             int32(active.spawn.x), int32(active.spawn.y), int32(active.spawn.z),
-            active.progress, active.def->objectiveCount, uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
+            uint32(active.progressPct), active.progress, uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
             uint32(active.inside.size()), uint32(active.contributors.size())));
 }
 

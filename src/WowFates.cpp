@@ -109,6 +109,7 @@ void WowFatesLoadConfig()
     c.cooldown = sConfigMgr->GetOption<uint32>("WowFates.Expedition.Cooldown", 600);
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
     c.announce = sConfigMgr->GetOption<bool>("WowFates.Expedition.Announce", true);
+    c.participantScaling = Positive("WowFates.Expedition.ParticipantScaling", 0.6f);
     c.adaptiveSpawn = sConfigMgr->GetOption<bool>("WowFates.Expedition.AdaptiveSpawn", true);
     c.adaptiveWindow = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AdaptiveWindow", 15), 5) * IN_MILLISECONDS;
     c.minRespawn = sConfigMgr->GetOption<uint32>("WowFates.Expedition.MinRespawn", 2) * IN_MILLISECONDS;

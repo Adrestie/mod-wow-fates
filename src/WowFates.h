@@ -121,6 +121,9 @@ struct WowFatesConfig
     uint32 areaInterval = 1000;      // ms between two looks at who is inside
     bool announce = true;
 
+    // The objective grows with the players in the area: base x (1 + this x (players - 1))
+    float participantScaling = 0.6f;
+
     // Monsters of an Expedition: brought back faster, and more of them, when
     // the area is cleared fast
     bool adaptiveSpawn = true;

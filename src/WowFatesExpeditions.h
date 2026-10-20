@@ -127,7 +127,8 @@ struct WowFatesActiveExpedition
     WowFatesSpawnPoint spawn;
     uint32 zone = 0;
     int64 remaining = 0;        // ms
-    uint32 progress = 0;
+    uint32 progress = 0;        // kills counted, for the GM commands
+    double progressPct = 0.0;   // what the players see: 100 completes it
     uint8 announcedQuarter = 0; // quarters of the objective already announced
     uint32 sentProgress = 0;    // progress the clients last heard of
     int64 summonTimer = 0;      // ms

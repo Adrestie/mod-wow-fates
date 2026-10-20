@@ -81,11 +81,11 @@ local INDOOR = { [0] = 300, 240, 180, 120, 80, 50 }
 -- ---------------------------------------------------------------------------
 
 local TEXTS = {
-    enUS = { level = "Expedition, level %d", progress = "%s: %d/%d", left = "%d min left", soon = "Ending soon" },
-    frFR = { level = "Expédition, niveau %d", progress = "%s : %d/%d", left = "%d min restantes", soon = "Bientôt terminée" },
-    deDE = { level = "Expedition, Stufe %d", progress = "%s: %d/%d", left = "Noch %d Min.", soon = "Endet bald" },
-    esES = { level = "Expedición, nivel %d", progress = "%s: %d/%d", left = "Quedan %d min", soon = "Termina pronto" },
-    ruRU = { level = "Экспедиция, уровень %d", progress = "%s: %d/%d", left = "Осталось %d мин.", soon = "Скоро завершится" },
+    enUS = { level = "Expedition, level %d", progress = "%s: %d%%", left = "%d min left", soon = "Ending soon" },
+    frFR = { level = "Expédition, niveau %d", progress = "%s : %d %%", left = "%d min restantes", soon = "Bientôt terminée" },
+    deDE = { level = "Expedition, Stufe %d", progress = "%s: %d %%", left = "Noch %d Min.", soon = "Endet bald" },
+    esES = { level = "Expedición, nivel %d", progress = "%s: %d %%", left = "Quedan %d min", soon = "Termina pronto" },
+    ruRU = { level = "Экспедиция, уровень %d", progress = "%s: %d%%", left = "Осталось %d мин.", soon = "Скоро завершится" },
 }
 local TRACKER_TEXTS = {
     enUS = {
@@ -295,7 +295,7 @@ local function tooltipLines(tooltip, e)
     tooltip:AddLine(e.name or "", TITLE_COLOR[1], TITLE_COLOR[2], TITLE_COLOR[3])
     tooltip:AddLine(string.format(L.level, e.level or 0), 1, 0.82, 0)
     if e.objective and e.objective ~= "" then
-        tooltip:AddLine(string.format(L.progress, e.objective, e.progress or 0, e.count or 0), 1, 1, 1, true)
+        tooltip:AddLine(string.format(L.progress, e.objective, e.progress or 0), 1, 1, 1, true)
     end
     local left = math.ceil(((e.ends or 0) - GetTime()) / 60)
     if left >= 1 then
@@ -806,8 +806,9 @@ local function fillBlock()
     local b, e = block, track.copy
     if not (b and e) then return end
     b.title:SetText(string.format(L.title, e.name or "", e.level or 0))
+    -- the progress in percent (the module sends it out of 100): no count shown
     local count, progress = e.count or 0, math.min(e.progress or 0, e.count or 0)
-    b.objective:SetText(string.format("%d/%d %s", progress, count, e.label or e.objective or ""))
+    b.objective:SetText(e.label or e.objective or "")
     local pct = count > 0 and math.floor(progress * 100 / count) or 0
     b.bar:SetValue(pct)
     b.barText:SetText(pct .. "%")

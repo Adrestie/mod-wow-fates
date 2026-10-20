@@ -152,6 +152,16 @@ WowFates.Expedition.AreaInterval        = 1000
 WowFates.Expedition.Announce            = 1
 
 #
+#    WowFates.Expedition.ParticipantScaling
+#        The players see a percentage, not a count: each kill brings 100 % /
+#        (objective_count x (1 + ParticipantScaling x (players in the area - 1))),
+#        the players counted at that kill. 0.6: alone, objective_count kills;
+#        two players, 1.6 times as many; four, 2.8 times.
+#
+
+WowFates.Expedition.ParticipantScaling  = 0.6
+
+#
 #    WowFates.Expedition.AdaptiveSpawn
 #        1 = the monsters an Expedition brings come back faster, and more of
 #        them, when its area is cleared fast; when the pace drops, back to the
