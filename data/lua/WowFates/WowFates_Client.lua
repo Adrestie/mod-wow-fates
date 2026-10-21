@@ -295,6 +295,47 @@ local function shareOf(rw, tier, pct)
     return out
 end
 
+-- The count of a reward of several, over the bottom right of its icon in the tooltip, as a
+-- stack in the bags: { tooltip line, count }, laid out once the tooltip is shown
+local TIP_ICON = 20
+local tipCounts = {}
+
+local function countString(tooltip, i)
+    tooltip.wowFatesCounts = tooltip.wowFatesCounts or {}
+    local fs = tooltip.wowFatesCounts[i]
+    if not fs then
+        fs = tooltip:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        fs:SetJustifyH("RIGHT")
+        tooltip.wowFatesCounts[i] = fs
+        if i == 1 and tooltip.HookScript then
+            -- the tooltip serves others too: the counts go with it
+            local function hide()
+                for _, c in ipairs(tooltip.wowFatesCounts) do c:Hide() end
+            end
+            tooltip:HookScript("OnHide", hide)
+            pcall(tooltip.HookScript, tooltip, "OnTooltipCleared", hide)
+        end
+    end
+    return fs
+end
+
+local function layoutCounts(tooltip)
+    local used = 0
+    local name = tooltip.GetName and tooltip:GetName()
+    for _, c in ipairs(tipCounts) do
+        local line = name and _G[name .. "TextLeft" .. c.line]
+        if line then
+            used = used + 1
+            local fs = countString(tooltip, used)
+            fs:SetText(c.count)
+            fs:ClearAllPoints()
+            fs:SetPoint("BOTTOMRIGHT", line, "BOTTOMLEFT", TIP_ICON - 1, 1)
+            fs:Show()
+        end
+    end
+    for i = used + 1, #(tooltip.wowFatesCounts or {}) do tooltip.wowFatesCounts[i]:Hide() end
+end
+
 local function rewardLines(tooltip, rw)
     if not rw or (rw.money == 0 and rw.xp == 0 and #rw.items == 0) then return end
     tooltip:AddLine(L.fullRewards, 1, 0.82, 0)
@@ -304,13 +345,15 @@ local function rewardLines(tooltip, rw)
     if #amounts > 0 then tooltip:AddLine(table.concat(amounts, "   "), 1, 1, 1) end
     for _, it in ipairs(rw.items) do
         if it.hidden then
-            tooltip:AddLine("|T" .. QUESTION .. ":16:16:0:0|t |cffff2020???|r")
+            tooltip:AddLine(string.format("|T%s:%d:%d:0:0|t |cffff2020???|r", QUESTION, TIP_ICON, TIP_ICON))
         else
             local name, icon, quality = itemInfo(it.entry)
             local r, g, b = 1, 1, 1
             if quality and GetItemQualityColor then r, g, b = GetItemQualityColor(quality) end
-            tooltip:AddLine(string.format("|T%s:16:16:0:0|t %s%s", icon, name or ("#" .. it.entry),
-                it.count > 1 and (" x" .. it.count) or ""), r, g, b)
+            tooltip:AddLine(string.format("|T%s:%d:%d:0:0|t %s", icon, TIP_ICON, TIP_ICON, name or ("#" .. it.entry)), r, g, b)
+            if it.count > 1 then
+                tipCounts[#tipCounts + 1] = { line = tooltip:NumLines(), count = it.count }
+            end
         end
     end
 end
@@ -333,11 +376,13 @@ end
 
 local function showTooltip(tooltip, owner, list)
     tooltip:SetOwner(owner, "ANCHOR_CURSOR")
+    for k in pairs(tipCounts) do tipCounts[k] = nil end
     for i, e in ipairs(list) do
         if i > 1 then tooltip:AddLine(" ") end
         tooltipLines(tooltip, e)
     end
     tooltip:Show()
+    layoutCounts(tooltip)
 end
 
 -- ---------------------------------------------------------------------------
