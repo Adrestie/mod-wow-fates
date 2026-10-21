@@ -49,7 +49,7 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (7, 'Harpy Ritual',     8, 5,     0,  1,  3116, 0, 15, 40,   0, 0, 1, 1, 'Durotar: channel at the Ritual Altar against waves of Dustwind Pillagers',
    'Complete the ritual at the altar while the Dustwind harpies try to stop you.', 'Ritual completed', 'The harpies swoop in!'),
 (8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40,   0, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards',
-   'Help the Razor Hill Veterans push back five Razormane assaults.', 'Assaults pushed back: {}/{}', 'The Razormane charge!');
+   'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -133,15 +133,15 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (7, 'ruRU', 'Ритуал гарпий',
    'Завершите ритуал у алтаря, пока гарпии Пыльного Ветра пытаются вам помешать.', 'Ритуал выполнен', 'Гарпии пикируют!'),
 (8, 'frFR', 'Déferlement tranchecrin',
-   'Aidez les vétérans de Razor Hill à repousser cinq assauts des Tranchecrins.', 'Assauts repoussés : {}/{}', 'Les Tranchecrins chargent !'),
+   'Aidez les vétérans de Razor Hill à repousser cinq assauts des Tranchecrins.', 'Repoussez les assauts des Tranchecrins', 'Les Tranchecrins chargent !'),
 (8, 'deDE', 'Ansturm der Klingenmähnen',
-   'Helft den Veteranen von Klingenhügel, fünf Angriffe der Klingenmähnen zurückzuschlagen.', 'Zurückgeschlagene Angriffe: {}/{}', 'Die Klingenmähnen stürmen heran!'),
+   'Helft den Veteranen von Klingenhügel, fünf Angriffe der Klingenmähnen zurückzuschlagen.', 'Schlagt die Angriffe der Klingenmähnen zurück', 'Die Klingenmähnen stürmen heran!'),
 (8, 'esES', 'Embestida Crines de Acero',
-   'Ayuda a los veteranos de Cerrotajo a rechazar cinco asaltos de los Crines de Acero.', 'Asaltos rechazados: {}/{}', '¡Cargan los Crines de Acero!'),
+   'Ayuda a los veteranos de Cerrotajo a rechazar cinco asaltos de los Crines de Acero.', 'Rechaza los asaltos de los Crines de Acero', '¡Cargan los Crines de Acero!'),
 (8, 'esMX', 'Embestida Crines de Acero',
-   'Ayuda a los veteranos de Cerrotajo a rechazar cinco asaltos de los Crines de Acero.', 'Asaltos rechazados: {}/{}', '¡Cargan los Crines de Acero!'),
+   'Ayuda a los veteranos de Cerrotajo a rechazar cinco asaltos de los Crines de Acero.', 'Rechaza los asaltos de los Crines de Acero', '¡Cargan los Crines de Acero!'),
 (8, 'ruRU', 'Натиск Иглогривых',
-   'Помогите ветеранам Колючего Холма отбить пять атак Иглогривых.', 'Отбито атак: {}/{}', 'Иглогривые идут в атаку!');
+   'Помогите ветеранам Колючего Холма отбить пять атак Иглогривых.', 'Отбейте атаки Иглогривых', 'Иглогривые идут в атаку!');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
