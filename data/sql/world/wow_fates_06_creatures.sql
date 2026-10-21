@@ -16,7 +16,8 @@
 --          Goldshire with his own name and model (240, display 1985), of
 --          faction 495 as every ally, with his words (creature_text);
 --          without the town's immunity to creatures (unit_flags 512), to
---          fight.
+--          fight. An elite, as every boss support's ally, the module making
+--          him a fifth bigger when he comes.
 --
 -- The ally of a boss support is a known figure of the zone's side, by his
 -- name and his model only: of the Alliance in an Alliance zone, of the Horde
@@ -62,7 +63,7 @@ DROP TEMPORARY TABLE `wow_fates_creature`;
 CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 240;
 UPDATE `wow_fates_creature` SET
   `entry` = 96202, `subname` = '',
-  `minlevel` = 12, `maxlevel` = 12, `rank` = 0, `faction` = 495,
+  `minlevel` = 12, `maxlevel` = 12, `rank` = 1, `faction` = 495,
   `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
   `HealthModifier` = 8, `DamageModifier` = 1.4, `ArmorModifier` = 1.5,
   `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
@@ -148,11 +149,16 @@ INSERT INTO `smart_scripts` (`entryorguid`, `source_type`, `id`, `link`, `event_
 -- The words of the boss supports' creatures: said (a bubble, not a yell),
 -- in the universal language, through creature_text groups the module calls: 0 at the
 -- start, 1 in the fight (every 20 to 40 s, one at random), 2 at the elite's
--- half health, 3 at the victory, 4 when he falls; the elite's, 0 when the
+-- half health, 3 at the victory, 4 when he falls, 5 to 8 at 75, 50, 25 and
+-- 10 % of his own health; the elite's, 0 when the
 -- true fight begins (a player in the area), 1 to 4 at 75, 50, 25 and 10 % of
 -- its health, 5 at its death.
 DELETE FROM `creature_text` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Language`, `Probability`, `Emote`, `Duration`, `Sound`, `BroadcastTextId`, `TextRange`, `comment`) VALUES
+(96202, 5, 0, 'I''ve taken worse in the Second War!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - his health at 75 %'),
+(96202, 6, 0, 'I need some help here!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - his health at 50 %'),
+(96202, 7, 0, 'Heal me, quickly!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - his health at 25 %'),
+(96202, 8, 0, 'I can''t... hold much longer...', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - his health at 10 %'),
 (96101, 0, 0, 'Grimmaw smells fresh meat! Kill! Kill!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - the true fight begins'),
 (96101, 1, 0, 'You scratch Grimmaw? Grimmaw bites back!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 75 %'),
 (96101, 2, 0, 'Pack! To me! Tear them apart!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 50 %'),
@@ -169,6 +175,26 @@ INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Lan
 
 DELETE FROM `creature_text_locale` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Text`) VALUES
+(96202, 5, 0, 'frFR', 'J''ai vu pire pendant la Deuxième Guerre !'),
+(96202, 5, 0, 'deDE', 'Im Zweiten Krieg habe ich Schlimmeres erlebt!'),
+(96202, 5, 0, 'esES', '¡He sufrido cosas peores en la Segunda Guerra!'),
+(96202, 5, 0, 'esMX', '¡He sufrido cosas peores en la Segunda Guerra!'),
+(96202, 5, 0, 'ruRU', 'Во Второй войне мне доставалось и похуже!'),
+(96202, 6, 0, 'frFR', 'Un peu d''aide, ici !'),
+(96202, 6, 0, 'deDE', 'Ich brauche hier Hilfe!'),
+(96202, 6, 0, 'esES', '¡Necesito ayuda aquí!'),
+(96202, 6, 0, 'esMX', '¡Necesito ayuda aquí!'),
+(96202, 6, 0, 'ruRU', 'Мне нужна помощь!'),
+(96202, 7, 0, 'frFR', 'Soignez-moi, vite !'),
+(96202, 7, 0, 'deDE', 'Heilt mich, schnell!'),
+(96202, 7, 0, 'esES', '¡Curadme, rápido!'),
+(96202, 7, 0, 'esMX', '¡Curadme, rápido!'),
+(96202, 7, 0, 'ruRU', 'Лечите меня, скорее!'),
+(96202, 8, 0, 'frFR', 'Je ne tiendrai... plus longtemps...'),
+(96202, 8, 0, 'deDE', 'Ich halte... nicht mehr lange durch...'),
+(96202, 8, 0, 'esES', 'No aguantaré... mucho más...'),
+(96202, 8, 0, 'esMX', 'No aguantaré... mucho más...'),
+(96202, 8, 0, 'ruRU', 'Я долго... не продержусь...'),
 (96101, 0, 0, 'frFR', 'Grimmaw sent la viande fraîche ! Tuez ! Tuez !'),
 (96101, 0, 0, 'deDE', 'Grimmaw riecht frisches Fleisch! Tötet! Tötet!'),
 (96101, 0, 0, 'esES', '¡Grimmaw huele carne fresca! ¡Matad! ¡Matad!'),

@@ -54,17 +54,17 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40,   0, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards',
    'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!'),
 (9, 'The Packleader''s End', 10, 7,   0,  1,   478, 3, 20, 35,   0, 0, 1, 1, 'Elwynn Forest: Marshal Dughan against Grimmaw the Packleader',
-   'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', '');
+   'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', 'Grimmaw calls the pack!');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
-  `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `comment`) VALUES
-(4, 96100, 70,      0, 8, 5,     0, 240, 40, 3, 1,      0, 1, 5, 'Defias Assault: the Defias Ringleader at 70 %'),
-(5,     0, 70, 960000, 8, 5,     0, 240, 40, 3, 1,      0, 1, 5, 'Kul Tiras Supplies: 8 crates out, one back 5 s after it is taken'),
-(6,     0, 70,      0, 8, 5, 96200, 240, 40, 2, 1,      0, 1, 5, 'Riverpaw Raid: four minutes, a wave every 40 s, 2 then 3, 4... Outrunners'),
-(7,     0, 70,      0, 8, 5,     0, 120, 30, 2, 1, 960100, 1, 5, 'Harpy Ritual: two minutes of channel for one player, a wave every 30 s'),
-(8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
-(9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, 'The Packleader''s End: Marshal Dughan against Grimmaw');
+  `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`, `comment`) VALUES
+(4, 96100, 70,      0, 8, 5,     0, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'Defias Assault: the Defias Ringleader at 70 %'),
+(5,     0, 70, 960000, 8, 5,     0, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'Kul Tiras Supplies: 8 crates out, one back 5 s after it is taken'),
+(6,     0, 70,      0, 8, 5, 96200, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'Riverpaw Raid: four minutes, a wave every 40 s, 2 then 3, 4... Outrunners'),
+(7,     0, 70,      0, 8, 5,     0, 120, 30, 2, 1, 960100, 1, 5, '25,50,75', 'Harpy Ritual: two minutes of channel for one player, a wave every 30 s'),
+(8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, '25,50,75', 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
+(9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'The Packleader''s End: Marshal Dughan against Grimmaw; the pack at 25, 50 and 75 % of the bar');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -149,15 +149,15 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (8, 'ruRU', 'Натиск Иглогривых',
    'Помогите ветеранам Колючего Холма отбить пять атак Иглогривых.', 'Отбейте атаки Иглогривых', 'Иглогривые идут в атаку!'),
 (9, 'frFR', 'La fin du chef de meute',
-   'Le maréchal Dughan a retrouvé Grimmaw, le chef de meute des Rivepattes : aidez le maréchal à abattre le gnoll.', 'Aidez le maréchal Dughan à vaincre Grimmaw', ''),
+   'Le maréchal Dughan a retrouvé Grimmaw, le chef de meute des Rivepattes : aidez le maréchal à abattre le gnoll.', 'Aidez le maréchal Dughan à vaincre Grimmaw', 'Grimmaw appelle la meute !'),
 (9, 'deDE', 'Das Ende des Rudelführers',
-   'Marschall Dughan hat Grimmaw, den Rudelführer der Flusspfoten, aufgespürt: Helft dem Marschall, den Gnoll zu Fall zu bringen.', 'Helft Marschall Dughan, Grimmaw zu besiegen', ''),
+   'Marschall Dughan hat Grimmaw, den Rudelführer der Flusspfoten, aufgespürt: Helft dem Marschall, den Gnoll zu Fall zu bringen.', 'Helft Marschall Dughan, Grimmaw zu besiegen', 'Grimmaw ruft das Rudel!'),
 (9, 'esES', 'El fin del líder de la manada',
-   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', ''),
+   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', '¡Grimmaw llama a la manada!'),
 (9, 'esMX', 'El fin del líder de la manada',
-   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', ''),
+   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', '¡Grimmaw llama a la manada!'),
 (9, 'ruRU', 'Конец вожака стаи',
-   'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', '');
+   'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', 'Гриммо зовёт стаю!');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES

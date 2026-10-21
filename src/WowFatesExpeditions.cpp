@@ -35,6 +35,8 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "Random.h"
+#include "StringConvert.h"
+#include "Tokenize.h"
 #include "Spell.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
@@ -51,6 +53,10 @@ namespace
 {
     // How long a monster of an Expedition stays dead, to be looted.
     constexpr uint32 SUMMON_CORPSE_MS = 60000;
+
+    // A boss support's ally, the figure the players come to help: this much
+    // bigger than its template, and always an elite.
+    constexpr float HERO_SCALE = 1.2f;
 
     bool IsFromPlayer(Unit const* unit)
     {
@@ -153,7 +159,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
     // The settings of each type of objective.
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`, "
-        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count` "
+        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves` "
         "FROM `mod_wow_fates_objective`"))
     {
         do
@@ -175,12 +181,30 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.channelEntry = f[11].Get<uint32>();
             itr->second.allyCount = std::clamp<uint32>(f[12].Get<uint32>(), 1, 10);
             itr->second.waveCount = std::max<uint32>(f[13].Get<uint32>(), 1);
+            // "25,50,75": the bar's percents that call the elite's pack
+            itr->second.bossWaves.clear();
+            std::string const marks = f[14].Get<std::string>();
+            for (std::string_view mark : Acore::Tokenize(marks, ',', false))
+                if (Optional<uint32> pct = Acore::StringTo<uint32>(mark))
+                    if (*pct > 0 && *pct < 100)
+                        itr->second.bossWaves.push_back(uint8(*pct));
+            std::sort(itr->second.bossWaves.begin(), itr->second.bossWaves.end());
         } while (result->NextRow());
     }
 
     for (auto itr = _defs.begin(); itr != _defs.end();)
     {
         WowFatesExpeditionDef const& def = itr->second;
+        // A boss support's ally is always an elite: the client reads the rank
+        // from the creature's template, so one that is not is made so.
+        if (def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+            if (CreatureTemplate const* hero = sObjectMgr->GetCreatureTemplate(def.allyEntry))
+                if (hero->rank < CREATURE_ELITE_ELITE)
+                {
+                    LOG_ERROR("module", "mod-wow-fates: Expedition {}: its ally, creature {}, is not an elite (rank {}); it is made one.",
+                        def.id, def.allyEntry, hero->rank);
+                    const_cast<CreatureTemplate*>(hero)->rank = CREATURE_ELITE_ELITE;
+                }
         if ((def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
             && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
         {
@@ -1942,7 +1966,8 @@ namespace
         ALLY_SAY_FIGHT   = 1, // every 20 to 40 s
         ALLY_SAY_HALF    = 2, // the elite at half health
         ALLY_SAY_VICTORY = 3,
-        ALLY_SAY_FALL    = 4
+        ALLY_SAY_FALL    = 4,
+        ALLY_SAY_HEALTH_75 = 5, // his own health at 75, 50, 25 and 10 %: 5 to 8
     };
 
     // The elite's (its creature_text groups).
@@ -2012,6 +2037,7 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         ally = SpawnAlly(active, map, Position(x, y, z, std::atan2(pos.GetPositionY() - y, pos.GetPositionX() - x)));
         if (ally)
         {
+            ally->SetObjectScale(ally->GetObjectScale() * HERO_SCALE);
             active.ally = ally->GetGUID();
             active.allyPlayers = 1;
         }
@@ -2055,6 +2081,41 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
             }
         }
     }
+
+    // the ally's at 75, 50, 25 and 10 % of his own health, once each
+    if (ally && ally->IsAlive() && !active.inside.empty())
+    {
+        static uint8 const marks[] = { 75, 50, 25, 10 };
+        for (uint8 i = 0; i < 4; ++i)
+        {
+            uint8 const bit = uint8(1 << i);
+            if (!(active.allySaidHealth & bit) && ally->GetHealthPct() <= float(marks[i]))
+            {
+                active.allySaidHealth |= bit;
+                Say(ally, uint8(ALLY_SAY_HEALTH_75 + i));
+                active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+                break;
+            }
+        }
+    }
+
+    // the elite's pack at the bar's marks (none without players: the bar does
+    // not move then), from several sides, at the ally or one of the players
+    if (!active.inside.empty() && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        for (std::size_t i = 0; i < def->bossWaves.size() && i < 32; ++i)
+        {
+            uint32 const bit = 1u << i;
+            if ((active.bossWavesSent & bit) || active.progressPct < double(def->bossWaves[i]))
+                continue;
+            active.bossWavesSent |= bit;
+            Unit* target = ally && ally->IsAlive() ? static_cast<Unit*>(ally) : nullptr;
+            if (urand(0, 1) || !target)
+                if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
+                    if (player->IsInWorld() && player->IsAlive())
+                        target = player;
+            SendWave(active, map, target);
+            break;
+        }
 
     // the ally's: at the start, now and then, at the elite's half health
     if (ally && ally->IsAlive() && !active.inside.empty())

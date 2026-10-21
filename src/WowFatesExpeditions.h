@@ -134,6 +134,7 @@ struct WowFatesExpeditionDef
     uint32 channelEntry = 0;                           // invocation: the altar (gameobject)
     uint32 allyCount = 1;                              // wave support: allies in the centre
     uint32 waveCount = 5;                              // wave support: waves to push back
+    std::vector<uint8> bossWaves = { 25, 50, 75 };     // boss support: the bar's % that call the elite's pack
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -237,6 +238,8 @@ struct WowFatesActiveExpedition
     // in the fight, at the elite's half health, at the end.
     uint8 said = 0;             // the groups already said: 1 start, 2 half
     uint8 bossSaid = 0;         // the elite's: 1 start, 2/4/8/16 at 75/50/25/10 %
+    uint8 allySaidHealth = 0;   // the ally's at 75/50/25/10 % of his own health: 1/2/4/8
+    uint32 bossWavesSent = 0;   // the elite's packs already called, one bit each
     int64 talkTimer = 0;        // ms before the next line in the fight
     int32 alliesAlive = -1;
     int32 allyHealthPct = -1;   // by steps of five

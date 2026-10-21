@@ -169,3 +169,13 @@ SET @wow_fates_sql := IF(@wow_fates_col = 0,
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
 DEALLOCATE PREPARE wow_fates_stmt;
+
+-- A boss support's pack: the bar's percents that call it (added when missing).
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'boss_waves');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `boss_waves` VARCHAR(64) NOT NULL DEFAULT ''25,50,75'' COMMENT ''boss support: the bar''''s percents that call the elite''''s pack (summon_entry, as the waves)'' AFTER `wave_count`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
