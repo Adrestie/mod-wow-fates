@@ -137,6 +137,7 @@ struct WowFatesConfig
 
     // The objective grows with the players in the area: base x (1 + this x (players - 1))
     float participantScaling = 0.6f;
+    std::vector<uint8> outdoorTypes = { 8 }; // objective types kept out from under a roof (8 sabotage)
     uint32 engageBase = 3;           // monsters at the players at once, for one player
     uint32 engagePerPlayer = 2;      // and this many more for each other one
     float spawnPlayerDistance = 20.0f; // no monster nor object comes this near a player

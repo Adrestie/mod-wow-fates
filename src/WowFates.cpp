@@ -109,6 +109,24 @@ void WowFatesLoadConfig()
     c.spawnInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.SpawnInterval", 60), 1) * IN_MILLISECONDS;
     c.cooldown = sConfigMgr->GetOption<uint32>("WowFates.Expedition.Cooldown", 600);
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
+    // "8": the objective types kept out from under a roof
+    c.outdoorTypes.clear();
+    {
+        std::string const types = sConfigMgr->GetOption<std::string>("WowFates.Expedition.OutdoorTypes", "8");
+        for (char const* p = types.c_str(); *p;)
+        {
+            char* end = nullptr;
+            unsigned long const type = std::strtoul(p, &end, 10);
+            if (end == p)
+            {
+                ++p;
+                continue;
+            }
+            if (type > 0 && type < 256)
+                c.outdoorTypes.push_back(uint8(type));
+            p = end;
+        }
+    }
     c.engageBase = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Engage.Base", 3), 1);
     c.engagePerPlayer = sConfigMgr->GetOption<uint32>("WowFates.Engage.PerPlayer", 2);
     c.spawnPlayerDistance = std::max(sConfigMgr->GetOption<float>("WowFates.Spawn.PlayerDistance", 20.0f), 0.0f);

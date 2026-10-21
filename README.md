@@ -159,6 +159,7 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
 | `WowFates.Waves.PerCharacter` | 1.0 | monsters of a wave per character in the area, times wave_size |
 | `WowFates.Waves.PaceFast` / `PaceStep` / `PaceMax` | 0.5 / 0.25 / 2.0 | a wave killed within half the interval makes the next ones a quarter bigger, twice at most |
+| `WowFates.Expedition.OutdoorTypes` | "8" | objective types kept out from under a roof (8 = sabotage) |
 | `WowFates.Engage.Base` / `PerPlayer` | 3 / 2 | the Expedition's monsters at the players at once; the others wait |
 | `WowFates.Spawn.PlayerDistance` | 20 | yards: nothing of an Expedition comes this near a player |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |

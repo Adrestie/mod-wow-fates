@@ -1097,7 +1097,7 @@ bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
         for (uint32 spawnId : def.spawns)
         {
             WowFatesSpawnPoint const& spawn = _spawns[spawnId];
-            if (spawn.zone != zone || _indoors.count(spawnId))
+            if (spawn.zone != zone || (_indoors.count(spawnId) && NeedsSky(&def)))
                 continue;
             bool const crosses = std::any_of(_active.begin(), _active.end(), [&spawn, &def](auto const& pair)
             {
@@ -1307,11 +1307,13 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     return Position(x, y, z, angle);
 }
 
-// A sabotage is under the sky (its targets are buildings and engines out in
-// the open); the others may be in a cave or a building as well.
+// The objective types under the sky (WowFates.Expedition.OutdoorTypes, a
+// sabotage by default: its targets are buildings and engines out in the
+// open); the others may be in a cave or a building as well.
 bool WowFatesExpeditionMgr::NeedsSky(WowFatesExpeditionDef const* def)
 {
-    return def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE;
+    std::vector<uint8> const& types = WowFatesConf().outdoorTypes;
+    return std::find(types.begin(), types.end(), def->objectiveType) != types.end();
 }
 
 // Under the sky: a point under a roof (a cave, a building; an awning is
