@@ -2089,6 +2089,17 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
             boss->AI()->AttackStart(ally);
         if (!ally->IsInCombat() && ally->AI())
             ally->AI()->AttackStart(boss);
+
+        // the elite's own (the Expedition's monsters, come back or not) hold
+        // the ally on their list: with no player at hand, they go for him
+        for (ObjectGuid const& guid : active.summons)
+            if (Creature* creature = map->GetCreature(guid))
+                if (creature->IsAlive() && creature->IsWithinDist(ally, def->radius))
+                {
+                    creature->AddThreat(ally, 0.0f);
+                    if (!creature->IsInCombat() && creature->AI())
+                        creature->AI()->AttackStart(ally);
+                }
     }
 
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
