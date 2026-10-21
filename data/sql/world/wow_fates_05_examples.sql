@@ -1,4 +1,4 @@
--- mod-wow-fates — nine example Expeditions, with the rewards every
+-- mod-wow-fates — ten example Expeditions, with the rewards every
 -- Expedition gives by default. Ids 1 to 99 of the module's tables are the
 -- module's own: give yours 100 and up, an update writes these rows again.
 --
@@ -22,6 +22,8 @@
 --   9  The Packleader's End, Elwynn Forest, level 10, boss support: Marshal
 --      Dughan (creature 96202) against Grimmaw the Packleader (96101), with
 --      a few Riverpaw Outrunners about
+--  10  The Burning Blade's Pyres, Durotar, level 10, sabotage: the pyres of the
+--      Burning Blade (gameobject 960001), two Fanatics guarding each
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -54,7 +56,9 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40,   0, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards',
    'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!'),
 (9, 'The Packleader''s End', 10, 7,   0,  1,   478, 3, 20, 35,   0, 0, 1, 1, 'Elwynn Forest: Marshal Dughan against Grimmaw the Packleader',
-   'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', 'Grimmaw calls the pack!');
+   'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', 'Grimmaw calls the pack!'),
+(10, 'The Burning Blade''s Pyres', 10, 8,   0,  8,  3197, 0, 20, 40,   0, 0, 1, 1, 'Durotar: the Burning Blade''s pyres, guarded by Fanatics',
+   'The Burning Blade feed their pyres to call on dark powers: wreck the pyres under their guards'' eyes.', 'Wreck the Burning Blade pyres', '');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -64,7 +68,8 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (6,     0, 70,      0, 8, 5, 96200, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'Riverpaw Raid: four minutes, a wave every 40 s, 2 then 3, 4... Outrunners'),
 (7,     0, 70,      0, 8, 5,     0, 120, 30, 2, 1, 960100, 1, 5, '25,50,75', 'Harpy Ritual: two minutes of channel for one player, a wave every 30 s'),
 (8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, '25,50,75', 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
-(9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'The Packleader''s End: Marshal Dughan against Grimmaw; the pack at 25, 50 and 75 % of the bar');
+(9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'The Packleader''s End: Marshal Dughan against Grimmaw; the pack at 25, 50 and 75 % of the bar'),
+(10,    0, 70, 960001, 5, 20,     0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'The Burning Blade''s Pyres: five pyres out, two Fanatics each, one back 20 s after it goes');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -157,7 +162,17 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (9, 'esMX', 'El fin del líder de la manada',
    'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', '¡Grimmaw llama a la manada!'),
 (9, 'ruRU', 'Конец вожака стаи',
-   'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', 'Гриммо зовёт стаю!');
+   'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', 'Гриммо зовёт стаю!'),
+(10, 'frFR', 'Les bûchers de la Lame ardente',
+   'La Lame ardente alimente ses bûchers pour invoquer des puissances obscures : détruisez-les sous les yeux de leurs gardes.', 'Détruisez les bûchers de la Lame ardente', ''),
+(10, 'deDE', 'Die Scheiterhaufen der Brennenden Klinge',
+   'Die Brennende Klinge nährt ihre Scheiterhaufen, um dunkle Mächte zu rufen: Zerstört sie vor den Augen ihrer Wachen.', 'Zerstört die Scheiterhaufen der Brennenden Klinge', ''),
+(10, 'esES', 'Las piras del Filo Ardiente',
+   'El Filo Ardiente alimenta sus piras para invocar poderes oscuros: destrúyelas ante los ojos de sus guardias.', 'Destruye las piras del Filo Ardiente', ''),
+(10, 'esMX', 'Las piras del Filo Ardiente',
+   'El Filo Ardiente alimenta sus piras para invocar poderes oscuros: destrúyelas ante los ojos de sus guardias.', 'Destruye las piras del Filo Ardiente', ''),
+(10, 'ruRU', 'Костры Пылающего Клинка',
+   'Пылающий Клинок разжигает костры, чтобы призвать тёмные силы: уничтожьте их на глазах у стражи.', 'Уничтожьте костры Пылающего Клинка', '');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -177,7 +192,9 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (14, 8,  1,   298.0,  -4269.0,    31.1,    0, 'Durotar, east of the Razormane grounds'),
 (15, 8,  1,   -29.5,  -4265.1,    66.6,    0, 'Durotar, north of the Razormane grounds'),
 (16, 9,  0, -9795.0,    389.0,    39.6,    0, 'Elwynn Forest, the hills west of Westbrook'),
-(17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp');
+(17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp'),
+(18, 10, 1,  1449.9,  -4738.3,    -2.0,    0, 'Durotar, the Burning Blade camp by the coast'),
+(19, 10, 1,  1483.4,  -4779.7,     6.1,    0, 'Durotar, the Burning Blade camp, the slopes');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES

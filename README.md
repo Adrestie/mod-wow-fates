@@ -54,6 +54,9 @@ ones and rewards for those who take part.
     contested one; friend of every player whatever his side) fights a unique
     elite; the bar is the health the elite lost, and the Expedition fails if
     the ally falls. The ally speaks now and then (said, in five languages).
+  - *Sabotage*: enemy objects to wreck (pyres, totems, tents...), each with
+    its guards, spread over the area and put back as they go; a one second
+    cast wrecks one, it blows up and its guards come. No failure.
 - **An objective that grows with the crowd.** Players see a percentage, never a
   count: the more players in the area, the more work each percent takes.
 - **Monsters that keep up.** An Expedition brings its own monsters. The faster
@@ -113,7 +116,7 @@ By hand: copy the module into `modules/`, copy `data/lua/WowFates` into the
 ALE scripts folder, copy `conf/mod-wow-fates.conf.dist` to `configs/modules/`
 as `mod-wow-fates.conf`, rebuild, and add the client patch with the installer.
 
-Nine example Expeditions come with it: Kobold Uprising (Elwynn Forest,
+Ten example Expeditions come with it: Kobold Uprising (Elwynn Forest,
 level 7), Razormane Raid (Durotar, level 8), Restless Dead (Icecrown,
 level 80), Defias Assault (Elwynn Forest, level 10, assault and boss: the
 Defias Ringleader), Kul Tiras Supplies (Durotar, level 7, gathering: supply
@@ -123,12 +126,14 @@ level 8, invocation: the Ritual Altar against Dustwind Pillagers) and
 Quilboar Onslaught (Durotar, level 9, wave support: three Razor Hill Veterans
 against five waves of Razormane Battleguards) and The Packleader's End
 (Elwynn Forest, level 10, boss support: Marshal Dughan against Grimmaw the
-Packleader). Expeditions, spawn points and rewards live in the world
+Packleader) and The Burning Blade's Pyres (Durotar, level 10, sabotage: the
+pyres of the Burning Blade, two Fanatics guarding each). Expeditions, spawn points and rewards live in the world
 database (`mod_wow_fates_expedition`, `mod_wow_fates_expedition_locale`,
 `mod_wow_fates_spawn`, `mod_wow_fates_reward`), and the settings of the
 objectives other than kills in `mod_wow_fates_objective` (for an assault, the
 leader's creature and the percent at which it appears; for a gathering, the
-gameobject, how many are out at once and how soon one comes back; for a
+gameobject, how many are out at once and how soon one comes back, and for a
+sabotage the guards of each object in `wave_size`; for a
 defence, the ally, how long to hold out and the waves; for an invocation, the
 altar and the channel asked; for a wave support, the allies and the number of
 waves); give your own ids 100 and up. A defence's ally takes faction 495, friend of every player and foe of

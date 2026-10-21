@@ -133,7 +133,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.trackerText = f[14].Get<std::string>();
             def.waveText = f[15].Get<std::string>();
 
-            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_SABOTAGE)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -227,7 +227,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 def.id, def.channelEntry, def.summonEntry);
             itr = _defs.erase(itr);
         }
-        else if (def.objectiveType == WOW_FATES_OBJECTIVE_GATHER && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
+        else if ((def.objectiveType == WOW_FATES_OBJECTIVE_GATHER || def.objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
+            && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is a gathering whose object, gameobject {}, does not exist; skipped.", def.id, def.gatherEntry);
             itr = _defs.erase(itr);
@@ -373,7 +374,7 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
     WowFatesExpeditionDef const* def = active.def;
     if (!def->objectiveText.empty())
         return Localized(def->objectiveText, def->objectiveTexts, session);
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER || def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_DEFENCE), CreatureName(def->allyEntry, session),
@@ -756,7 +757,7 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
     // the leader of an assault, once out, by its name; else the Expedition's own words
     if (!def->trackerText.empty() && !(def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut))
         return Acore::StringFormat(Localized(def->trackerText, def->trackerTexts, session), active.repelled, def->waveCount);
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER || def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_DEFENCE), CreatureName(def->allyEntry, session));
@@ -1003,7 +1004,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
 
             if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
                 UpdateBoss(active, map);
-            else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
+            else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER
+                || active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
                 UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
@@ -1482,6 +1484,30 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         go->SetSpawnedByDefault(false);
         map->AddToMap(go);
         active.objects.push_back(go->GetGUID());
+
+        // a sabotage's object has its guards (wave_size of summon_entry), close
+        // by, back to it after a fight
+        if (def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE && def->summonEntry)
+            for (uint32 g = 0; g < def->waveSize; ++g)
+            {
+                float const angle = frand(0.0f, 2.0f * float(M_PI));
+                float const gx = pos.GetPositionX() + 4.0f * std::cos(angle);
+                float const gy = pos.GetPositionY() + 4.0f * std::sin(angle);
+                float gz = map->GetHeight(PHASEMASK_NORMAL, gx, gy, pos.GetPositionZ() + 5.0f, true, 20.0f);
+                if (gz <= INVALID_HEIGHT)
+                    gz = pos.GetPositionZ();
+                Position const at(gx, gy, gz, std::atan2(gy - pos.GetPositionY(), gx - pos.GetPositionX()));
+                TempSummon* guard = map->SummonCreature(def->summonEntry, at);
+                if (!guard)
+                    break;
+                guard->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
+                guard->SetTimer(SUMMON_CORPSE_MS);
+                guard->SetHomePosition(at);
+                guard->SetWanderDistance(3.0f);
+                guard->SetDefaultMovementType(RANDOM_MOTION_TYPE);
+                guard->GetMotionMaster()->Initialize();
+                active.summons.push_back(guard->GetGUID());
+            }
     }
     active.gatherTimer = int64(def->gatherRespawn) * IN_MILLISECONDS;
 }
@@ -1516,6 +1542,18 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
         active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
         ++active.contributors[player->GetGUID()].picks;
         Active(active);
+
+        // a sabotage: the object blows up, its guards (and those near) come
+        if (active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
+        {
+            Map* map = go->GetMap();
+            if (TempSummon* bunny = map->SummonCreature(WOW_FATES_ALTAR_FOCUS, go->GetPosition(), nullptr, 3 * IN_MILLISECONDS))
+                bunny->CastSpell(bunny, WOW_FATES_WRECK_SPELL, true);
+            for (ObjectGuid const& guid : active.summons)
+                if (Creature* keeper = map->GetCreature(guid))
+                    if (keeper->IsAlive() && !keeper->IsInCombat() && keeper->IsWithinDist(go, 20.0f) && keeper->AI())
+                        keeper->AI()->AttackStart(player);
+        }
         if (active.gatherTimer <= 0)
             active.gatherTimer = int64(active.def->gatherRespawn) * IN_MILLISECONDS;
         return;

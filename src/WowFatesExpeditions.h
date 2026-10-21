@@ -44,7 +44,9 @@
  *     when every ally is dead;
  *   7 boss support: a renowned ally fights a unique elite in the centre; the
  *     bar is the health the elite lost, the Expedition fails when the ally
- *     dies.
+ *     dies;
+ *   8 sabotage: guarded enemy objects to wreck, spread over the area and put
+ *     back as they go (a gathering whose objects each have their guards).
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -87,8 +89,12 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_DEFENCE = 4, // an ally to keep alive against waves
     WOW_FATES_OBJECTIVE_INVOKE  = 5, // channel at an altar against waves
     WOW_FATES_OBJECTIVE_SUPPORT = 6, // allies pushing back a number of waves
-    WOW_FATES_OBJECTIVE_BOSS_SUPPORT = 7 // an ally against an elite
+    WOW_FATES_OBJECTIVE_BOSS_SUPPORT = 7, // an ally against an elite
+    WOW_FATES_OBJECTIVE_SABOTAGE = 8 // guarded objects to wreck
 };
+
+// What a wrecked object shows: Explosion Visual, cast by a bunny on its spot.
+constexpr uint32 WOW_FATES_WRECK_SPELL = 34602;
 
 // The channel of an invocation: Ritual (tools/gen_spells.py), thirty seconds at
 // the altar's focus, an invisible creature on it, for the beam; a blow,
