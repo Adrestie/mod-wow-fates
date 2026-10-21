@@ -1365,8 +1365,8 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
 // Assault and boss
 
 // The leader of an assault: out when the kills reach boss_at, in the centre;
-// back if it went away alive (a grid unloaded). Its health grows with the
-// players in the area, as the objective does, and never shrinks; the bar shows
+// back if it went away alive (a grid unloaded). Its health follows the
+// players in the area, as the objective does, its share kept; the bar shows
 // the health it lost, and never goes back, even when it heals after a fight.
 void WowFatesExpeditionMgr::UpdateBoss(WowFatesActiveExpedition& active, Map* map)
 {
@@ -1528,18 +1528,24 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
 // ---------------------------------------------------------------------------
 // Defence, and the waves
 
-// The health of a creature for the players in the area, as the objective
-// grows: never lowered, its share of health kept.
+// The health of a creature for the players in the area, as the objective:
+// its maximum follows them up and down, its share of health stays (78 % with
+// fifteen players more is still 78 %), never a death or a full heal from the
+// rounding.
 void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const
 {
-    if (players <= setFor)
+    if (players == setFor || !creature->IsAlive() || !baseHealth)
         return;
-    float const pct = creature->GetHealthPct();
-    uint32 const health = uint32(float(baseHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
-    creature->SetCreateHealth(health);
-    creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
+    double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
+    uint32 const maxHealth = uint32(float(baseHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
+    creature->SetCreateHealth(maxHealth);
+    creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
     creature->UpdateMaxHealth();
-    creature->SetHealth(std::max<uint32>(1, uint32(float(creature->GetMaxHealth()) * pct / 100.0f)));
+    uint32 const max = creature->GetMaxHealth();
+    uint32 health = uint32(std::lround(double(max) * share));
+    if (share < 1.0 && health >= max && max > 1)
+        health = max - 1;
+    creature->SetHealth(std::clamp<uint32>(health, 1, max));
     setFor = players;
 }
 
