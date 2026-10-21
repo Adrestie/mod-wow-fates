@@ -19,7 +19,8 @@
 --   96203  Remy "Two Times": the ally of Remy's Wares (Elwynn Forest, level 6),
 --          the Goldshire merchant with his own name and model (241, display
 --          3254), of faction 495, without his town's immunity (unit_flags
---          512) nor his shop, with his words (creature_text).
+--          512) nor his shop, with his words (creature_text). He heals
+--          between two fights: his road is long (RegenHealth 1).
 --   96204  Darkspear Captive: the captives of Zalazane's Captives (Durotar,
 --          level 8), Darkspear trolls of four looks (the trolls of Sen'jin,
 --          displays 4070, 4073 to 4075), of faction 495, with their words.
@@ -118,8 +119,8 @@ UPDATE `wow_fates_creature` SET
   `entry` = 96203, `subname` = '',
   `minlevel` = 6, `maxlevel` = 6, `rank` = 0, `faction` = 495,
   `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
-  `HealthModifier` = 5, `DamageModifier` = 1, `ArmorModifier` = 1.5,
-  `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
+  `HealthModifier` = 7, `DamageModifier` = 1.2, `ArmorModifier` = 1.5,
+  `RegenHealth` = 1, `AIName` = '', `ScriptName` = '',
   `KillCredit1` = 0, `KillCredit2` = 0;
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
