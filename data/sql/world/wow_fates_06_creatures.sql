@@ -17,7 +17,7 @@
 --          faction 495 as every ally, with his words (creature_text);
 --          without the town's immunity to creatures (unit_flags 512), to
 --          fight. An elite, as every boss support's ally, the module making
---          him a fifth bigger when he comes.
+--          him bigger when he comes (WowFates.Boss.Scale).
 --
 -- The ally of a boss support is a known figure of the zone's side, by his
 -- name and his model only: of the Alliance in an Alliance zone, of the Horde

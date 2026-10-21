@@ -165,6 +165,10 @@ WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000
 
 #
+#    WowFates.Boss.Scale
+#        The size of a boss support's ally, the figure the players come to
+#        help, times the size of its creature's template. 0.5 to 4.
+#
 #    WowFates.Waves.PerCharacter
 #        The monsters of a wave (defence, invocation, wave support): wave_size
 #        times this for each character in the area, players and bots alike,
@@ -187,6 +191,7 @@ WowFates.Expedition.AreaInterval        = 1000
 #        two players, 1.6 times as many; four, 2.8 times.
 #
 
+WowFates.Boss.Scale                     = 1.44
 WowFates.Waves.PerCharacter             = 1.0
 WowFates.Waves.PaceFast                 = 0.5
 WowFates.Waves.PaceStep                 = 0.25

@@ -54,9 +54,6 @@ namespace
     // How long a monster of an Expedition stays dead, to be looted.
     constexpr uint32 SUMMON_CORPSE_MS = 60000;
 
-    // A boss support's ally, the figure the players come to help: this much
-    // bigger than its template, and always an elite.
-    constexpr float HERO_SCALE = 1.2f;
 
     bool IsFromPlayer(Unit const* unit)
     {
@@ -2037,7 +2034,8 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         ally = SpawnAlly(active, map, Position(x, y, z, std::atan2(pos.GetPositionY() - y, pos.GetPositionX() - x)));
         if (ally)
         {
-            ally->SetObjectScale(ally->GetObjectScale() * HERO_SCALE);
+            // the figure the players come to help, bigger than its kind
+            ally->SetObjectScale(ally->GetObjectScale() * WowFatesConf().bossScale);
             active.ally = ally->GetGUID();
             active.allyPlayers = 1;
         }
