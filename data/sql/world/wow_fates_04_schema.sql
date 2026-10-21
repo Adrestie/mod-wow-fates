@@ -117,3 +117,55 @@ SET @wow_fates_sql := IF(@wow_fates_col = 0,
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
 DEALLOCATE PREPARE wow_fates_stmt;
+
+-- The texts of an Expedition in the world's words (the map's tooltip, the
+-- tracker, the banner of the waves), English in mod_wow_fates_expedition, the
+-- other languages in mod_wow_fates_expedition_locale: added when missing.
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition' AND COLUMN_NAME = 'objective_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition` ADD COLUMN `objective_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''what the map''''s tooltip says of the objective, in the world''''s words; empty = a text made from the type'' AFTER `name`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition' AND COLUMN_NAME = 'tracker_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition` ADD COLUMN `tracker_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''the tracker''''s line; a wave support''''s may hold {}/{} (pushed back, all); empty = a text made from the type'' AFTER `objective_text`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition' AND COLUMN_NAME = 'wave_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition` ADD COLUMN `wave_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''the banner of each wave ("The Gnolls attack!"); empty = Wave N'' AFTER `tracker_text`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition_locale' AND COLUMN_NAME = 'objective_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition_locale` ADD COLUMN `objective_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''what the map''''s tooltip says of the objective, in the world''''s words; empty = a text made from the type'' AFTER `name`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition_locale' AND COLUMN_NAME = 'tracker_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition_locale` ADD COLUMN `tracker_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''the tracker''''s line; a wave support''''s may hold {}/{} (pushed back, all); empty = a text made from the type'' AFTER `objective_text`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_expedition_locale' AND COLUMN_NAME = 'wave_text');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_expedition_locale` ADD COLUMN `wave_text` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''the banner of each wave ("The Gnolls attack!"); empty = Wave N'' AFTER `tracker_text`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;

@@ -55,7 +55,7 @@
     with id; "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
     "defend" with id and the ally's name, "invoke" with id and the altar's
-    name, "wave" with id and its number (a banner each); "sync" with level and percent kept.
+    name, "wave" with id, its number and the Expedition's words for it (a banner each); "sync" with level and percent kept.
     Positions are world coordinates. WowFatesBounds
     (WowFates_Bounds_Client.lua, from WorldMapArea.dbc) gives each map's edges
     in world coordinates: an Expedition's map fraction, and the player's world
@@ -204,7 +204,9 @@ local function onMessage(message)
     elseif command == "invoke" and id then
         track.alert(id, string.format(L.invoke, f[3] or ""))
     elseif command == "wave" and id then
-        track.alert(id, string.format(L.wave, tonumber(f[3]) or 0), WAVE_SOUND)
+        -- the Expedition's own words ("The Gnolls attack!"), else "Wave N"
+        local words = f[4] and f[4] ~= "" and f[4] or string.format(L.wave, tonumber(f[3]) or 0)
+        track.alert(id, words, WAVE_SOUND)
     elseif command == "sync" then
         track.sync(tonumber(f[2]) or 0, tonumber(f[3]) or 100)
     end
@@ -361,7 +363,6 @@ end
 local function tooltipLines(tooltip, e)
     tooltip:AddLine(e.name or "", TITLE_COLOR[1], TITLE_COLOR[2], TITLE_COLOR[3])
     tooltip:AddLine(string.format(L.level, e.level or 0), 1, 0.82, 0)
-    if L.types[e.type or 1] then tooltip:AddLine(L.types[e.type or 1], 0.9, 0.9, 0.9) end
     if e.objective and e.objective ~= "" then
         tooltip:AddLine(e.objective, 1, 1, 1, true)
     end

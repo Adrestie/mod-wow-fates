@@ -98,6 +98,9 @@ struct WowFatesExpeditionDef
     uint32 id = 0;
     std::string name;                                  // enUS
     std::unordered_map<std::string, std::string> names; // by locale (frFR, deDE...)
+    // in the world's words; empty: a text made from the type
+    std::string objectiveText, trackerText, waveText;   // enUS
+    std::unordered_map<std::string, std::string> objectiveTexts, trackerTexts, waveTexts; // by locale
     uint8 level = 1;                                   // sync level and reference
     uint8 objectiveType = WOW_FATES_OBJECTIVE_KILL;
     uint32 objectiveEntry = 0;                         // 0 = any hostile monster
@@ -268,6 +271,7 @@ public:
     bool OnAddonMessage(Player* player, std::string const& msg);
 
     std::string Name(WowFatesExpeditionDef const* def, WorldSession* session) const;
+    static std::string Localized(std::string const& enUS, std::unordered_map<std::string, std::string> const& texts, WorldSession* session);
 
 private:
     WowFatesActiveExpedition* FindAt(Unit const* unit);

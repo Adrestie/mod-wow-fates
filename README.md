@@ -23,7 +23,13 @@ ones and rewards for those who take part.
   objective with a progress bar in percent, and the
   rewards the player can expect. It works with the game's own tracker and with
   mod-forever-ui's.
-- **Types of objectives.** Each type is named in the map's tooltip:
+- **In the world's words.** Each Expedition speaks of its own enemies, places
+  and objects ("Protect the Westbrook Sentinel against the Gnolls for 4
+  minutes", "The Gnolls attack!"): its objective, its tracker line and the
+  banner of its waves are its own texts, in five languages
+  (`objective_text`, `tracker_text`, `wave_text`), with texts made from its
+  type when they are empty.
+- **Types of objectives.**
   - *Extermination*: kill monsters in the area.
   - *Assault and boss*: kill monsters until the bar reaches a set point (70 %
     by default), then their leader appears in the centre with a banner; its

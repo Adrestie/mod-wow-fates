@@ -105,7 +105,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
 
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `id`, `name`, `level`, `objective_type`, `objective_entry`, `objective_count`, "
-        "`summon_entry`, `summon_count`, `summon_respawn`, `radius`, `duration`, `cooldown`, `weight` "
+        "`summon_entry`, `summon_count`, `summon_respawn`, `radius`, `duration`, `cooldown`, `weight`, "
+        "`objective_text`, `tracker_text`, `wave_text` "
         "FROM `mod_wow_fates_expedition` WHERE `enabled` = 1"))
     {
         do
@@ -125,6 +126,9 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.duration = f[10].Get<uint32>();
             def.cooldown = f[11].Get<uint32>();
             def.weight = f[12].Get<uint32>();
+            def.objectiveText = f[13].Get<std::string>();
+            def.trackerText = f[14].Get<std::string>();
+            def.waveText = f[15].Get<std::string>();
 
             if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_SUPPORT)
             {
@@ -205,14 +209,20 @@ void WowFatesExpeditionMgr::LoadFromDB()
             ++itr;
     }
 
-    if (QueryResult result = WorldDatabase.Query("SELECT `id`, `locale`, `name` FROM `mod_wow_fates_expedition_locale`"))
+    if (QueryResult result = WorldDatabase.Query(
+        "SELECT `id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text` FROM `mod_wow_fates_expedition_locale`"))
     {
         do
         {
             Field* f = result->Fetch();
             auto itr = _defs.find(f[0].Get<uint32>());
-            if (itr != _defs.end())
-                itr->second.names[f[1].Get<std::string>()] = f[2].Get<std::string>();
+            if (itr == _defs.end())
+                continue;
+            std::string const locale = f[1].Get<std::string>();
+            itr->second.names[locale] = f[2].Get<std::string>();
+            itr->second.objectiveTexts[locale] = f[3].Get<std::string>();
+            itr->second.trackerTexts[locale] = f[4].Get<std::string>();
+            itr->second.waveTexts[locale] = f[5].Get<std::string>();
         } while (result->NextRow());
     }
 
@@ -278,6 +288,22 @@ void WowFatesExpeditionMgr::LoadFromDB()
     _rotateTimer = 0;
 }
 
+// A text of an Expedition in the player's language, else the English one.
+std::string WowFatesExpeditionMgr::Localized(std::string const& enUS, std::unordered_map<std::string, std::string> const& texts, WorldSession* session)
+{
+    if (session)
+    {
+        LocaleConstant const locale = session->GetSessionDbLocaleIndex();
+        if (locale != LOCALE_enUS && locale < TOTAL_LOCALES)
+        {
+            auto itr = texts.find(localeNames[locale]);
+            if (itr != texts.end() && !itr->second.empty())
+                return itr->second;
+        }
+    }
+    return enUS;
+}
+
 std::string WowFatesExpeditionMgr::Name(WowFatesExpeditionDef const* def, WorldSession* session) const
 {
     if (session)
@@ -318,6 +344,8 @@ std::string WowFatesExpeditionMgr::GameObjectName(uint32 entry, WorldSession* se
 std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (!def->objectiveText.empty())
+        return Localized(def->objectiveText, def->objectiveTexts, session);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
@@ -696,6 +724,9 @@ std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& activ
 std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    // the leader of an assault, once out, by its name; else the Expedition's own words
+    if (!def->trackerText.empty() && !(def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut))
+        return Acore::StringFormat(Localized(def->trackerText, def->trackerTexts, session), active.repelled, def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
@@ -1670,7 +1701,8 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         def->id, active.wave, count, characters, active.pace, entries.size());
     for (ObjectGuid const& guid : active.inside)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
-            SendAddon(player, Acore::StringFormat("wave\t{}\t{}", def->id, active.wave));
+            SendAddon(player, Acore::StringFormat("wave\t{}\t{}\t{}", def->id, active.wave,
+                Clean(Localized(def->waveText, def->waveTexts, player->GetSession()))));
 }
 
 // ---------------------------------------------------------------------------
