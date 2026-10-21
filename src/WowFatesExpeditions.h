@@ -91,8 +91,17 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_INVOKE  = 5, // channel at an altar against waves
     WOW_FATES_OBJECTIVE_SUPPORT = 6, // allies pushing back a number of waves
     WOW_FATES_OBJECTIVE_BOSS_SUPPORT = 7, // an ally against an elite
-    WOW_FATES_OBJECTIVE_SABOTAGE = 8 // guarded objects to wreck
+    WOW_FATES_OBJECTIVE_SABOTAGE = 8, // guarded objects to wreck
+    WOW_FATES_OBJECTIVE_ESCORT  = 9,  // an ally led along a route, ambushed
+    WOW_FATES_OBJECTIVE_RESCUE  = 10, // captives freed from cages and led out
+    WOW_FATES_OBJECTIVE_CAPTURE = 11, // banners taken and held against the foe
+    WOW_FATES_OBJECTIVE_WARLORD = 12  // a unique elite, its phases and reinforcements
 };
+constexpr uint8 WOW_FATES_OBJECTIVE_LAST = WOW_FATES_OBJECTIVE_WARLORD;
+
+// What walks the paths as a player would (never on the map): an object of the
+// module's, always there.
+constexpr uint32 WOW_FATES_WALKER_ENTRY = 960000;
 
 // What a wrecked object shows: Explosion Visual, cast by bunnies around it,
 // and the game's large hut fire on it for a while.
@@ -144,6 +153,10 @@ struct WowFatesExpeditionDef
     uint32 allyCount = 1;                              // wave support: allies in the centre
     uint32 waveCount = 5;                              // wave support: waves to push back
     std::vector<uint8> bossWaves = { 25, 50, 75 };     // boss support: the bar's % that call the elite's pack
+    uint32 timeLimit = 0;                              // capture, warlord: s from the first player to reach 100 %, 0 = none
+    uint32 maxLosses = 2;                              // rescue: captives that may die
+    uint32 takenEntry = 0;                             // capture: the banner once taken (gameobject)
+    std::vector<uint32> bossSpells;                    // warlord: its blows, one more with each phase
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -154,6 +167,8 @@ struct WowFatesSpawnPoint
     uint32 map = 0;
     float x = 0.0f, y = 0.0f, z = 0.0f, o = 0.0f;
     uint32 zone = 0;   // the game's zone (AreaTable), read at loading
+    // escort: its route, the start first; rescue: the last is the way out
+    std::vector<Position> path;
 };
 
 // How much a player took part, from his damage and healing against the
@@ -260,6 +275,28 @@ struct WowFatesActiveExpedition
     int32 alliesAlive = -1;
     int32 allyHealthPct = -1;   // by steps of five
     int32 sentGuard = -1;
+
+    // What walks its paths (WalkPath), made once its map is there; deleted at the end.
+    GameObject* walker = nullptr;
+    int64 deadline = 0;         // elapsed when a timed one fails (capture, warlord), 0 = none
+    int64 hideTimer = 0;        // ms before the next look for the figure a warlord stands for
+
+    // Escort: its route walked (points, yards done at each), where its ally is on it
+    std::vector<Position> route;
+    std::vector<float> routeAt;
+    uint32 routeIndex = 0;
+
+    // Rescue: captives led out, captives lost (the way out in route)
+    uint32 saved = 0;
+    uint32 lost = 0;
+
+    // Capture: its banners, the foe's or taken; the foe at the foot of a taken one
+    struct Flag { ObjectGuid go; Position pos; bool ours = false; int64 contest = 0; };
+    std::vector<Flag> flags;
+
+    // Warlord: its phase (the marks of boss_waves passed), the next blow
+    uint32 phase = 0;
+    int64 spellTimer = 0;
 };
 
 class WowFatesExpeditionMgr
@@ -291,6 +328,9 @@ public:
     // A boss support's creatures fight for show while nobody is in its area:
     // no blow hurts, no spell is cast.
     bool IsForShow(Unit const* unit);
+    // Every point and path of an Expedition (all of them: 0), as the module
+    // would take them: what fails, for the GM.
+    void Check(ChatHandler* handler, uint32 id);
     void OnHeal(Unit* healer, Unit* target, uint32 gain);
     void OnDeath(Unit* victim, Unit* killer);
     // A gathering's object used, from its map's thread.
@@ -322,6 +362,13 @@ private:
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
+    bool MonsterPoint(WowFatesActiveExpedition const& active, Map* map, Position& out) const;
+    bool AroundPoint(WowFatesActiveExpedition const& active, Map* map, Position const& around, float angle, Position& out) const;
+    GameObject* Walker(WowFatesActiveExpedition& active, Map* map);
+    bool BuildRoute(WowFatesActiveExpedition& active, Map* map, std::string* why);
+    bool WalkPath(Map* map, WorldObject const* walker, Position const& from, Position const& to,
+        std::vector<Position>* points = nullptr) const;
+    void Broken(WowFatesActiveExpedition& active, std::string const& why);
     // An object's place: what stands there already (x, y, footprint radius)
     struct Footing { float x, y, r; };
     static float Footprint(uint32 displayId, float scale);
@@ -332,6 +379,8 @@ private:
         std::vector<Footing> const& obstacles, Position& out) const;
     bool Level(Map* map, float x, float y, float z, float reach) const;
     static bool Wet(Map* map, float x, float y, float z, bool* outdoors = nullptr);
+    bool FlagPoint(WowFatesActiveExpedition const& active, Map* map, float footprint, std::vector<Footing> const& obstacles,
+        std::vector<Position> const& placed, Position& out) const;
     bool Outdoors(Map* map, float x, float y, float z) const;
     static bool NeedsSky(WowFatesExpeditionDef const* def);
     bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const;
@@ -344,7 +393,8 @@ private:
     void UpdateGather(WowFatesActiveExpedition& active, Map* map);
     void UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map, Position const& pos);
-    void SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target);
+    void SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around = nullptr,
+        Position const* goal = nullptr);
     bool EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const;
     bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);
     Position Centre(WowFatesActiveExpedition const& active, Map* map, float spread = 0.0f) const;
@@ -395,6 +445,7 @@ private:
 
     std::unordered_set<uint32> _populated; // zones with players, at the last look
     std::unordered_set<uint32> _indoors;   // spawn points found under a roof: never used again
+    std::unordered_set<uint32> _broken;    // spawn points whose route or way out cannot be walked: never used again
     int64 _rotateTimer = 0;
     int64 _areaTimer = 0;
 };

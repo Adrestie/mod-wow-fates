@@ -205,6 +205,11 @@ WowFates.Expedition.AreaInterval        = 1000
 #        The walk from the centre to an object at most this many times the
 #        straight line, plus 10 yards.
 #
+#    WowFates.Path.MaxSlope
+#        Every path the module walks (to an object, a monster's or a wave's
+#        point, an escort's route, a rescue's way out): the rise per yard
+#        between two of its points at most, plus 1.5 yards. No jump, no cliff.
+#
 #    WowFates.Boss.Scale
 #        The size of a boss support's ally, the figure the players come to
 #        help, times the size of its creature's template. 0.5 to 4.
@@ -241,6 +246,7 @@ WowFates.Object.MinSpacing              = 6
 WowFates.Object.MaxHeight               = 6
 WowFates.Object.MaxSlope                = 0.5
 WowFates.Object.PathFactor              = 2.0
+WowFates.Path.MaxSlope                  = 1.0
 WowFates.Boss.Scale                     = 1.44
 WowFates.Waves.PerCharacter             = 1.0
 WowFates.Waves.PaceFast                 = 0.5

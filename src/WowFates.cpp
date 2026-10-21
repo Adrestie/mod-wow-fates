@@ -136,6 +136,7 @@ void WowFatesLoadConfig()
     c.objectMaxHeight = std::max(sConfigMgr->GetOption<float>("WowFates.Object.MaxHeight", 6.0f), 1.0f);
     c.objectMaxSlope = std::max(sConfigMgr->GetOption<float>("WowFates.Object.MaxSlope", 0.5f), 0.05f);
     c.objectPathFactor = std::max(sConfigMgr->GetOption<float>("WowFates.Object.PathFactor", 2.0f), 1.0f);
+    c.pathMaxSlope = std::max(sConfigMgr->GetOption<float>("WowFates.Path.MaxSlope", 1.0f), 0.1f);
     c.bossScale = std::clamp(sConfigMgr->GetOption<float>("WowFates.Boss.Scale", 1.44f), 0.5f, 4.0f);
     c.wavePerCharacter = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PerCharacter", 1.0f), 0.0f);
     c.wavePaceFast = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceFast", 0.5f), 0.0f, 1.0f);

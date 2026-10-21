@@ -134,7 +134,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.trackerText = f[14].Get<std::string>();
             def.waveText = f[15].Get<std::string>();
 
-            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_SABOTAGE)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_LAST)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -157,7 +157,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
     // The settings of each type of objective.
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`, "
-        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves` "
+        "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`, "
+        "`time_limit`, `max_losses`, `taken_entry`, `boss_spells` "
         "FROM `mod_wow_fates_objective`"))
     {
         do
@@ -187,6 +188,20 @@ void WowFatesExpeditionMgr::LoadFromDB()
                     if (*pct > 0 && *pct < 100)
                         itr->second.bossWaves.push_back(uint8(*pct));
             std::sort(itr->second.bossWaves.begin(), itr->second.bossWaves.end());
+            itr->second.timeLimit = f[15].Get<uint32>();
+            itr->second.maxLosses = f[16].Get<uint32>();
+            itr->second.takenEntry = f[17].Get<uint32>();
+            // "6730,6016,8599": a warlord's blows, the first from the start, one more with each phase
+            itr->second.bossSpells.clear();
+            std::string const spells = f[18].Get<std::string>();
+            for (std::string_view spell : Acore::Tokenize(spells, ',', false))
+                if (Optional<uint32> id = Acore::StringTo<uint32>(spell))
+                {
+                    if (sSpellMgr->GetSpellInfo(*id))
+                        itr->second.bossSpells.push_back(*id);
+                    else
+                        LOG_ERROR("module", "mod-wow-fates: Expedition {}: spell {} of its boss_spells does not exist; left out.", itr->first, *id);
+                }
         } while (result->NextRow());
     }
 
@@ -255,7 +270,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
         } while (result->NextRow());
     }
 
-    if (QueryResult result = WorldDatabase.Query("SELECT `id`, `expedition`, `map`, `x`, `y`, `z`, `o` FROM `mod_wow_fates_spawn`"))
+    if (QueryResult result = WorldDatabase.Query("SELECT `id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `path` FROM `mod_wow_fates_spawn`"))
     {
         do
         {
@@ -268,10 +283,30 @@ void WowFatesExpeditionMgr::LoadFromDB()
             spawn.y = f[4].Get<float>();
             spawn.z = f[5].Get<float>();
             spawn.o = f[6].Get<float>();
+            // "x,y,z;x,y,z": an escort's route, a rescue's way out
+            std::string const path = f[7].Get<std::string>();
+            for (std::string_view point : Acore::Tokenize(path, ';', false))
+            {
+                std::vector<std::string_view> const xyz = Acore::Tokenize(point, ',', false);
+                Optional<float> px = xyz.size() == 3 ? Acore::StringTo<float>(xyz[0]) : std::nullopt;
+                Optional<float> py = xyz.size() == 3 ? Acore::StringTo<float>(xyz[1]) : std::nullopt;
+                Optional<float> pz = xyz.size() == 3 ? Acore::StringTo<float>(xyz[2]) : std::nullopt;
+                if (px && py && pz)
+                    spawn.path.emplace_back(*px, *py, *pz, 0.0f);
+                else
+                    LOG_ERROR("module", "mod-wow-fates: spawn point {}: \"{}\" of its path is no \"x,y,z\"; left out.", spawn.id, point);
+            }
 
             auto def = _defs.find(spawn.expedition);
             if (def == _defs.end())
                 continue;
+            uint8 const type = def->second.objectiveType;
+            if ((type == WOW_FATES_OBJECTIVE_ESCORT && spawn.path.size() < 2) || (type == WOW_FATES_OBJECTIVE_RESCUE && spawn.path.empty()))
+            {
+                LOG_ERROR("module", "mod-wow-fates: spawn point {} of Expedition {} has no {} in its path; skipped.", spawn.id, spawn.expedition,
+                    type == WOW_FATES_OBJECTIVE_ESCORT ? "route (two points at least)" : "way out");
+                continue;
+            }
             MapEntry const* map = sMapStore.LookupEntry(spawn.map);
             if (!map || map->Instanceable())
             {
@@ -581,6 +616,9 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
     for (ObjectGuid const& guid : active.inside)
         Leave(guid, true);
     active.inside.clear();
+
+    delete active.walker;
+    active.walker = nullptr;
 
     _cooldowns[active.def->id] = int64(active.def->cooldown ? active.def->cooldown : c.cooldown) * IN_MILLISECONDS;
     if (_activeCount)
@@ -980,6 +1018,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
         }
         active.summonTimer -= diff;
         active.gatherTimer -= diff;
+        Walker(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map));
         if (active.def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
             UpdateDefence(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
@@ -1098,7 +1137,7 @@ bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
         for (uint32 spawnId : def.spawns)
         {
             WowFatesSpawnPoint const& spawn = _spawns[spawnId];
-            if (spawn.zone != zone || (_indoors.count(spawnId) && NeedsSky(&def)))
+            if (spawn.zone != zone || (_indoors.count(spawnId) && NeedsSky(&def)) || _broken.count(spawnId))
                 continue;
             bool const crosses = std::any_of(_active.begin(), _active.end(), [&spawn, &def](auto const& pair)
             {
@@ -1272,15 +1311,15 @@ void WowFatesExpeditionMgr::UpdateSync(uint32 diff)
 }
 
 // A point of the area for a monster: a random spot of the ground within 80 %
-// of the radius, seen from the centre (not behind a wall nor in a cave under
-// it) and not much higher or lower than the centre. The ground is searched
-// from well above, so that a slope or a hill around the centre is found (from
-// just above the centre, every point higher up the hill had no ground and the
-// monster fell back on the centre). Several tries; the centre, a little
-// spread, as the last resort.
-Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const
+// of the radius, not much higher or lower than the centre, dry, and reached
+// on foot from the centre (WalkPath: not behind a wall, not in a cave under
+// it, not on a rock). The ground is searched from well above, so that a slope
+// or a hill around the centre is found (from just above the centre, every
+// point higher up the hill had no ground). Several tries; false when none.
+bool WowFatesExpeditionMgr::MonsterPoint(WowFatesActiveExpedition const& active, Map* map, Position& out) const
 {
     WowFatesSpawnPoint const& c = active.spawn;
+    Position const centre(c.x, c.y, c.z, 0.0f);
     float const reach = active.def->radius * 0.8f;
     for (uint32 attempt = 0; attempt < 16; ++attempt)
     {
@@ -1289,16 +1328,29 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
         float const x = c.x + dist * std::cos(angle);
         float const y = c.y + dist * std::sin(angle);
         float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
-        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
+        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f || NearPlayer(active, x, y))
             continue;
-        if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
-                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+        bool outdoors = false;
+        if (Wet(map, x, y, z, &outdoors) || (NeedsSky(active.def) && !outdoors))
             continue;
-        if ((NeedsSky(active.def) && !Outdoors(map, x, y, z)) || NearPlayer(active, x, y))
+        Position const pos(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
+        if (!WalkPath(map, active.walker, centre, pos))
             continue;
-        return Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
+        out = pos;
+        return true;
     }
+    return false;
+}
 
+// A monster's point (MonsterPoint); the centre, a little spread, as the last
+// resort.
+Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const
+{
+    Position pos;
+    if (MonsterPoint(active, map, pos))
+        return pos;
+
+    WowFatesSpawnPoint const& c = active.spawn;
     float const angle = frand(0.0f, 2.0f * float(M_PI));
     float const x = c.x + 3.0f * std::cos(angle);
     float const y = c.y + 3.0f * std::sin(angle);
@@ -1306,6 +1358,188 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     if (z <= INVALID_HEIGHT)
         return Position(c.x, c.y, c.z, angle);
     return Position(x, y, z, angle);
+}
+
+// The scratch object that walks the paths as a player would (WalkPath), never
+// on the map: one per Expedition, made once its map is there, deleted at its end.
+GameObject* WowFatesExpeditionMgr::Walker(WowFatesActiveExpedition& active, Map* map)
+{
+    if (active.walker || !map)
+        return active.walker;
+    GameObject* go = new GameObject();
+    if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), WOW_FATES_WALKER_ENTRY, map, PHASEMASK_NORMAL,
+            active.spawn.x, active.spawn.y, active.spawn.z, 0.0f, G3D::Quat(), 0, GO_STATE_READY))
+    {
+        delete go;
+        return nullptr;
+    }
+    active.walker = go;
+    return go;
+}
+
+// On foot from one point to the other, as a player: a path of the navigation
+// mesh, whole (not cut short, not from or to a point off the mesh), not much
+// longer than the straight line (WowFates.Object.PathFactor), with no step
+// steeper than WowFates.Path.MaxSlope between two of its points (no jump, no
+// cliff) and none in water. Where the paths are not known (no mmap there),
+// one seen from the other. The points of the path in points, when asked.
+bool WowFatesExpeditionMgr::WalkPath(Map* map, WorldObject const* walker, Position const& from, Position const& to,
+    std::vector<Position>* points) const
+{
+    WowFatesConfig const& conf = WowFatesConf();
+    float const straight = from.GetExactDist(to);
+    if (walker)
+    {
+        PathGenerator path(walker);
+        path.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
+            to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false);
+        PathType const type = path.GetPathType();
+        if (!(type & PATHFIND_NOT_USING_PATH))
+        {
+            if (!(type & PATHFIND_NORMAL) || (type & (PATHFIND_NOPATH | PATHFIND_INCOMPLETE | PATHFIND_SHORT | PATHFIND_FARFROMPOLY)))
+                return false;
+            if (path.getPathLength() > straight * conf.objectPathFactor + 10.0f)
+                return false;
+            Movement::PointsArray const& steps = path.GetPath();
+            for (std::size_t i = 1; i < steps.size(); ++i)
+            {
+                float const flat = std::hypot(steps[i].x - steps[i - 1].x, steps[i].y - steps[i - 1].y);
+                if (std::fabs(steps[i].z - steps[i - 1].z) > 1.5f + flat * conf.pathMaxSlope)
+                    return false;
+                if (Wet(map, steps[i].x, steps[i].y, steps[i].z))
+                    return false;
+            }
+            if (points)
+            {
+                points->clear();
+                for (G3D::Vector3 const& step : steps)
+                    points->emplace_back(step.x, step.y, step.z, 0.0f);
+            }
+            return true;
+        }
+    }
+    if (!map->isInLineOfSight(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ() + 2.0f,
+            to.GetPositionX(), to.GetPositionY(), to.GetPositionZ() + 2.0f, PHASEMASK_NORMAL,
+            LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+        return false;
+    if (points)
+        *points = { from, to };
+    return true;
+}
+
+// A point that cannot be used (its route or way out not walkable): the
+// Expedition goes quietly, the point never again.
+void WowFatesExpeditionMgr::Broken(WowFatesActiveExpedition& active, std::string const& why)
+{
+    LOG_ERROR("module", "mod-wow-fates: spawn point {} of Expedition {}: {}; it is not used again.", active.spawn.id, active.def->id, why);
+    _broken.insert(active.spawn.id);
+    active.remaining = 0;
+}
+
+// The route of an escort: its spawn point's path, each leg walked as a player
+// would (WalkPath), joined into one line of points, every one in the area;
+// the yards done at each. Its grids are loaded first. False, and why, when a
+// leg cannot be walked.
+bool WowFatesExpeditionMgr::BuildRoute(WowFatesActiveExpedition& active, Map* map, std::string* why)
+{
+    active.route.clear();
+    active.routeAt.clear();
+    std::vector<Position> const& legs = active.spawn.path;
+    if (legs.size() < 2)
+    {
+        if (why)
+            *why = "no route (two points at least)";
+        return false;
+    }
+    map->LoadGridsInRange(Position(active.spawn.x, active.spawn.y, active.spawn.z, 0.0f), active.def->radius + 30.0f);
+    GameObject* walker = Walker(active, map);
+    for (std::size_t i = 1; i < legs.size(); ++i)
+    {
+        std::vector<Position> points;
+        if (!WalkPath(map, walker, legs[i - 1], legs[i], &points))
+        {
+            if (why)
+                *why = Acore::StringFormat("leg {} ({:.1f} {:.1f} {:.1f} to {:.1f} {:.1f} {:.1f}) not walked", i,
+                    legs[i - 1].GetPositionX(), legs[i - 1].GetPositionY(), legs[i - 1].GetPositionZ(),
+                    legs[i].GetPositionX(), legs[i].GetPositionY(), legs[i].GetPositionZ());
+            active.route.clear();
+            return false;
+        }
+        for (std::size_t p = active.route.empty() ? 0 : 1; p < points.size(); ++p)
+            active.route.push_back(points[p]);
+    }
+    float done = 0.0f;
+    for (std::size_t i = 0; i < active.route.size(); ++i)
+    {
+        if (i)
+            done += active.route[i].GetExactDist(active.route[i - 1]);
+        active.routeAt.push_back(done);
+        if (std::hypot(active.route[i].GetPositionX() - active.spawn.x, active.route[i].GetPositionY() - active.spawn.y)
+            > active.def->radius * 0.95f)
+        {
+            if (why)
+                *why = Acore::StringFormat("point {} of the route ({:.1f} {:.1f}) out of the area", i,
+                    active.route[i].GetPositionX(), active.route[i].GetPositionY());
+            active.route.clear();
+            active.routeAt.clear();
+            return false;
+        }
+    }
+    return true;
+}
+
+// A capture's banner: an object's point (ObjectPoint), far from the others
+// placed (the larger of MinSpacing and 45 % of the radius), so that one
+// cannot be held from another. A few tries; false when none.
+bool WowFatesExpeditionMgr::FlagPoint(WowFatesActiveExpedition const& active, Map* map, float footprint,
+    std::vector<Footing> const& obstacles, std::vector<Position> const& placed, Position& out) const
+{
+    float const apart = std::max(WowFatesConf().objectMinSpacing, active.def->radius * 0.45f);
+    for (uint32 attempt = 0; attempt < 6; ++attempt)
+    {
+        Position pos;
+        if (!ObjectPoint(active, map, active.walker, footprint, obstacles, pos))
+            continue;
+        if (std::any_of(placed.begin(), placed.end(), [&pos, apart](Position const& other)
+            {
+                return pos.GetExactDist2d(other.GetPositionX(), other.GetPositionY()) < apart;
+            }))
+            continue;
+        out = pos;
+        return true;
+    }
+    return false;
+}
+
+// A point near another (an ambush around an escort's ally, reinforcements
+// around a warlord): 18 to 28 yards from it, near the angle, on the ground
+// about its level, dry, in the area, and reached on foot to it. A few angles
+// around; false when none.
+bool WowFatesExpeditionMgr::AroundPoint(WowFatesActiveExpedition const& active, Map* map, Position const& around, float angle,
+    Position& out) const
+{
+    WowFatesSpawnPoint const& c = active.spawn;
+    for (uint32 attempt = 0; attempt < 8; ++attempt)
+    {
+        float const a = angle + (attempt ? frand(-0.6f, 0.6f) : 0.0f);
+        float const dist = frand(18.0f, 28.0f);
+        float const x = around.GetPositionX() + dist * std::cos(a);
+        float const y = around.GetPositionY() + dist * std::sin(a);
+        if (std::hypot(x - c.x, y - c.y) > active.def->radius || NearPlayer(active, x, y))
+            continue;
+        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, around.GetPositionZ() + 8.0f, true, 16.0f);
+        if (z <= INVALID_HEIGHT || std::fabs(z - around.GetPositionZ()) > 8.0f)
+            continue;
+        bool outdoors = false;
+        if (Wet(map, x, y, z, &outdoors) || (NeedsSky(active.def) && !outdoors))
+            continue;
+        Position const pos(x, y, z, std::atan2(around.GetPositionY() - y, around.GetPositionX() - x));
+        if (!WalkPath(map, active.walker, pos, around))
+            continue;
+        out = pos;
+        return true;
+    }
+    return false;
 }
 
 // The radius of an object's model on the ground, as the client draws it.
@@ -1409,21 +1643,12 @@ bool WowFatesExpeditionMgr::ObjectPoint(WowFatesActiveExpedition const& active, 
         if (!Level(map, x, y, z, std::max(3.0f, footprint * 0.8f)))
             continue;
 
-        // on foot from the centre; where the paths are not known (no mmap
-        // there), seen from the centre at least
-        PathType type = PATHFIND_NOT_USING_PATH;
-        if (walker)
-        {
-            PathGenerator path(walker);
-            path.CalculatePath(c.x, c.y, c.z, x, y, z, false);
-            type = path.GetPathType();
-            if (!(type & PATHFIND_NOT_USING_PATH)
-                && (!(type & PATHFIND_NORMAL) || (type & (PATHFIND_NOPATH | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY_END))
-                    || path.getPathLength() > dist * conf.objectPathFactor + 10.0f))
-                continue;
-        }
-        if ((type & PATHFIND_NOT_USING_PATH) && !map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
-                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+        // on foot from the centre; a rescue's cage, to the way out as well
+        Position const pos(x, y, z, 0.0f);
+        if (!WalkPath(map, walker, Position(c.x, c.y, c.z, 0.0f), pos))
+            continue;
+        if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE
+            && (active.route.empty() || !WalkPath(map, walker, pos, active.route.front())))
             continue;
 
         out = Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
@@ -1753,18 +1978,10 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
 
     // Each object on its own ground, never on another nor in a building of the
     // place: what does not find room waits, fewer at once rather than piled up.
-    // The paths are walked as a player's, from an object of the centre never
-    // put on the map.
     GameObjectTemplate const* goInfo = sObjectMgr->GetGameObjectTemplate(def->gatherEntry);
     float const footprint = Footprint(goInfo ? goInfo->displayId : 0, goInfo ? goInfo->size : 1.0f);
     std::vector<Footing> obstacles = Obstacles(active, map);
-    GameObject* walker = new GameObject();
-    if (!walker->Create(map->GenerateLowGuid<HighGuid::GameObject>(), def->gatherEntry, map, PHASEMASK_NORMAL,
-            active.spawn.x, active.spawn.y, active.spawn.z, 0.0f, G3D::Quat(), 0, GO_STATE_READY))
-    {
-        delete walker;
-        walker = nullptr;
-    }
+    GameObject* walker = Walker(active, map);
     uint32 placed = 0;
     for (uint32 i = 0; i < wanted; ++i)
     {
@@ -1809,7 +2026,6 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
                 itsGuards.push_back(guard->GetGUID());
             }
     }
-    delete walker;
     // no room for all: the others are tried again soon
     active.gatherTimer = placed < wanted ? int64(10 * IN_MILLISECONDS)
         : int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
@@ -2010,8 +2226,8 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
 }
 
 // A point of the edge of the area near an angle, for a wave to come from: the
-// ground there, seen from the centre and not much higher or lower, as the
-// monsters' points; a few angles around it, else none.
+// ground there, not much higher or lower than the centre, dry, and walked to
+// the centre, as the monsters' points; a few angles around it, else none.
 bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const
 {
     WowFatesSpawnPoint const& c = active.spawn;
@@ -2022,14 +2238,15 @@ bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Ma
         float const x = c.x + dist * std::cos(a);
         float const y = c.y + dist * std::sin(a);
         float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 40.0f, true, 80.0f);
-        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f)
+        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > 25.0f || NearPlayer(active, x, y))
             continue;
-        if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
-                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+        bool outdoors = false;
+        if (Wet(map, x, y, z, &outdoors) || (NeedsSky(active.def) && !outdoors))
             continue;
-        if ((NeedsSky(active.def) && !Outdoors(map, x, y, z)) || NearPlayer(active, x, y))
+        Position const pos(x, y, z, std::atan2(c.y - y, c.x - x));
+        if (!WalkPath(map, active.walker, pos, Position(c.x, c.y, c.z, 0.0f)))
             continue;
-        out.Relocate(x, y, z, std::atan2(c.y - y, c.x - x));
+        out = pos;
         return true;
     }
     return false;
@@ -2043,7 +2260,8 @@ bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Ma
 // drawn again for each wave and at least a quarter turn over their number
 // apart, and runs at the target (or the centre, when there is none). Back
 // from a fight with the players, they go back to it.
-void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target)
+void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around,
+    Position const* goal)
 {
     WowFatesExpeditionDef const* def = active.def;
     std::erase_if(active.summons, [map](ObjectGuid const& guid)
@@ -2076,15 +2294,17 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
     std::vector<Position> entries;
     for (uint32 i = 0; i < sides; ++i)
     {
+        // from the edge of the area, or around a point (an escort's ally, a warlord)
         Position pos;
-        if (EdgePoint(active, map, start + gap * float(i) + frand(-0.25f, 0.25f) * gap, pos))
+        float const angle = start + gap * float(i) + frand(-0.25f, 0.25f) * gap;
+        if (around ? AroundPoint(active, map, *around, angle, pos) : EdgePoint(active, map, angle, pos))
             entries.push_back(pos);
     }
     if (entries.empty())
         entries.push_back(SpawnPoint(active, map));
 
     WowFatesSpawnPoint const& centre = active.spawn;
-    Position const goal = target ? target->GetPosition() : Centre(active, map);
+    Position const to = goal ? *goal : (target ? target->GetPosition() : Centre(active, map));
     uint32 const cap = EngageCap(active);
     uint32 engaged = Engaged(active, map);
     for (uint32 i = 0; i < count; ++i)
@@ -2106,14 +2326,14 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         active.waveMobs.push_back(summon->GetGUID());
         if (engaged < cap)
         {
-            Send(active, summon, target, goal);
+            Send(active, summon, target, to);
             ++engaged;
         }
         else
         {
             // the players have enough on them: it waits at its side
             summon->SetHomePosition(pos);
-            active.waiting.push_back({ summon->GetGUID(), target ? target->GetGUID() : ObjectGuid::Empty, goal });
+            active.waiting.push_back({ summon->GetGUID(), target ? target->GetGUID() : ObjectGuid::Empty, to });
         }
     }
 
@@ -2727,6 +2947,133 @@ void WowFatesExpeditionMgr::ListSynced(ChatHandler* handler)
             active != _active.end() ? uint32(active->second.def->level) : 0u, state.ratio,
             player && sWowFatesSync->IsSynced(player) ? "yes" : "no"));
     }
+}
+
+// Every point and path of an Expedition (0: of all), as the module takes them:
+// its centre on dry ground (under the sky for a sabotage), the monsters'
+// points and the edges the waves come from, the objects of its type placed one
+// after the other (gathering, sabotage, rescue, capture), an escort's route
+// and a rescue's way out, each walked as a player would (WalkPath). Its grids
+// are loaded for it. One line per point, "ok" or what fails.
+void WowFatesExpeditionMgr::Check(ChatHandler* handler, uint32 id)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    uint32 checked = 0, failing = 0;
+    for (auto const& [defId, def] : _defs)
+    {
+        if (id && defId != id)
+            continue;
+        for (uint32 spawnId : def.spawns)
+        {
+            WowFatesSpawnPoint const& spawn = _spawns[spawnId];
+            Map* map = sMapMgr->CreateBaseMap(spawn.map);
+            if (!map)
+                continue;
+            map->LoadGridsInRange(Position(spawn.x, spawn.y, spawn.z, 0.0f), def.radius + 30.0f);
+
+            WowFatesActiveExpedition probe;
+            probe.def = &def;
+            probe.spawn = spawn;
+            Walker(probe, map);
+            std::vector<std::string> faults;
+            std::string notes;
+            Position const centre(spawn.x, spawn.y, spawn.z, 0.0f);
+
+            float const ground = map->GetHeight(PHASEMASK_NORMAL, spawn.x, spawn.y, spawn.z + 3.0f, true, 10.0f);
+            bool outdoors = false;
+            if (ground <= INVALID_HEIGHT || std::fabs(ground - spawn.z) > 3.0f)
+                faults.push_back(Acore::StringFormat("centre off the ground (z {:.1f}, ground {:.1f})", spawn.z, ground));
+            else if (Wet(map, spawn.x, spawn.y, ground, &outdoors))
+                faults.push_back("centre in water");
+            else if (NeedsSky(&def) && !outdoors)
+                faults.push_back("centre under a roof");
+
+            uint32 monsters = 0;
+            for (uint32 i = 0; i < 20; ++i)
+            {
+                Position pos;
+                if (MonsterPoint(probe, map, pos))
+                    ++monsters;
+            }
+            notes += Acore::StringFormat("monsters {}/20", monsters);
+            if (monsters < 10)
+                faults.push_back(Acore::StringFormat("monster points {}/20", monsters));
+
+            uint32 edges = 0;
+            for (uint32 i = 0; i < 8; ++i)
+            {
+                Position pos;
+                if (EdgePoint(probe, map, float(i) * float(M_PI) / 4.0f, pos))
+                    ++edges;
+            }
+            notes += Acore::StringFormat(", edges {}/8", edges);
+            if (edges < 3)
+                faults.push_back(Acore::StringFormat("wave edges {}/8", edges));
+
+            uint8 const type = def.objectiveType;
+            if (type == WOW_FATES_OBJECTIVE_ESCORT)
+            {
+                std::string why;
+                if (BuildRoute(probe, map, &why))
+                    notes += Acore::StringFormat(", route {:.0f} yd in {} points", probe.routeAt.back(), uint32(probe.route.size()));
+                else
+                    faults.push_back("route: " + why);
+            }
+            if (type == WOW_FATES_OBJECTIVE_RESCUE)
+            {
+                if (!spawn.path.empty() && WalkPath(map, probe.walker, centre, spawn.path.back()))
+                {
+                    probe.route = { spawn.path.back() };
+                    notes += ", way out ok";
+                }
+                else
+                    faults.push_back("way out not walked from the centre");
+            }
+            if (type == WOW_FATES_OBJECTIVE_GATHER || type == WOW_FATES_OBJECTIVE_SABOTAGE
+                || type == WOW_FATES_OBJECTIVE_RESCUE || type == WOW_FATES_OBJECTIVE_CAPTURE)
+            {
+                GameObjectTemplate const* info = sObjectMgr->GetGameObjectTemplate(def.gatherEntry);
+                float const footprint = Footprint(info ? info->displayId : 0, info ? info->size : 1.0f);
+                std::vector<Footing> obstacles = Obstacles(probe, map);
+                std::vector<Position> placed;
+                uint32 const wanted = def.gatherCount;
+                for (uint32 i = 0; i < wanted; ++i)
+                {
+                    Position pos;
+                    if (type == WOW_FATES_OBJECTIVE_CAPTURE ? !FlagPoint(probe, map, footprint, obstacles, placed, pos)
+                        : !ObjectPoint(probe, map, probe.walker, footprint, obstacles, pos))
+                        break;
+                    obstacles.push_back({ pos.GetPositionX(), pos.GetPositionY(), footprint });
+                    placed.push_back(pos);
+                }
+                notes += Acore::StringFormat(", objects {}/{}", uint32(placed.size()), wanted);
+                if (placed.size() < std::min<uint32>(wanted, type == WOW_FATES_OBJECTIVE_CAPTURE ? 2 : wanted))
+                    faults.push_back(Acore::StringFormat("objects placed {}/{}", uint32(placed.size()), wanted));
+            }
+
+            delete probe.walker;
+            probe.walker = nullptr;
+
+            ++checked;
+            std::string line = Acore::StringFormat("Expedition {} point {} ({:.1f} {:.1f} {:.1f}): {}", defId, spawnId,
+                spawn.x, spawn.y, spawn.z, notes);
+            if (faults.empty())
+                line += " -- ok";
+            else
+            {
+                ++failing;
+                line += " -- FAIL:";
+                for (std::string const& fault : faults)
+                    line += " " + fault + ";";
+            }
+            handler->SendSysMessage(line);
+            LOG_INFO("module", "mod-wow-fates: check: {}", line);
+        }
+    }
+    std::string const summary = Acore::StringFormat("mod-wow-fates: {} points checked, {} failing.", checked, failing);
+    handler->SendSysMessage(summary);
+    LOG_INFO("module", "{}", summary);
 }
 
 void WowFatesExpeditionMgr::ListDefinitions(ChatHandler* handler)

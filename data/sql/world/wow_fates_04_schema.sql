@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'English; the other languages in mod_wow_fates_expedition_locale',
   `level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Synced level: whoever is stronger than this level in the area is brought down to it',
-  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence, 5 = invocation, 6 = wave support, 7 = boss support, 8 = sabotage (mod_wow_fates_objective)',
+  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence, 5 = invocation, 6 = wave support, 7 = boss support, 8 = sabotage, 9 = escort, 10 = rescue, 11 = capture, 12 = warlord (mod_wow_fates_objective)',
   `objective_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry counted; 0 = any monster',
   `objective_count` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'kills to complete it',
   `summon_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry the Expedition brings; 0 = the monsters already there',
@@ -175,6 +175,49 @@ SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'boss_waves');
 SET @wow_fates_sql := IF(@wow_fates_col = 0,
   'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `boss_waves` VARCHAR(64) NOT NULL DEFAULT ''25,50,75'' COMMENT ''boss support: the bar''''s percents that call the elite''''s pack (summon_entry, as the waves)'' AFTER `wave_count`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+
+-- The columns of the escort, the rescue, the capture and the warlord (added
+-- when missing).
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'time_limit');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `time_limit` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''capture, warlord: seconds from the first player in the area to reach 100 %; past them, it fails. 0 = no limit'' AFTER `boss_waves`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'max_losses');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `max_losses` TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT ''rescue: captives (ally_entry) that may die; one more and it fails'' AFTER `time_limit`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'taken_entry');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `taken_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''capture: gameobject_template.entry of a banner once taken (gather_entry: the foe''''s, to take)'' AFTER `max_losses`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'boss_spells');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `boss_spells` VARCHAR(64) NOT NULL DEFAULT '''' COMMENT ''warlord: its blows (spell ids), the first from the start, one more with each mark of boss_waves; one on itself (an enrage) is cast once'' AFTER `taken_entry`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_spawn' AND COLUMN_NAME = 'path');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_spawn` ADD COLUMN `path` VARCHAR(1024) NOT NULL DEFAULT '''' COMMENT ''x,y,z;x,y,z... escort: its route, the start first, each leg walked as a player; rescue: the last is the way out'' AFTER `o`',
   'DO 0');
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
