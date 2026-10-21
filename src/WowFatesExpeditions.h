@@ -55,7 +55,10 @@
  *     Expedition fails when more than max_losses die;
  *  11 capture: two or three of the foe's banners to take and hold against
  *     his squads; the bar is the time they are held, the Expedition fails
- *     when time_limit runs out first.
+ *     when time_limit runs out first;
+ *  12 warlord: a unique elite with phases (its words, reinforcements, one
+ *     more blow at each mark of boss_waves); the bar is the health it lost,
+ *     the Expedition fails when time_limit runs out first.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -417,6 +420,7 @@ private:
     void UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void PutFlag(WowFatesActiveExpedition& active, Map* map, WowFatesActiveExpedition::Flag& flag, bool ours);
     int64 TimeLeft(WowFatesActiveExpedition const& active) const;
+    void UpdateWarlord(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;

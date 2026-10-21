@@ -67,6 +67,11 @@ ones and rewards for those who take part.
     they stand at its foot with no player near. The bar is the time they
     are held (`hold_time` holding them all); `time_limit` out first, it
     fails.
+  - *Warlord*: a unique elite (always an elite, bigger) whose phases, at
+    the marks of `boss_waves`, bring his words, reinforcements and one
+    more of his blows (`boss_spells`). The bar is the health he lost;
+    `time_limit` out first, it fails. The game's own figure he stands for
+    (`objective_entry`) stays out of the area meanwhile.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

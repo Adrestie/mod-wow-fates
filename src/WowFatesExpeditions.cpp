@@ -218,7 +218,17 @@ void WowFatesExpeditionMgr::LoadFromDB()
                         def.id, def.allyEntry, hero->rank);
                     const_cast<CreatureTemplate*>(hero)->rank = CREATURE_ELITE_ELITE;
                 }
-        if ((def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+        // A warlord is always an elite, as a boss support's ally.
+        if (def.objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
+            if (CreatureTemplate const* warlord = sObjectMgr->GetCreatureTemplate(def.bossEntry))
+                if (warlord->rank < CREATURE_ELITE_ELITE)
+                {
+                    LOG_ERROR("module", "mod-wow-fates: Expedition {}: its warlord, creature {}, is not an elite (rank {}); it is made one.",
+                        def.id, def.bossEntry, warlord->rank);
+                    const_cast<CreatureTemplate*>(warlord)->rank = CREATURE_ELITE_ELITE;
+                }
+        if ((def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT
+                || def.objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
             && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
@@ -255,6 +265,12 @@ void WowFatesExpeditionMgr::LoadFromDB()
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is a rescue whose cage (gameobject {}) or captive (creature {}) does not exist; skipped.",
                 def.id, def.gatherEntry, def.allyEntry);
+            itr = _defs.erase(itr);
+        }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_WARLORD && !sObjectMgr->GetCreatureTemplate(def.summonEntry))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a warlord whose reinforcements (summon_entry {}) do not exist; skipped.",
+                def.id, def.summonEntry);
             itr = _defs.erase(itr);
         }
         else if (def.objectiveType == WOW_FATES_OBJECTIVE_CAPTURE
@@ -439,7 +455,7 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
             (def->holdTime + 59) / 60);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_INVOKE), GameObjectName(def->channelEntry, session));
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), CreatureName(def->bossEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_SUPPORT), CreatureName(def->allyEntry, session), def->waveCount);
@@ -843,7 +859,7 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_RESCUE), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_CAPTURE), GameObjectName(def->gatherEntry, session));
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
+    if ((def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut) || def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
         return WowFatesText(session, WOW_FATES_STR_TRACKER_KILL_ANY);
@@ -853,7 +869,7 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
 // The tracker's second line: what there is to protect. A wave support: its
 // allies alive out of ally_count; a defence: its ally's health; a rescue: the
 // captives led out and those lost, against the losses that fail it; a
-// capture: the banners held and the time left.
+// capture: the banners held and the time left; a warlord: the time left.
 std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
@@ -866,6 +882,14 @@ std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& 
             return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_HELD), held, total);
         uint32 const seconds = uint32((left + 9999) / 10000 * 10); // by steps of ten
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_HELD_TIME), held, total, seconds / 60, seconds % 60);
+    }
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
+    {
+        int64 const left = TimeLeft(active);
+        if (left < 0)
+            return "";
+        uint32 const seconds = uint32((left + 9999) / 10000 * 10); // by steps of ten
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TIME_LEFT), seconds / 60, seconds % 60);
     }
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED), active.saved,
@@ -1087,6 +1111,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateRescue(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map));
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
             UpdateCapture(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
+            UpdateWarlord(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -2662,7 +2688,8 @@ namespace
         BOSS_SAY_50    = 2,
         BOSS_SAY_25    = 3,
         BOSS_SAY_10    = 4,
-        BOSS_SAY_DEATH = 5
+        BOSS_SAY_DEATH = 5,
+        BOSS_SAY_TIMEOUT = 6 // a warlord: the time out, the players beaten
     };
 
     void Say(Creature* creature, uint8 group)
@@ -3278,6 +3305,134 @@ void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map*
 }
 
 // ---------------------------------------------------------------------------
+// Warlord
+
+// A unique elite (boss_entry, always an elite, bigger by Boss.Scale) in the
+// centre as soon as the area is loaded; the game's own figure it stands for
+// (objective_entry, if any) kept out of the area meanwhile, back two minutes
+// after it goes. The first player starts the fight and its clock
+// (time_limit). Its health follows the players in the area; the bar is the
+// health it lost, never going back. Each mark of boss_waves passed is a
+// phase: its words, reinforcements (summon_entry, as a wave) from around it
+// at one of the players, and one more of its blows (boss_spells, the first
+// from the start; one on itself, an enrage, cast once then). In a fight, one
+// of its blows every 8 to 14 s at its victim. Dead, done; the clock out
+// first, it fails. Gone alive (a grid unloaded), it comes back as it was.
+void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0 || active.remaining <= 0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+    if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        return;
+
+    active.hideTimer -= diff;
+    if (def->objectiveEntry && active.hideTimer <= 0)
+    {
+        active.hideTimer = 5 * IN_MILLISECONDS;
+        std::vector<Creature*> others;
+        for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
+            if (creature && creature->IsInWorld() && creature->IsAlive() && creature->GetEntry() == def->objectiveEntry
+                && creature->GetExactDist2d(active.spawn.x, active.spawn.y) <= def->radius + 20.0f)
+                others.push_back(creature);
+        for (Creature* creature : others)
+            creature->DespawnOrUnsummon(0ms, Seconds(120));
+    }
+
+    Creature* boss = active.boss ? map->GetCreature(active.boss) : nullptr;
+    if (!boss)
+    {
+        bool const first = !active.bossOut;
+        Position const pos = Centre(active, map);
+        TempSummon* summon = map->SummonCreature(def->bossEntry, pos);
+        if (!summon)
+            return;
+        summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
+        summon->SetTimer(SUMMON_CORPSE_MS);
+        summon->SetObjectScale(summon->GetObjectScale() * WowFatesConf().bossScale);
+        summon->SetHomePosition(pos);
+        summon->SetWanderDistance(5.0f);
+        summon->SetDefaultMovementType(RANDOM_MOTION_TYPE);
+        summon->GetMotionMaster()->Initialize();
+        boss = summon;
+        active.boss = boss->GetGUID();
+        active.bossOut = true;
+        active.bossHealth = boss->GetMaxHealth();
+        active.bossPlayers = 1;
+        if (!first)
+            boss->SetHealth(std::max<uint32>(1, uint32(boss->GetMaxHealth() * (1.0 - active.progressPct / 100.0))));
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: its warlord appears ({} health).", def->id, boss->GetMaxHealth());
+    }
+    if (!boss->IsAlive())
+    {
+        Say(boss, BOSS_SAY_DEATH);
+        active.progressPct = 100.0;
+        return;
+    }
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
+    active.progressPct = std::max(active.progressPct, std::min(100.0 * lost, 99.0));
+
+    if (!Start(active, "warlord", &WowFatesExpeditionMgr::CreatureName, def->bossEntry))
+        return;
+    if (!(active.bossSaid & 1))
+    {
+        active.bossSaid |= 1;
+        Say(boss, BOSS_SAY_START);
+        if (def->timeLimit)
+            active.deadline = active.elapsed + int64(def->timeLimit) * IN_MILLISECONDS;
+        active.spellTimer = urand(4, 8) * IN_MILLISECONDS;
+    }
+    if (active.deadline && active.elapsed >= active.deadline)
+    {
+        Say(boss, BOSS_SAY_TIMEOUT);
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: the time is out, its warlord at {} %.", def->id, uint32(100.0 - active.progressPct));
+        active.failed = true;
+        return;
+    }
+
+    // its phases, at the bar's marks
+    for (std::size_t i = 0; i < def->bossWaves.size() && i < 32; ++i)
+    {
+        uint32 const bit = 1u << i;
+        if ((active.bossWavesSent & bit) || active.progressPct < double(def->bossWaves[i]))
+            continue;
+        active.bossWavesSent |= bit;
+        active.phase = uint32(i + 1);
+        Say(boss, uint8(BOSS_SAY_75 + std::min<std::size_t>(i, 3)));
+        if (active.phase < def->bossSpells.size())
+            if (SpellInfo const* info = sSpellMgr->GetSpellInfo(def->bossSpells[active.phase]))
+                if (info->IsPositive())
+                    boss->CastSpell(boss, info->Id, true);
+        Unit* target = boss->GetVictim();
+        if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
+            if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map)
+                target = player;
+        Position const around = boss->GetPosition();
+        SendWave(active, map, target, &around);
+        break;
+    }
+
+    // its blows, those of the phases passed
+    if (boss->IsInCombat() && boss->GetVictim() && !def->bossSpells.empty())
+    {
+        active.spellTimer -= diff;
+        if (active.spellTimer <= 0 && !boss->HasUnitState(UNIT_STATE_CASTING))
+        {
+            active.spellTimer = urand(8, 14) * IN_MILLISECONDS;
+            std::vector<uint32> pool;
+            for (std::size_t i = 0; i <= active.phase && i < def->bossSpells.size(); ++i)
+                if (SpellInfo const* info = sSpellMgr->GetSpellInfo(def->bossSpells[i]))
+                    if (!info->IsPositive())
+                        pool.push_back(info->Id);
+            if (!pool.empty())
+                boss->CastSpell(boss->GetVictim(), Acore::Containers::SelectRandomContainerElement(pool), false);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -3301,7 +3456,7 @@ bool WowFatesExpeditionMgr::IsForShow(Unit const* unit)
         return false;
     uint8 const type = active->def->objectiveType;
     return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT || type == WOW_FATES_OBJECTIVE_RESCUE
-        || type == WOW_FATES_OBJECTIVE_CAPTURE;
+        || type == WOW_FATES_OBJECTIVE_CAPTURE || type == WOW_FATES_OBJECTIVE_WARLORD;
 }
 
 void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)
@@ -3367,7 +3522,8 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     Active(*active);
 
     // The leader of an assault: the end of the bar.
-    if ((def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+    if ((def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT
+            || def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
         && active->bossOut && creature->GetGUID() == active->boss)
     {
         active->progressPct = 100.0;

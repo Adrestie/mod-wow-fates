@@ -6,6 +6,10 @@
 --          Forest, level 10 elite), a Defias Bandit made bigger and stronger.
 --   96101  Grimmaw the Packleader: the elite of The Packleader's End (Elwynn
 --          Forest, level 11 elite), a big Riverpaw gnoll.
+--   96102  Hogger: the warlord of Hogger's Rampage (Elwynn Forest, level 11
+--          elite), the gnoll himself, his name and model (448, display 384);
+--          his blows are the module's (boss_spells), not his SmartAI: the
+--          game's Hogger stays away from the area while he is out.
 --   96200  Westbrook Sentinel: the ally of the Riverpaw Raid (Elwynn Forest,
 --          level 10), a Stormwind guard of faction 495 (an escortee's: friend
 --          of every player, Alliance and Horde, foe of the monsters), no
@@ -131,6 +135,16 @@ UPDATE `wow_fates_creature` SET
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
 
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 448;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96102, `subname` = '',
+  `minlevel` = 11, `maxlevel` = 11, `rank` = 1,
+  `HealthModifier` = 7, `DamageModifier` = 1.7, `ArmorModifier` = 1.2,
+  `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
 DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (96100, 0, 2357, 1.35, 1, 0),
@@ -143,7 +157,8 @@ INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`,
 (96204, 0, 4070, 1, 1, 0),
 (96204, 1, 4073, 1, 1, 0),
 (96204, 2, 4074, 1, 1, 0),
-(96204, 3, 4075, 1, 1, 0);
+(96204, 3, 4075, 1, 1, 0),
+(96102, 0, 384, 1, 1, 0);
 
 DELETE FROM `creature_template_locale` WHERE `entry` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `VerifiedBuild`) VALUES
@@ -181,7 +196,12 @@ INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `Ver
 (96204, 'deDE', 'Gefangener der Dunkelspeere', '', 0),
 (96204, 'esES', 'Cautivo Lanza Negra', '', 0),
 (96204, 'esMX', 'Cautivo Lanza Negra', '', 0),
-(96204, 'ruRU', 'Пленник из племени Черного Копья', '', 0);
+(96204, 'ruRU', 'Пленник из племени Черного Копья', '', 0),
+(96102, 'frFR', 'Lardeur', '', 0),
+(96102, 'deDE', 'Hogger', '', 0),
+(96102, 'esES', 'Hogger', '', 0),
+(96102, 'esMX', 'Hogger', '', 0),
+(96102, 'ruRU', 'Дробитель', '', 0);
 
 -- Its blows: the Bandit's Snap Kick, more often, and the Bodyguard's Disarm.
 DELETE FROM `smart_scripts` WHERE `entryorguid` BETWEEN 96100 AND 96399 AND `source_type` = 0;
@@ -190,6 +210,8 @@ INSERT INTO `smart_scripts` (`entryorguid`, `source_type`, `id`, `link`, `event_
 (96100, 0, 1, 0, 0, 0, 100, 0, 8000, 10000, 25000, 30000, 0, 0, 11, 6713, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Defias Ringleader - In Combat - Cast Disarm'),
 (96101, 0, 0, 0, 0, 0, 100, 0, 4000, 6000, 7000, 11000, 0, 0, 11, 8646, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - In Combat - Cast Snap Kick');
 
+-- A warlord's: 0 when the fight begins, 1 to 4 at its phases (the marks of
+-- boss_waves, in order), 5 at its death, 6 when the time is out.
 -- A rescue's captives': 0 out of the cage, 1 at the way out.
 -- An escort's ally's: 0 when he sets off, 1 at an ambush, 2 waiting for the
 -- players (every 30 s), 3 at the end of the road, 4 when he falls.
@@ -227,7 +249,14 @@ INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Lan
 (96203, 4, 0, 'My... wares...', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - falls'),
 (96204, 0, 0, 'Thank the loa! I be out of here, mon!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - out of the cage'),
 (96204, 0, 1, 'You be a true friend of the Darkspear!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - out of the cage'),
-(96204, 1, 0, 'Sen''jin, here I come!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - at the way out');
+(96204, 1, 0, 'Sen''jin, here I come!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - at the way out'),
+(96102, 0, 0, 'Grr... Hogger is big boss! You die now!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - the fight begins'),
+(96102, 1, 0, 'Pack! Come help Hogger!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - first phase'),
+(96102, 2, 0, 'Hogger smash you!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - second phase'),
+(96102, 3, 0, 'Grraaarrr! Hogger angry now!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - third phase'),
+(96102, 4, 0, 'No... Hogger... not lose...', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - fourth phase'),
+(96102, 5, 0, 'Yipe! Help Hogger!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - death'),
+(96102, 6, 0, 'Ha! Weak little ones run! Hogger rules the forest!', 12, 0, 100, 0, 0, 0, 0, 0, 'Hogger - the time is out');
 
 DELETE FROM `creature_text_locale` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Text`) VALUES
@@ -360,4 +389,39 @@ INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Te
 (96204, 1, 0, 'deDE', 'Sen''jin, ich komme!'),
 (96204, 1, 0, 'esES', '¡Sen''jin, allá voy!'),
 (96204, 1, 0, 'esMX', '¡Sen''jin, allá voy!'),
-(96204, 1, 0, 'ruRU', 'Сен''джин, я иду!');
+(96204, 1, 0, 'ruRU', 'Сен''джин, я иду!'),
+(96102, 0, 0, 'frFR', 'Grr... Lardeur est grand chef ! Toi mourir maintenant !'),
+(96102, 0, 0, 'deDE', 'Grr... Hogger ist großer Boss! Du stirbst jetzt!'),
+(96102, 0, 0, 'esES', '¡Grr... Hogger es gran jefe! ¡Tú morir ahora!'),
+(96102, 0, 0, 'esMX', '¡Grr... Hogger es gran jefe! ¡Tú morir ahora!'),
+(96102, 0, 0, 'ruRU', 'Ррр... Дробитель — большой вожак! Ты умирать сейчас!'),
+(96102, 1, 0, 'frFR', 'La meute ! Venez aider Lardeur !'),
+(96102, 1, 0, 'deDE', 'Rudel! Kommt Hogger helfen!'),
+(96102, 1, 0, 'esES', '¡Manada! ¡Venid a ayudar a Hogger!'),
+(96102, 1, 0, 'esMX', '¡Manada! ¡Venid a ayudar a Hogger!'),
+(96102, 1, 0, 'ruRU', 'Стая! Помогите Дробителю!'),
+(96102, 2, 0, 'frFR', 'Lardeur t''écrase !'),
+(96102, 2, 0, 'deDE', 'Hogger zerquetscht dich!'),
+(96102, 2, 0, 'esES', '¡Hogger te aplasta!'),
+(96102, 2, 0, 'esMX', '¡Hogger te aplasta!'),
+(96102, 2, 0, 'ruRU', 'Дробитель раздавит тебя!'),
+(96102, 3, 0, 'frFR', 'Grraaarrr ! Lardeur en colère maintenant !'),
+(96102, 3, 0, 'deDE', 'Grraaarrr! Hogger jetzt wütend!'),
+(96102, 3, 0, 'esES', '¡Grraaarrr! ¡Hogger enfadado ahora!'),
+(96102, 3, 0, 'esMX', '¡Grraaarrr! ¡Hogger enfadado ahora!'),
+(96102, 3, 0, 'ruRU', 'Грррааа! Дробитель злой теперь!'),
+(96102, 4, 0, 'frFR', 'Non... Lardeur... pas perdre...'),
+(96102, 4, 0, 'deDE', 'Nein... Hogger... nicht verlieren...'),
+(96102, 4, 0, 'esES', 'No... Hogger... no perder...'),
+(96102, 4, 0, 'esMX', 'No... Hogger... no perder...'),
+(96102, 4, 0, 'ruRU', 'Нет... Дробитель... не проиграть...'),
+(96102, 5, 0, 'frFR', 'Kaï ! À l''aide, Lardeur !'),
+(96102, 5, 0, 'deDE', 'Jaul! Helft Hogger!'),
+(96102, 5, 0, 'esES', '¡Ay! ¡Ayudad a Hogger!'),
+(96102, 5, 0, 'esMX', '¡Ay! ¡Ayudad a Hogger!'),
+(96102, 5, 0, 'ruRU', 'Ай! Помогите Дробителю!'),
+(96102, 6, 0, 'frFR', 'Ha ! Les petits faibles fuient ! Lardeur règne sur la forêt !'),
+(96102, 6, 0, 'deDE', 'Ha! Schwache Kleine laufen weg! Hogger herrscht über den Wald!'),
+(96102, 6, 0, 'esES', '¡Ja! ¡Los débiles huyen! ¡Hogger manda en el bosque!'),
+(96102, 6, 0, 'esMX', '¡Ja! ¡Los débiles huyen! ¡Hogger manda en el bosque!'),
+(96102, 6, 0, 'ruRU', 'Ха! Слабаки бегут! Дробитель правит лесом!');
