@@ -93,6 +93,10 @@ constexpr uint32 WOW_FATES_CHANNEL_SPELL = 96004;
 constexpr uint32 WOW_FATES_ALTAR_FOCUS = 96300;
 constexpr float WOW_FATES_CHANNEL_RANGE = 6.0f; // yards from the altar
 
+// A gathering's object is taken by the game's kneeling "Opening" (one second,
+// broken by moving or a blow), the spell of its lock (43, open kneeling).
+constexpr uint32 WOW_FATES_GATHER_SPELL = 6478;
+
 struct WowFatesExpeditionDef
 {
     uint32 id = 0;

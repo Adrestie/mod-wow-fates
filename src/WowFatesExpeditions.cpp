@@ -1454,9 +1454,18 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
 }
 
 // An object taken: the share of an objective that grows with the players in
-// the area, as a kill does; it goes, another comes back in its time.
+// the area, as a kill does; it goes, another comes back in its time. Only at
+// the end of an opening cast: a click straight on it (a client whose cache
+// still holds the object without its lock) starts that cast instead.
 void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
 {
+    Spell const* opening = player->GetCurrentSpell(CURRENT_GENERIC_SPELL);
+    if (!opening || !opening->m_spellInfo->HasEffect(SPELL_EFFECT_OPEN_LOCK))
+    {
+        player->CastSpell(go, WOW_FATES_GATHER_SPELL, false);
+        return;
+    }
+
     std::lock_guard<std::recursive_mutex> guard(_lock);
 
     for (auto& [id, active] : _active)
