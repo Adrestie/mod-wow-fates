@@ -93,8 +93,10 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_SABOTAGE = 8 // guarded objects to wreck
 };
 
-// What a wrecked object shows: Explosion Visual, cast by a bunny on its spot.
+// What a wrecked object shows: Explosion Visual, cast by bunnies around it,
+// and the game's large hut fire on it for a while.
 constexpr uint32 WOW_FATES_WRECK_SPELL = 34602;
+constexpr uint32 WOW_FATES_WRECK_FIRE = 182146;
 
 // The channel of an invocation: Ritual (tools/gen_spells.py), thirty seconds at
 // the altar's focus, an invisible creature on it, for the beam; a blow,
@@ -214,6 +216,13 @@ struct WowFatesActiveExpedition
     // Gathering
     std::vector<ObjectGuid> objects; // out in the area
     int64 gatherTimer = 0;      // ms before the next one is put back
+    bool gatherFilled = false;  // the first ones are out: then one at a time
+    std::unordered_map<ObjectGuid, std::vector<ObjectGuid>> guards; // a sabotage's object: its guards
+
+    // Monsters held back, the players having enough on them: sent when fewer fight
+    struct Waiting { ObjectGuid guid; ObjectGuid target; Position goal; };
+    std::vector<Waiting> waiting;
+    bool checked = false;       // its point was found outdoors once its ground was loaded
 
     // Defence and its waves
     ObjectGuid ally;
@@ -312,6 +321,12 @@ private:
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
+    bool Outdoors(Map* map, float x, float y, float z) const;
+    bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const;
+    uint32 EngageCap(WowFatesActiveExpedition const& active) const;
+    uint32 Engaged(WowFatesActiveExpedition const& active, Map* map) const;
+    void Send(WowFatesActiveExpedition& active, Creature* creature, Unit* target, Position const& goal);
+    void UpdateWaiting(WowFatesActiveExpedition& active, Map* map);
     void UpdateBoss(WowFatesActiveExpedition& active, Map* map);
     void SpawnBoss(WowFatesActiveExpedition& active, Map* map);
     void UpdateGather(WowFatesActiveExpedition& active, Map* map);
@@ -367,6 +382,7 @@ private:
     std::atomic<uint32> _activeCount{0};
 
     std::unordered_set<uint32> _populated; // zones with players, at the last look
+    std::unordered_set<uint32> _indoors;   // spawn points found under a roof: never used again
     int64 _rotateTimer = 0;
     int64 _areaTimer = 0;
 };

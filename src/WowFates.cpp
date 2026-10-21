@@ -109,6 +109,9 @@ void WowFatesLoadConfig()
     c.spawnInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.SpawnInterval", 60), 1) * IN_MILLISECONDS;
     c.cooldown = sConfigMgr->GetOption<uint32>("WowFates.Expedition.Cooldown", 600);
     c.areaInterval = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AreaInterval", 1000), 200);
+    c.engageBase = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Engage.Base", 3), 1);
+    c.engagePerPlayer = sConfigMgr->GetOption<uint32>("WowFates.Engage.PerPlayer", 2);
+    c.spawnPlayerDistance = std::max(sConfigMgr->GetOption<float>("WowFates.Spawn.PlayerDistance", 20.0f), 0.0f);
     c.bossScale = std::clamp(sConfigMgr->GetOption<float>("WowFates.Boss.Scale", 1.44f), 0.5f, 4.0f);
     c.wavePerCharacter = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PerCharacter", 1.0f), 0.0f);
     c.wavePaceFast = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceFast", 0.5f), 0.0f, 1.0f);

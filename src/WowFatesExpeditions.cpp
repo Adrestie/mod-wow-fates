@@ -993,6 +993,21 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
             UpdateArea(active, map);
             UpdateSummons(active, map, diff);
+            UpdateWaiting(active, map);
+
+            // its point, once its ground is loaded: under a roof, it is never used again
+            if (map && !active.checked && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            {
+                active.checked = true;
+                if (!Outdoors(map, active.spawn.x, active.spawn.y, active.spawn.z + 1.0f))
+                {
+                    LOG_ERROR("module", "mod-wow-fates: spawn point {} of Expedition {} is under a roof; it is not used again.",
+                        active.spawn.id, active.def->id);
+                    _indoors.insert(active.spawn.id);
+                    active.remaining = 0;
+                }
+            }
+
             // when the wave on its way was all killed, for the pace of the next
             if (map && !active.waveMobs.empty() && active.waveClearedAt < 0
                 && std::none_of(active.waveMobs.begin(), active.waveMobs.end(), [map](ObjectGuid const& guid)
@@ -1082,7 +1097,7 @@ bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
         for (uint32 spawnId : def.spawns)
         {
             WowFatesSpawnPoint const& spawn = _spawns[spawnId];
-            if (spawn.zone != zone)
+            if (spawn.zone != zone || _indoors.count(spawnId))
                 continue;
             bool const crosses = std::any_of(_active.begin(), _active.end(), [&spawn, &def](auto const& pair)
             {
@@ -1278,6 +1293,8 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
         if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
                 LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
             continue;
+        if (!Outdoors(map, x, y, z) || NearPlayer(active, x, y))
+            continue;
         return Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
     }
 
@@ -1288,6 +1305,90 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     if (z <= INVALID_HEIGHT)
         return Position(c.x, c.y, c.z, angle);
     return Position(x, y, z, angle);
+}
+
+// Under the sky: a point under a roof (a cave, a building; an awning is
+// outdoors) is never one of an Expedition's.
+bool WowFatesExpeditionMgr::Outdoors(Map* map, float x, float y, float z) const
+{
+    PositionFullTerrainStatus status;
+    map->GetFullTerrainStatusForPosition(PHASEMASK_NORMAL, x, y, z, 2.0f, status);
+    return status.outdoors;
+}
+
+bool WowFatesExpeditionMgr::NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const
+{
+    float const distance = WowFatesConf().spawnPlayerDistance;
+    for (ObjectGuid const& guid : active.inside)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            if (player->GetExactDist2d(x, y) < distance)
+                return true;
+    return false;
+}
+
+// How many of its monsters may be at the players at once: never an army on
+// a player alone.
+uint32 WowFatesExpeditionMgr::EngageCap(WowFatesActiveExpedition const& active) const
+{
+    WowFatesConfig const& c = WowFatesConf();
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    return c.engageBase + c.engagePerPlayer * (players - 1);
+}
+
+// Its monsters fighting, or on their way to: those of a wave that are not
+// held back count, as those in a fight.
+uint32 WowFatesExpeditionMgr::Engaged(WowFatesActiveExpedition const& active, Map* map) const
+{
+    std::unordered_set<ObjectGuid> held;
+    for (auto const& w : active.waiting)
+        held.insert(w.guid);
+    std::unordered_set<ObjectGuid> wave(active.waveMobs.begin(), active.waveMobs.end());
+    uint32 count = 0;
+    for (ObjectGuid const& guid : active.summons)
+        if (Creature* creature = map->GetCreature(guid))
+            if (creature->IsAlive() && !held.count(guid) && (creature->IsInCombat() || wave.count(guid)))
+                ++count;
+    return count;
+}
+
+// A monster sent: at the target if there is one still, else to the goal.
+void WowFatesExpeditionMgr::Send(WowFatesActiveExpedition& /*active*/, Creature* creature, Unit* target, Position const& goal)
+{
+    creature->SetHomePosition(goal.GetPositionX() + frand(-4.0f, 4.0f), goal.GetPositionY() + frand(-4.0f, 4.0f),
+        goal.GetPositionZ(), goal.GetOrientation());
+    creature->SetReactState(REACT_AGGRESSIVE);
+    if (target && target->IsAlive() && target->IsInWorld() && creature->AI())
+        creature->AI()->AttackStart(target);
+    else
+        creature->GetMotionMaster()->MovePoint(0, goal.GetPositionX() + frand(-4.0f, 4.0f),
+            goal.GetPositionY() + frand(-4.0f, 4.0f), goal.GetPositionZ());
+}
+
+// Those held back go, one or two at a time, as fewer fight.
+void WowFatesExpeditionMgr::UpdateWaiting(WowFatesActiveExpedition& active, Map* map)
+{
+    if (active.waiting.empty() || !map)
+        return;
+    uint32 const cap = EngageCap(active);
+    uint32 engaged = Engaged(active, map);
+    uint32 sent = 0;
+    for (auto itr = active.waiting.begin(); itr != active.waiting.end();)
+    {
+        Creature* creature = map->GetCreature(itr->guid);
+        if (!creature || !creature->IsAlive() || creature->IsInCombat())
+        {
+            itr = active.waiting.erase(itr); // gone, or the players came to it
+            continue;
+        }
+        if (engaged >= cap || sent >= 2)
+            break;
+        Unit* target = itr->target ? ObjectAccessor::GetUnit(*creature, itr->target) : nullptr;
+        WowFatesActiveExpedition::Waiting const w = *itr;
+        itr = active.waiting.erase(itr);
+        Send(active, creature, target, w.goal);
+        ++engaged;
+        ++sent;
+    }
 }
 
 void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 /*diff*/)
@@ -1332,11 +1433,16 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
         return;
 
     float const delay = std::max(respawn / (1.0f + pace * respawn), float(c.minRespawn) / IN_MILLISECONDS);
+    // once the area is filled, never many at once, none while the players
+    // have their fill
+    if (active.filled && Engaged(active, map) >= EngageCap(active))
+        return;
     // Under the floor between two waves: up to the floor at once, the wave keeps its time.
     uint32 const wanted = (thin && active.summonTimer > 0) ? floor - alive
         : ((!active.filled || pace > 0.0f) ? population - alive : 1);
     bool const wave = !(thin && active.summonTimer > 0);
-    for (uint32 i = 0; i < wanted; ++i)
+    uint32 const coming = active.filled ? std::min<uint32>(wanted, 2) : wanted;
+    for (uint32 i = 0; i < coming; ++i)
     {
         Position const pos = SpawnPoint(active, map);
         TempSummon* summon = map->SummonCreature(def->summonEntry, pos);
@@ -1459,14 +1565,22 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         return !go || !go->isSpawned();
     });
 
+    for (auto itr = active.guards.begin(); itr != active.guards.end();)
+        if (std::find(active.objects.begin(), active.objects.end(), itr->first) == active.objects.end())
+            itr = active.guards.erase(itr);
+        else
+            ++itr;
+
     WowFatesExpeditionDef const* def = active.def;
     if (active.objects.size() >= def->gatherCount || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
-    bool const all = active.objects.empty();
+    // the first ones together; then one at a time, each in its own time
+    bool const all = !active.gatherFilled;
     if (!all && active.gatherTimer > 0)
         return;
 
     uint32 const wanted = all ? def->gatherCount - uint32(active.objects.size()) : 1;
+    active.gatherFilled = true;
     for (uint32 i = 0; i < wanted; ++i)
     {
         Position const pos = SpawnPoint(active, map);
@@ -1484,6 +1598,7 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         go->SetSpawnedByDefault(false);
         map->AddToMap(go);
         active.objects.push_back(go->GetGUID());
+        std::vector<ObjectGuid>& itsGuards = active.guards[go->GetGUID()];
 
         // a sabotage's object has its guards (wave_size of summon_entry), close
         // by, back to it after a fight
@@ -1507,9 +1622,10 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
                 guard->SetDefaultMovementType(RANDOM_MOTION_TYPE);
                 guard->GetMotionMaster()->Initialize();
                 active.summons.push_back(guard->GetGUID());
+                itsGuards.push_back(guard->GetGUID());
             }
     }
-    active.gatherTimer = int64(def->gatherRespawn) * IN_MILLISECONDS;
+    active.gatherTimer = int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
 }
 
 // An object taken: the share of an objective that grows with the players in
@@ -1546,16 +1662,38 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
         // a sabotage: the object blows up, its guards (and those near) come
         if (active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
         {
+            // it goes up in flames: blasts around it, a fire on it for a while
             Map* map = go->GetMap();
-            if (TempSummon* bunny = map->SummonCreature(WOW_FATES_ALTAR_FOCUS, go->GetPosition(), nullptr, 3 * IN_MILLISECONDS))
-                bunny->CastSpell(bunny, WOW_FATES_WRECK_SPELL, true);
-            for (ObjectGuid const& guid : active.summons)
+            for (uint32 i = 0; i < 3; ++i)
+            {
+                float const angle = frand(0.0f, 2.0f * float(M_PI));
+                float const reach = i ? frand(1.5f, 3.0f) : 0.0f;
+                Position const at(go->GetPositionX() + reach * std::cos(angle), go->GetPositionY() + reach * std::sin(angle),
+                    go->GetPositionZ() + frand(0.5f, 2.0f), 0.0f);
+                if (TempSummon* bunny = map->SummonCreature(WOW_FATES_ALTAR_FOCUS, at, nullptr, 8 * IN_MILLISECONDS))
+                {
+                    bunny->CastSpell(bunny, WOW_FATES_WRECK_SPELL, true);
+                    if (!i)
+                        bunny->SummonGameObject(WOW_FATES_WRECK_FIRE, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(),
+                            go->GetOrientation(), 0.0f, 0.0f, 0.0f, 0.0f, 6);
+                }
+            }
+            // its own guards come, as many as the players may take on
+            uint32 const cap = EngageCap(active);
+            uint32 engaged = Engaged(active, map);
+            for (ObjectGuid const& guid : active.guards[go->GetGUID()])
                 if (Creature* keeper = map->GetCreature(guid))
-                    if (keeper->IsAlive() && !keeper->IsInCombat() && keeper->IsWithinDist(go, 20.0f) && keeper->AI())
+                    if (keeper->IsAlive() && !keeper->IsInCombat() && keeper->AI())
+                    {
+                        if (engaged >= cap)
+                            break;
                         keeper->AI()->AttackStart(player);
+                        ++engaged;
+                    }
+            active.guards.erase(go->GetGUID());
         }
         if (active.gatherTimer <= 0)
-            active.gatherTimer = int64(active.def->gatherRespawn) * IN_MILLISECONDS;
+            active.gatherTimer = int64(float(active.def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
         return;
     }
 
@@ -1700,6 +1838,8 @@ bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Ma
         if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
                 LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
             continue;
+        if (!Outdoors(map, x, y, z) || NearPlayer(active, x, y))
+            continue;
         out.Relocate(x, y, z, std::atan2(c.y - y, c.x - x));
         return true;
     }
@@ -1756,6 +1896,8 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
 
     WowFatesSpawnPoint const& centre = active.spawn;
     Position const goal = target ? target->GetPosition() : Centre(active, map);
+    uint32 const cap = EngageCap(active);
+    uint32 engaged = Engaged(active, map);
     for (uint32 i = 0; i < count; ++i)
     {
         Position const& entry = entries[i % entries.size()];
@@ -1771,16 +1913,19 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
             break;
         summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
         summon->SetTimer(SUMMON_CORPSE_MS);
-        summon->SetHomePosition(goal.GetPositionX() + frand(-4.0f, 4.0f), goal.GetPositionY() + frand(-4.0f, 4.0f),
-            goal.GetPositionZ(), goal.GetOrientation());
-        summon->SetReactState(REACT_AGGRESSIVE);
-        if (target && summon->AI())
-            summon->AI()->AttackStart(target);
-        else
-            summon->GetMotionMaster()->MovePoint(0, goal.GetPositionX() + frand(-4.0f, 4.0f),
-                goal.GetPositionY() + frand(-4.0f, 4.0f), goal.GetPositionZ());
         active.summons.push_back(summon->GetGUID());
         active.waveMobs.push_back(summon->GetGUID());
+        if (engaged < cap)
+        {
+            Send(active, summon, target, goal);
+            ++engaged;
+        }
+        else
+        {
+            // the players have enough on them: it waits at its side
+            summon->SetHomePosition(pos);
+            active.waiting.push_back({ summon->GetGUID(), target ? target->GetGUID() : ObjectGuid::Empty, goal });
+        }
     }
 
     LOG_INFO("module", "mod-wow-fates: Expedition {}: wave {}, {} monsters for {} characters at pace {:.2f}, from {} sides.",

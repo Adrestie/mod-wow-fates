@@ -165,6 +165,17 @@ WowFates.Expedition.Cooldown            = 600
 WowFates.Expedition.AreaInterval        = 1000
 
 #
+#    WowFates.Engage.Base
+#    WowFates.Engage.PerPlayer
+#        The monsters of an Expedition sent at its players at once (waves,
+#        guards of a wrecked object, monsters brought back): Base for one
+#        player, PerPlayer more for each other one. The others wait where
+#        they are until fewer fight.
+#
+#    WowFates.Spawn.PlayerDistance
+#        Yards: no monster nor object of an Expedition comes this near a
+#        player.
+#
 #    WowFates.Boss.Scale
 #        The size of a boss support's ally, the figure the players come to
 #        help, times the size of its creature's template. 0.5 to 4.
@@ -191,6 +202,9 @@ WowFates.Expedition.AreaInterval        = 1000
 #        two players, 1.6 times as many; four, 2.8 times.
 #
 
+WowFates.Engage.Base                    = 3
+WowFates.Engage.PerPlayer               = 2
+WowFates.Spawn.PlayerDistance           = 20
 WowFates.Boss.Scale                     = 1.44
 WowFates.Waves.PerCharacter             = 1.0
 WowFates.Waves.PaceFast                 = 0.5

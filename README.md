@@ -54,11 +54,17 @@ ones and rewards for those who take part.
     contested one; friend of every player whatever his side) fights a unique
     elite; the bar is the health the elite lost, and the Expedition fails if
     the ally falls. The ally speaks now and then (said, in five languages).
-  - *Sabotage*: enemy objects to wreck (pyres, totems, tents...), each with
-    its guards, spread over the area and put back as they go; a one second
-    cast wrecks one, it blows up and its guards come. No failure.
+  - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
+    wagons, catapults), each with its guards, spread over the area and put
+    back one at a time; a one second cast sets one alight, it goes up in
+    flames and its guards come. No failure.
 - **An objective that grows with the crowd.** Players see a percentage, never a
   count: the more players in the area, the more work each percent takes.
+- **Fair fights, under the sky.** Every Expedition, its objects and its
+  monsters are outdoors (a point found under a roof is never used again).
+  Monsters and objects come back one or two at a time, never on a player;
+  no more of them come at the players at once than they can take (three for
+  one player, two more for each other one), the others wait.
 - **Monsters that keep up.** An Expedition brings its own monsters. The faster
   the area is cleared, the faster and the more of them come back, and the area
   is never left empty.
@@ -126,8 +132,8 @@ level 8, invocation: the Ritual Altar against Dustwind Pillagers) and
 Quilboar Onslaught (Durotar, level 9, wave support: three Razor Hill Veterans
 against five waves of Razormane Battleguards) and The Packleader's End
 (Elwynn Forest, level 10, boss support: Marshal Dughan against Grimmaw the
-Packleader) and The Burning Blade's Pyres (Durotar, level 10, sabotage: the
-pyres of the Burning Blade, two Fanatics guarding each). Expeditions, spawn points and rewards live in the world
+Packleader) and The Kolkar War Camp (Durotar, level 8, sabotage: the war
+tents of the Kolkar centaurs, two Outrunners guarding each). Expeditions, spawn points and rewards live in the world
 database (`mod_wow_fates_expedition`, `mod_wow_fates_expedition_locale`,
 `mod_wow_fates_spawn`, `mod_wow_fates_reward`), and the settings of the
 objectives other than kills in `mod_wow_fates_objective` (for an assault, the
@@ -153,6 +159,8 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Expedition.Cooldown` | 600 | seconds before an Expedition may come back |
 | `WowFates.Waves.PerCharacter` | 1.0 | monsters of a wave per character in the area, times wave_size |
 | `WowFates.Waves.PaceFast` / `PaceStep` / `PaceMax` | 0.5 / 0.25 / 2.0 | a wave killed within half the interval makes the next ones a quarter bigger, twice at most |
+| `WowFates.Engage.Base` / `PerPlayer` | 3 / 2 | the Expedition's monsters at the players at once; the others wait |
+| `WowFates.Spawn.PlayerDistance` | 20 | yards: nothing of an Expedition comes this near a player |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
 | `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |

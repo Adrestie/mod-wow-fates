@@ -137,6 +137,9 @@ struct WowFatesConfig
 
     // The objective grows with the players in the area: base x (1 + this x (players - 1))
     float participantScaling = 0.6f;
+    uint32 engageBase = 3;           // monsters at the players at once, for one player
+    uint32 engagePerPlayer = 2;      // and this many more for each other one
+    float spawnPlayerDistance = 20.0f; // no monster nor object comes this near a player
     float bossScale = 1.44f;         // a boss support's ally (its boss), times its template's size
     float wavePerCharacter = 1.0f;   // times wave_size, per character in the area
     float wavePaceFast = 0.5f;       // a wave killed within this share of the interval is fast

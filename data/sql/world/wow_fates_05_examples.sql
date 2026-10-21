@@ -22,8 +22,9 @@
 --   9  The Packleader's End, Elwynn Forest, level 10, boss support: Marshal
 --      Dughan (creature 96202) against Grimmaw the Packleader (96101), with
 --      a few Riverpaw Outrunners about
---  10  The Burning Blade's Pyres, Durotar, level 10, sabotage: the pyres of the
---      Burning Blade (gameobject 960001), two Fanatics guarding each
+--  10  The Kolkar War Camp, Durotar, level 8, sabotage: the war tents of the
+--      Kolkar centaurs (gameobject 960001), two Outrunners guarding each,
+--      out in the open of their camp
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -57,8 +58,8 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
    'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!'),
 (9, 'The Packleader''s End', 10, 7,   0,  1,   478, 3, 20, 35,   0, 0, 1, 1, 'Elwynn Forest: Marshal Dughan against Grimmaw the Packleader',
    'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', 'Grimmaw calls the pack!'),
-(10, 'The Burning Blade''s Pyres', 10, 8,   0,  8,  3197, 0, 20, 40,   0, 0, 1, 1, 'Durotar: the Burning Blade''s pyres, guarded by Fanatics',
-   'The Burning Blade feed their pyres to call on dark powers: wreck the pyres under their guards'' eyes.', 'Wreck the Burning Blade pyres', '');
+(10, 'The Kolkar War Camp', 8, 8,   0,  8,  3120, 0, 20, 40,   0, 0, 1, 1, 'Durotar: the Kolkar war tents, guarded by Outrunners',
+   'The Kolkar centaurs are massing in their camp: burn their war tents before they ride on Razor Hill.', 'Burn the Kolkar war tents', '');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -69,7 +70,7 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (7,     0, 70,      0, 8, 5,     0, 120, 30, 2, 1, 960100, 1, 5, '25,50,75', 'Harpy Ritual: two minutes of channel for one player, a wave every 30 s'),
 (8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, '25,50,75', 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
 (9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'The Packleader''s End: Marshal Dughan against Grimmaw; the pack at 25, 50 and 75 % of the bar'),
-(10,    0, 70, 960001, 5, 20,     0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'The Burning Blade''s Pyres: five pyres out, two Fanatics each, one back 20 s after it goes');
+(10,    0, 70, 960001, 4, 25,     0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'The Kolkar War Camp: four tents out, two Outrunners each, one back about 25 s after one burns');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -163,16 +164,16 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
    'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', '¡Grimmaw llama a la manada!'),
 (9, 'ruRU', 'Конец вожака стаи',
    'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', 'Гриммо зовёт стаю!'),
-(10, 'frFR', 'Les bûchers de la Lame ardente',
-   'La Lame ardente alimente ses bûchers pour invoquer des puissances obscures : détruisez-les sous les yeux de leurs gardes.', 'Détruisez les bûchers de la Lame ardente', ''),
-(10, 'deDE', 'Die Scheiterhaufen der Brennenden Klinge',
-   'Die Brennende Klinge nährt ihre Scheiterhaufen, um dunkle Mächte zu rufen: Zerstört sie vor den Augen ihrer Wachen.', 'Zerstört die Scheiterhaufen der Brennenden Klinge', ''),
-(10, 'esES', 'Las piras del Filo Ardiente',
-   'El Filo Ardiente alimenta sus piras para invocar poderes oscuros: destrúyelas ante los ojos de sus guardias.', 'Destruye las piras del Filo Ardiente', ''),
-(10, 'esMX', 'Las piras del Filo Ardiente',
-   'El Filo Ardiente alimenta sus piras para invocar poderes oscuros: destrúyelas ante los ojos de sus guardias.', 'Destruye las piras del Filo Ardiente', ''),
-(10, 'ruRU', 'Костры Пылающего Клинка',
-   'Пылающий Клинок разжигает костры, чтобы призвать тёмные силы: уничтожьте их на глазах у стражи.', 'Уничтожьте костры Пылающего Клинка', '');
+(10, 'frFR', 'Le camp de guerre kolkar',
+   'Les centaures kolkars se rassemblent dans leur camp : incendiez leurs tentes de guerre avant qu''ils ne fondent sur Razor Hill.', 'Incendiez les tentes de guerre kolkars', ''),
+(10, 'deDE', 'Das Kriegslager der Kolkar',
+   'Die Kolkarzentauren sammeln sich in ihrem Lager: Brennt ihre Kriegszelte nieder, bevor sie gegen Klingenhügel reiten.', 'Brennt die Kriegszelte der Kolkar nieder', ''),
+(10, 'esES', 'El campamento de guerra kolkar',
+   'Los centauros kolkar se reúnen en su campamento: quema sus tiendas de guerra antes de que cabalguen sobre Cerrotajo.', 'Quema las tiendas de guerra kolkar', ''),
+(10, 'esMX', 'El campamento de guerra kolkar',
+   'Los centauros kolkar se reúnen en su campamento: quema sus tiendas de guerra antes de que cabalguen sobre Cerrotajo.', 'Quema las tiendas de guerra kolkar', ''),
+(10, 'ruRU', 'Боевой лагерь колкаров',
+   'Кентавры-колкары собираются в своём лагере: сожгите их боевые шатры, пока они не напали на Колючий Холм.', 'Сожгите боевые шатры колкаров', '');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -193,8 +194,8 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (15, 8,  1,   -29.5,  -4265.1,    66.6,    0, 'Durotar, north of the Razormane grounds'),
 (16, 9,  0, -9795.0,    389.0,    39.6,    0, 'Elwynn Forest, the hills west of Westbrook'),
 (17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp'),
-(18, 10, 1,  1449.9,  -4738.3,    -2.0,    0, 'Durotar, the Burning Blade camp by the coast'),
-(19, 10, 1,  1483.4,  -4779.7,     6.1,    0, 'Durotar, the Burning Blade camp, the slopes');
+(18, 10, 1, -1012.7,  -4600.6,    25.7,    0, 'Durotar, Kolkar Crag, the heart of the camp'),
+(19, 10, 1,  -984.8,  -4503.7,    26.8,    0, 'Durotar, Kolkar Crag, the north of the camp');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES
