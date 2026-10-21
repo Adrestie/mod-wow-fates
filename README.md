@@ -60,9 +60,9 @@ ones and rewards for those who take part.
     flames and its guards come. No failure.
 - **An objective that grows with the crowd.** Players see a percentage, never a
   count: the more players in the area, the more work each percent takes.
-- **Fair fights, under the sky.** Every Expedition, its objects and its
-  monsters are outdoors (a point found under a roof is never used again).
-  Monsters and objects come back one or two at a time, never on a player;
+- **Fair fights.** A sabotage, its targets and its monsters are outdoors (a
+  point found under a roof is never used again); the other Expeditions may be
+  in caves and buildings too. Monsters and objects come back one or two at a time, never on a player;
   no more of them come at the players at once than they can take (three for
   one player, two more for each other one), the others wait.
 - **Monsters that keep up.** An Expedition brings its own monsters. The faster

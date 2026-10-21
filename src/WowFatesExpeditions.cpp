@@ -996,7 +996,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateWaiting(active, map);
 
             // its point, once its ground is loaded: under a roof, it is never used again
-            if (map && !active.checked && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            if (map && !active.checked && NeedsSky(active.def) && map->IsGridLoaded(active.spawn.x, active.spawn.y))
             {
                 active.checked = true;
                 if (!Outdoors(map, active.spawn.x, active.spawn.y, active.spawn.z + 1.0f))
@@ -1293,7 +1293,7 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
         if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
                 LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
             continue;
-        if (!Outdoors(map, x, y, z) || NearPlayer(active, x, y))
+        if ((NeedsSky(active.def) && !Outdoors(map, x, y, z)) || NearPlayer(active, x, y))
             continue;
         return Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
     }
@@ -1307,8 +1307,15 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     return Position(x, y, z, angle);
 }
 
+// A sabotage is under the sky (its targets are buildings and engines out in
+// the open); the others may be in a cave or a building as well.
+bool WowFatesExpeditionMgr::NeedsSky(WowFatesExpeditionDef const* def)
+{
+    return def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE;
+}
+
 // Under the sky: a point under a roof (a cave, a building; an awning is
-// outdoors) is never one of an Expedition's.
+// outdoors) is not one of a sabotage's.
 bool WowFatesExpeditionMgr::Outdoors(Map* map, float x, float y, float z) const
 {
     PositionFullTerrainStatus status;
@@ -1838,7 +1845,7 @@ bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Ma
         if (!map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
                 LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
             continue;
-        if (!Outdoors(map, x, y, z) || NearPlayer(active, x, y))
+        if ((NeedsSky(active.def) && !Outdoors(map, x, y, z)) || NearPlayer(active, x, y))
             continue;
         out.Relocate(x, y, z, std::atan2(c.y - y, c.x - x));
         return true;

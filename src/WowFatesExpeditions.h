@@ -222,7 +222,7 @@ struct WowFatesActiveExpedition
     // Monsters held back, the players having enough on them: sent when fewer fight
     struct Waiting { ObjectGuid guid; ObjectGuid target; Position goal; };
     std::vector<Waiting> waiting;
-    bool checked = false;       // its point was found outdoors once its ground was loaded
+    bool checked = false;       // a sabotage's point was found outdoors once its ground was loaded
 
     // Defence and its waves
     ObjectGuid ally;
@@ -322,6 +322,7 @@ private:
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
     bool Outdoors(Map* map, float x, float y, float z) const;
+    static bool NeedsSky(WowFatesExpeditionDef const* def);
     bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const;
     uint32 EngageCap(WowFatesActiveExpedition const& active) const;
     uint32 Engaged(WowFatesActiveExpedition const& active, Map* map) const;
