@@ -56,7 +56,9 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates', 112, '#{} {} (level {}): {} spawn points, weight {}, {}.'),
 ('mod-wow-fates', 113, '{}: Expedition {} (level {}), ratio {:.2f}, debuff {}.'),
 ('mod-wow-fates', 114, 'Nobody is in the area of an Expedition.'),
-('mod-wow-fates', 115, 'No such player in the world.');
+('mod-wow-fates', 115, 'No such player in the world.'),
+('mod-wow-fates',  36, 'escort {} to the end of the road'),
+('mod-wow-fates',  37, 'Escort {}');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -242,4 +244,12 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates', 112, 'ruRU', '#{} {} (уровень {}): точек появления {}, вес {}, {}.'),
 ('mod-wow-fates', 113, 'ruRU', '{}: экспедиция {} (уровень {}), соотношение {:.2f}, эффект {}.'),
 ('mod-wow-fates', 114, 'ruRU', 'Никого нет в зоне экспедиции.'),
-('mod-wow-fates', 115, 'ruRU', 'Такого игрока нет в мире.');
+('mod-wow-fates', 115, 'ruRU', 'Такого игрока нет в мире.'),
+('mod-wow-fates',  36, 'frFR', 'escorter {} jusqu''au bout du chemin'),
+('mod-wow-fates',  37, 'frFR', 'Escorter {}'),
+('mod-wow-fates',  36, 'deDE', 'begleitet {} bis ans Ende des Weges'),
+('mod-wow-fates',  37, 'deDE', 'Begleitet {}'),
+('mod-wow-fates',  36, 'esES', 'escolta a {} hasta el final del camino'),
+('mod-wow-fates',  37, 'esES', 'Escolta a {}'),
+('mod-wow-fates',  36, 'ruRU', 'сопроводите: {} — до конца пути'),
+('mod-wow-fates',  37, 'ruRU', 'Сопроводите: {}');

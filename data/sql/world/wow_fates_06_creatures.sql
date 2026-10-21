@@ -12,6 +12,10 @@
 --          gossip, no guard's script.
 --   96201  Razor Hill Veteran: the allies of the Quilboar Onslaught (Durotar,
 --          level 9), Orgrimmar grunts of the same faction 495.
+--   96203  Remy "Two Times": the ally of Remy's Wares (Elwynn Forest, level 6),
+--          the Goldshire merchant with his own name and model (241, display
+--          3254), of faction 495, without his town's immunity (unit_flags
+--          512) nor his shop, with his words (creature_text).
 --   96202  Marshal Dughan: the ally of The Packleader's End, the marshal of
 --          Goldshire with his own name and model (240, display 1985), of
 --          faction 495 as every ally, with his words (creature_text);
@@ -102,6 +106,17 @@ UPDATE `wow_fates_creature` SET
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
 
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 241;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96203, `subname` = '',
+  `minlevel` = 6, `maxlevel` = 6, `rank` = 0, `faction` = 495,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
+  `HealthModifier` = 5, `DamageModifier` = 1, `ArmorModifier` = 1.5,
+  `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
 DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (96100, 0, 2357, 1.35, 1, 0),
@@ -109,7 +124,8 @@ INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`,
 (96101, 0, 512, 1.6, 1, 0),
 (96201, 0, 4259, 1, 1, 0),
 (96202, 0, 1985, 1, 1, 0),
-(96300, 0, 11686, 1, 1, 0);
+(96300, 0, 11686, 1, 1, 0),
+(96203, 0, 3254, 1, 1, 0);
 
 DELETE FROM `creature_template_locale` WHERE `entry` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `VerifiedBuild`) VALUES
@@ -137,7 +153,12 @@ INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `Ver
 (96202, 'deDE', 'Marschall Dughan', '', 0),
 (96202, 'esES', 'Alguacil Dughan', '', 0),
 (96202, 'esMX', 'Alguacil Dughan', '', 0),
-(96202, 'ruRU', 'Маршал Дугхан', '', 0);
+(96202, 'ruRU', 'Маршал Дугхан', '', 0),
+(96203, 'frFR', 'Remy « Deux fois »', '', 0),
+(96203, 'deDE', 'Remy "Zweifach"', '', 0),
+(96203, 'esES', 'Remy "Dos Veces"', '', 0),
+(96203, 'esMX', 'Remy "Dos Veces"', '', 0),
+(96203, 'ruRU', 'Реми Повторюх', '', 0);
 
 -- Its blows: the Bandit's Snap Kick, more often, and the Bodyguard's Disarm.
 DELETE FROM `smart_scripts` WHERE `entryorguid` BETWEEN 96100 AND 96399 AND `source_type` = 0;
@@ -146,6 +167,8 @@ INSERT INTO `smart_scripts` (`entryorguid`, `source_type`, `id`, `link`, `event_
 (96100, 0, 1, 0, 0, 0, 100, 0, 8000, 10000, 25000, 30000, 0, 0, 11, 6713, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Defias Ringleader - In Combat - Cast Disarm'),
 (96101, 0, 0, 0, 0, 0, 100, 0, 4000, 6000, 7000, 11000, 0, 0, 11, 8646, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - In Combat - Cast Snap Kick');
 
+-- An escort's ally's: 0 when he sets off, 1 at an ambush, 2 waiting for the
+-- players (every 30 s), 3 at the end of the road, 4 when he falls.
 -- The words of the boss supports' creatures: said (a bubble, not a yell),
 -- in the universal language, through creature_text groups the module calls: 0 at the
 -- start, 1 in the fight (every 20 to 40 s, one at random), 2 at the elite's
@@ -171,7 +194,13 @@ INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Lan
 (96202, 1, 2, 'Keep at it, it can''t last much longer!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - in the fight'),
 (96202, 2, 0, 'It''s weakening! Press the attack!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - the elite at half health'),
 (96202, 3, 0, 'It''s done. Well fought, friends.', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - victory'),
-(96202, 4, 0, 'I... have failed...', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - falls');
+(96202, 4, 0, 'I... have failed...', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - falls'),
+(96203, 0, 0, 'Right, let''s get these goods up the road. Stay close!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - sets off'),
+(96203, 1, 0, 'Defias! Protect the wares!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - an ambush'),
+(96203, 1, 1, 'Thieves! Keep them off the crates!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - an ambush'),
+(96203, 2, 0, 'Hey! I''m not going on alone, these hills aren''t safe!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - waits for the players'),
+(96203, 3, 0, 'We made it, and not a crate lost! You have my thanks, friends.', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - the end of the road'),
+(96203, 4, 0, 'My... wares...', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - falls');
 
 DELETE FROM `creature_text_locale` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Text`) VALUES
@@ -259,4 +288,34 @@ INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Te
 (96202, 4, 0, 'deDE', 'Ich... habe versagt...'),
 (96202, 4, 0, 'esES', 'He... fracasado...'),
 (96202, 4, 0, 'esMX', 'He... fracasado...'),
-(96202, 4, 0, 'ruRU', 'Я... подвёл вас...');
+(96202, 4, 0, 'ruRU', 'Я... подвёл вас...'),
+(96203, 0, 0, 'frFR', 'Bon, montons ces marchandises par la route. Restez près de moi !'),
+(96203, 0, 0, 'deDE', 'Also gut, bringen wir die Waren die Straße hinauf. Bleibt in meiner Nähe!'),
+(96203, 0, 0, 'esES', 'Bien, subamos esta mercancía por el camino. ¡No os alejéis!'),
+(96203, 0, 0, 'esMX', 'Bien, subamos esta mercancía por el camino. ¡No os alejéis!'),
+(96203, 0, 0, 'ruRU', 'Ну что ж, повезём товар по дороге. Держитесь рядом!'),
+(96203, 1, 0, 'frFR', 'Des Défias ! Protégez la marchandise !'),
+(96203, 1, 0, 'deDE', 'Defias! Schützt die Waren!'),
+(96203, 1, 0, 'esES', '¡Defias! ¡Proteged la mercancía!'),
+(96203, 1, 0, 'esMX', '¡Defias! ¡Proteged la mercancía!'),
+(96203, 1, 0, 'ruRU', 'Братство! Защитите товар!'),
+(96203, 1, 1, 'frFR', 'Des voleurs ! Éloignez-les des caisses !'),
+(96203, 1, 1, 'deDE', 'Diebe! Haltet sie von den Kisten fern!'),
+(96203, 1, 1, 'esES', '¡Ladrones! ¡Alejadlos de las cajas!'),
+(96203, 1, 1, 'esMX', '¡Ladrones! ¡Alejadlos de las cajas!'),
+(96203, 1, 1, 'ruRU', 'Воры! Не подпускайте их к ящикам!'),
+(96203, 2, 0, 'frFR', 'Hé ! Je ne continue pas seul, ces collines ne sont pas sûres !'),
+(96203, 2, 0, 'deDE', 'He! Allein gehe ich nicht weiter, diese Hügel sind nicht sicher!'),
+(96203, 2, 0, 'esES', '¡Eh! No sigo solo, estas colinas no son seguras.'),
+(96203, 2, 0, 'esMX', '¡Eh! No sigo solo, estas colinas no son seguras.'),
+(96203, 2, 0, 'ruRU', 'Эй! Один я дальше не пойду, на этих холмах опасно!'),
+(96203, 3, 0, 'frFR', 'On y est, et pas une caisse de perdue ! Merci, mes amis.'),
+(96203, 3, 0, 'deDE', 'Geschafft, und keine Kiste verloren! Habt Dank, Freunde.'),
+(96203, 3, 0, 'esES', '¡Lo logramos, y sin perder una caja! Gracias, amigos.'),
+(96203, 3, 0, 'esMX', '¡Lo logramos, y sin perder una caja! Gracias, amigos.'),
+(96203, 3, 0, 'ruRU', 'Добрались, и ни одного ящика не потеряли! Спасибо, друзья.'),
+(96203, 4, 0, 'frFR', 'Ma... marchandise...'),
+(96203, 4, 0, 'deDE', 'Meine... Waren...'),
+(96203, 4, 0, 'esES', 'Mi... mercancía...'),
+(96203, 4, 0, 'esMX', 'Mi... mercancía...'),
+(96203, 4, 0, 'ruRU', 'Мой... товар...');

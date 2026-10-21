@@ -54,6 +54,10 @@ ones and rewards for those who take part.
     contested one; friend of every player whatever his side) fights a unique
     elite; the bar is the health the elite lost, and the Expedition fails if
     the ally falls. The ally speaks now and then (said, in five languages).
+  - *Escort*: an ally (a known figure of the zone) walks a route while
+    players are near him, waits otherwise; ambushes at fixed marks of it.
+    The bar is the route behind him; he dies, it fails. The route is the
+    spawn point's `path`, each leg walked as a player would.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

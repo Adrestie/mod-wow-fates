@@ -243,6 +243,13 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 def.id, def.channelEntry, def.summonEntry);
             itr = _defs.erase(itr);
         }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_ESCORT
+            && (!sObjectMgr->GetCreatureTemplate(def.allyEntry) || !sObjectMgr->GetCreatureTemplate(def.summonEntry)))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is an escort whose ally (creature {}) or ambushers (summon_entry {}) do not exist; skipped.",
+                def.id, def.allyEntry, def.summonEntry);
+            itr = _defs.erase(itr);
+        }
         else if ((def.objectiveType == WOW_FATES_OBJECTIVE_GATHER || def.objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
             && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
         {
@@ -421,6 +428,8 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), CreatureName(def->bossEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_SUPPORT), CreatureName(def->allyEntry, session), def->waveCount);
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_ESCORT), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -804,6 +813,8 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_INVOKE), GameObjectName(def->channelEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_SUPPORT), active.repelled, def->waveCount);
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_ESCORT), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -819,8 +830,8 @@ std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& 
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
             uint32(active.alliesAlive), def->allyCount);
-    if ((def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
-        && active.allyHealthPct >= 0)
+    if ((def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT
+            || def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT) && active.allyHealthPct >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLY_HEALTH), CreatureName(def->allyEntry, session),
             uint32(active.allyHealthPct));
     return "";
@@ -1027,6 +1038,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
             UpdateBossSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
+            UpdateEscort(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -2764,6 +2777,148 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
 }
 
 // ---------------------------------------------------------------------------
+// Escort
+
+namespace
+{
+    // The lines of an escort's ally (its creature_text groups).
+    enum WowFatesEscortTalk : uint8
+    {
+        ESCORT_SAY_START  = 0, // the first player comes: off he goes
+        ESCORT_SAY_AMBUSH = 1,
+        ESCORT_SAY_WAIT   = 2, // nobody near him: he waits, and says so every 30 s
+        ESCORT_SAY_END    = 3, // the end of the route
+        ESCORT_SAY_FALL   = 4
+    };
+
+    constexpr float ESCORT_REACH = 25.0f; // yards: with a player this near, he walks
+}
+
+// The ally waits at the start of its route (BuildRoute, once the area is
+// loaded: a route that cannot be walked, and the point is never used again);
+// the first player in the area starts it. He walks the route while a player
+// is within ESCORT_REACH of him, waits otherwise; he fights what attacks him
+// and goes on from there. Ambushes at the bar's marks (boss_waves), from
+// around him, at him. His health grows with the players in the area. The bar
+// is the route behind him; at its end, done; dead, failed. Gone alive (a grid
+// unloaded), he comes back where he was on it.
+void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0 || active.remaining <= 0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+
+    if (active.route.empty())
+    {
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        std::string why;
+        if (!BuildRoute(active, map, &why))
+        {
+            Broken(active, "its route: " + why);
+            return;
+        }
+    }
+
+    Creature* ally = active.ally ? map->GetCreature(active.ally) : nullptr;
+    if (ally && !ally->IsAlive())
+    {
+        active.allyHealthPct = 0;
+        Say(ally, ESCORT_SAY_FALL);
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died, {} % of the route behind him.", def->id, uint32(active.progressPct));
+        active.failed = true;
+        return;
+    }
+    std::size_t const last = active.route.size() - 1;
+    if (!ally)
+    {
+        Position const& at = active.route[active.routeIndex];
+        if (!map->IsGridLoaded(at.GetPositionX(), at.GetPositionY()))
+            return;
+        Position const& next = active.route[std::min<std::size_t>(active.routeIndex + 1, last)];
+        ally = SpawnAlly(active, map, Position(at.GetPositionX(), at.GetPositionY(), at.GetPositionZ(),
+            std::atan2(next.GetPositionY() - at.GetPositionY(), next.GetPositionX() - at.GetPositionX())));
+        if (!ally)
+            return;
+        ally->SetWalk(true);
+        active.ally = ally->GetGUID();
+        active.allyPlayers = 1;
+    }
+
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
+    active.allyHealthPct = std::max<int32>(5, int32(std::ceil(ally->GetHealthPct() / 5.0f)) * 5);
+
+    if (!Start(active, "escort", &WowFatesExpeditionMgr::CreatureName, def->allyEntry))
+        return;
+    if (!(active.said & 1))
+    {
+        active.said |= 1;
+        Say(ally, ESCORT_SAY_START);
+        active.talkTimer = 30 * IN_MILLISECONDS;
+    }
+
+    // how far along: the farthest of the next points he stands at
+    for (std::size_t j = active.routeIndex + 1; j <= std::min<std::size_t>(active.routeIndex + 12, last); ++j)
+        if (ally->GetExactDist2d(active.route[j].GetPositionX(), active.route[j].GetPositionY()) < 4.0f)
+            active.routeIndex = uint32(j);
+    if (active.routeIndex >= last)
+    {
+        Say(ally, ESCORT_SAY_END);
+        ally->StopMoving();
+        active.progressPct = 100.0;
+        return;
+    }
+    double const total = std::max<double>(active.routeAt.back(), 1.0);
+    active.progressPct = std::max(active.progressPct, std::min(99.0, 100.0 * double(active.routeAt[active.routeIndex]) / total));
+
+    // the ambushes at the bar's marks, around him
+    for (std::size_t i = 0; i < def->bossWaves.size() && i < 32; ++i)
+    {
+        uint32 const bit = 1u << i;
+        if ((active.bossWavesSent & bit) || active.progressPct < double(def->bossWaves[i]))
+            continue;
+        active.bossWavesSent |= bit;
+        Say(ally, ESCORT_SAY_AMBUSH);
+        Position const around = ally->GetPosition();
+        SendWave(active, map, ally, &around);
+        break;
+    }
+
+    if (ally->IsInCombat())
+        return;
+    ally->SetHomePosition(ally->GetPosition()); // back from a fight: here, not at the start
+
+    bool followed = false;
+    for (ObjectGuid const& guid : active.inside)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map && player->GetExactDist2d(ally) <= ESCORT_REACH)
+            {
+                followed = true;
+                break;
+            }
+    MotionMaster* motion = ally->GetMotionMaster();
+    if (!followed)
+    {
+        if (motion->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
+        {
+            motion->Clear();
+            ally->StopMoving();
+        }
+        active.talkTimer -= diff;
+        if (active.talkTimer <= 0)
+        {
+            Say(ally, ESCORT_SAY_WAIT);
+            active.talkTimer = 30 * IN_MILLISECONDS;
+        }
+        return;
+    }
+    active.talkTimer = std::max<int64>(active.talkTimer, 15 * IN_MILLISECONDS);
+    if (motion->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
+        motion->MovePoint(1, active.route[std::min<std::size_t>(active.routeIndex + 5, last)], FORCED_MOVEMENT_WALK);
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -2783,7 +2938,10 @@ bool WowFatesExpeditionMgr::IsForShow(Unit const* unit)
         return false;
     std::lock_guard<std::recursive_mutex> guard(_lock);
     WowFatesActiveExpedition* active = FindAt(unit);
-    return active && active->def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT && active->inside.empty();
+    if (!active || !active->inside.empty())
+        return false;
+    uint8 const type = active->def->objectiveType;
+    return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT;
 }
 
 void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)

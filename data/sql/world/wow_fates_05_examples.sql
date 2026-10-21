@@ -25,6 +25,9 @@
 --  10  The Kolkar War Camp, Durotar, level 8, sabotage: the war tents of the
 --      Kolkar centaurs (gameobject 960001), two Outrunners guarding each,
 --      out in the open of their camp
+--  11  Remy's Wares, Elwynn Forest, level 6, escort: Remy "Two Times"
+--      (creature 96203) takes his wares up the hill road north-east of
+--      Goldshire, Defias Cutpurses ambushing him at 25, 50 and 75 % of it
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -59,7 +62,9 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (9, 'The Packleader''s End', 10, 7,   0,  1,   478, 3, 20, 35,   0, 0, 1, 1, 'Elwynn Forest: Marshal Dughan against Grimmaw the Packleader',
    'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', 'Grimmaw calls the pack!'),
 (10, 'The Kolkar War Camp', 8, 8,   0,  8,  3120, 0, 20, 40,   0, 0, 1, 1, 'Durotar: the Kolkar war tents, guarded by Outrunners',
-   'The Kolkar centaurs are massing in their camp: burn their war tents before they ride on Razor Hill.', 'Burn the Kolkar war tents', '');
+   'The Kolkar centaurs are massing in their camp: burn their war tents before they ride on Razor Hill.', 'Burn the Kolkar war tents', ''),
+(11, 'Remy''s Wares', 6, 9,   0,  1,    94, 0, 20, 110,  0, 0, 1, 1, 'Elwynn Forest: Remy "Two Times" up the hill road, Defias Cutpurses lying in wait',
+   'Remy "Two Times" is taking his wares up the hill road, where Defias Cutpurses lie in wait: escort him to the end of the road.', 'Escort Remy "Two Times"', 'Defias Cutpurses spring an ambush!');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -71,6 +76,12 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, '25,50,75', 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
 (9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 'The Packleader''s End: Marshal Dughan against Grimmaw; the pack at 25, 50 and 75 % of the bar'),
 (10,    0, 70, 960001, 4, 25,     0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 'The Kolkar War Camp: four tents out, two Outrunners each, one back about 25 s after one burns');
+
+-- The escort, the rescue, the capture and the warlord, with their own columns.
+INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
+  `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`,
+  `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `comment`) VALUES
+(11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Remy''s Wares: Remy walks the hill road; Defias Cutpurses ambush him at 25, 50 and 75 % of it');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -173,7 +184,17 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (10, 'esMX', 'El campamento de guerra kolkar',
    'Los centauros kolkar se reúnen en su campamento: quema sus tiendas de guerra antes de que cabalguen sobre Cerrotajo.', 'Quema las tiendas de guerra kolkar', ''),
 (10, 'ruRU', 'Боевой лагерь колкаров',
-   'Кентавры-колкары собираются в своём лагере: сожгите их боевые шатры, пока они не напали на Колючий Холм.', 'Сожгите боевые шатры колкаров', '');
+   'Кентавры-колкары собираются в своём лагере: сожгите их боевые шатры, пока они не напали на Колючий Холм.', 'Сожгите боевые шатры колкаров', ''),
+(11, 'frFR', 'La marchandise de Remy',
+   'Remy « Deux fois » monte sa marchandise par la route des collines, où guettent des vide-goussets défias : escortez-le jusqu''au bout du chemin.', 'Escortez Remy « Deux fois »', 'Des vide-goussets défias tendent une embuscade !'),
+(11, 'deDE', 'Remys Waren',
+   'Remy "Zweifach" bringt seine Waren die Hügelstraße hinauf, wo Taschendiebe der Defias lauern: Begleitet ihn bis ans Ende des Weges.', 'Begleitet Remy "Zweifach"', 'Taschendiebe der Defias greifen aus dem Hinterhalt an!'),
+(11, 'esES', 'La mercancía de Remy',
+   'Remy "Dos Veces" sube su mercancía por el camino de las colinas, donde acechan rateros Defias: escóltalo hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
+(11, 'esMX', 'La mercancía de Remy',
+   'Remy "Dos Veces" sube su mercancía por el camino de las colinas, donde acechan rateros Defias: escóltalo hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
+(11, 'ruRU', 'Товары Реми',
+   'Реми Повторюх везёт товар по холмистой дороге, где подстерегают карманники из Братства Справедливости: сопроводите его до конца пути.', 'Сопроводите Реми Повторюха', 'Карманники из Братства Справедливости устроили засаду!');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -196,6 +217,12 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp'),
 (18, 10, 1, -1012.7,  -4600.6,    25.7,    0, 'Durotar, Kolkar Crag, the heart of the camp'),
 (19, 10, 1,  -984.8,  -4503.7,    26.8,    0, 'Durotar, Kolkar Crag, the north of the camp');
+
+-- An escort's route, a rescue's way out: "x,y,z" points (path), each leg
+-- walked as a player would; .fates check tries them.
+INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`, `path`) VALUES
+(20, 11, 0, -9175.0,     78.0,    77.7,    0, 'Elwynn Forest, the hill road north-east of Goldshire',
+   '-9244.0,122.0,72.5;-9184.0,83.0,77.9;-9144.0,54.0,77.7;-9109.0,7.0,88.3');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES
