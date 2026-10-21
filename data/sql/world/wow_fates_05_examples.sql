@@ -248,7 +248,7 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
-(1, 1,   0, -9797.38,   131.632,  24.5919, 0, 'Fargodeep Mine, outside'),
+(1, 1,   0, -9783.0,    108.7,    46.0,    0, 'Fargodeep Mine, on the hill above its entrance'),
 (2, 1,   0, -9256.03,  -707.889,  63.1122, 0, 'Jasperlode Mine, outside'),
 (3, 2,   1,  92.7794, -4557.56,   54.6971, 0, 'Razormane grounds, south'),
 (4, 2,   1,  80.3499, -4406.12,   43.5863, 0, 'Razormane grounds, north'),
@@ -262,7 +262,7 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (12, 7,  1,   793.9,  -4849.5,    38.0,    0, 'Durotar, south of Drygulch Ravine'),
 (13, 7,  1,   641.3,  -4664.4,    22.1,    0, 'Durotar, west of Drygulch Ravine'),
 (14, 8,  1,   298.0,  -4269.0,    31.1,    0, 'Durotar, east of the Razormane grounds'),
-(15, 8,  1,   -29.5,  -4265.1,    66.6,    0, 'Durotar, north of the Razormane grounds'),
+(15, 8,  1,    19.0,  -4251.5,    73.0,    0, 'Durotar, north of the Razormane grounds'),
 (16, 9,  0, -9795.0,    389.0,    39.6,    0, 'Elwynn Forest, the hills west of Westbrook'),
 (17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp'),
 (18, 10, 1, -1012.7,  -4600.6,    25.7,    0, 'Durotar, Kolkar Crag, the heart of the camp'),
