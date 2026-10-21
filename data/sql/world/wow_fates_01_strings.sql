@@ -61,7 +61,11 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  37, 'Escort {}'),
 ('mod-wow-fates',  38, 'free the {} and lead them out'),
 ('mod-wow-fates',  39, 'Free: {}'),
-('mod-wow-fates',  40, 'Led out: {}/{} - lost: {}/{}');
+('mod-wow-fates',  40, 'Led out: {}/{} - lost: {}/{}'),
+('mod-wow-fates',  41, 'take and hold: {}'),
+('mod-wow-fates',  42, 'Hold: {}'),
+('mod-wow-fates',  43, 'Banners held: {}/{} - {}:{:02} left'),
+('mod-wow-fates',  44, 'Banners held: {}/{}');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -267,4 +271,20 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  40, 'esES', 'Rescatados: {}/{} — perdidos: {}/{}'),
 ('mod-wow-fates',  38, 'ruRU', 'освободите: {} — и выведите их'),
 ('mod-wow-fates',  39, 'ruRU', 'Освободите: {}'),
-('mod-wow-fates',  40, 'ruRU', 'Выведено: {}/{} — потеряно: {}/{}');
+('mod-wow-fates',  40, 'ruRU', 'Выведено: {}/{} — потеряно: {}/{}'),
+('mod-wow-fates',  41, 'frFR', 'prendre et tenir : {}'),
+('mod-wow-fates',  42, 'frFR', 'Tenir : {}'),
+('mod-wow-fates',  43, 'frFR', 'Bannières tenues : {}/{} — reste {}:{:02}'),
+('mod-wow-fates',  44, 'frFR', 'Bannières tenues : {}/{}'),
+('mod-wow-fates',  41, 'deDE', 'nehmt und haltet: {}'),
+('mod-wow-fates',  42, 'deDE', 'Haltet: {}'),
+('mod-wow-fates',  43, 'deDE', 'Gehaltene Banner: {}/{} — noch {}:{:02}'),
+('mod-wow-fates',  44, 'deDE', 'Gehaltene Banner: {}/{}'),
+('mod-wow-fates',  41, 'esES', 'toma y mantén: {}'),
+('mod-wow-fates',  42, 'esES', 'Mantén: {}'),
+('mod-wow-fates',  43, 'esES', 'Estandartes tomados: {}/{} — quedan {}:{:02}'),
+('mod-wow-fates',  44, 'esES', 'Estandartes tomados: {}/{}'),
+('mod-wow-fates',  41, 'ruRU', 'захватите и удерживайте: {}'),
+('mod-wow-fates',  42, 'ruRU', 'Удерживайте: {}'),
+('mod-wow-fates',  43, 'ruRU', 'Знамён удержано: {}/{} — осталось {}:{:02}'),
+('mod-wow-fates',  44, 'ruRU', 'Знамён удержано: {}/{}');

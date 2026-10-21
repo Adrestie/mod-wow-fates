@@ -85,6 +85,10 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_OBJECTIVE_RESCUE   = 38,
     WOW_FATES_STR_TRACKER_RESCUE     = 39,
     WOW_FATES_STR_RESCUED            = 40,  // the tracker's second line: led out, lost
+    WOW_FATES_STR_OBJECTIVE_CAPTURE  = 41,
+    WOW_FATES_STR_TRACKER_CAPTURE    = 42,
+    WOW_FATES_STR_HELD_TIME          = 43,  // the tracker's second line: banners held, time left
+    WOW_FATES_STR_HELD               = 44,  // the same, with no time limit
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,

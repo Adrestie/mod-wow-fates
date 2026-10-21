@@ -52,7 +52,10 @@
  *     when he dies;
  *  10 rescue: cages to open, spread over the area as a gathering's objects;
  *     each captive runs for the way out, the bar is those led out, the
- *     Expedition fails when more than max_losses die.
+ *     Expedition fails when more than max_losses die;
+ *  11 capture: two or three of the foe's banners to take and hold against
+ *     his squads; the bar is the time they are held, the Expedition fails
+ *     when time_limit runs out first.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -411,6 +414,9 @@ private:
     void UpdateEscort(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateRescue(WowFatesActiveExpedition& active, Map* map);
     void FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage);
+    void UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void PutFlag(WowFatesActiveExpedition& active, Map* map, WowFatesActiveExpedition::Flag& flag, bool ours);
+    int64 TimeLeft(WowFatesActiveExpedition const& active) const;
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;

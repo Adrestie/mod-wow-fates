@@ -62,6 +62,11 @@ ones and rewards for those who take part.
     walked to the way out (the last point of the spawn point's `path`);
     each captive runs for it. The bar is the captives led out; more than
     `max_losses` dead, it fails.
+  - *Capture*: two or three of the foe's banners, far apart, to take (a
+    one second cast) and hold against his squads, which take one back when
+    they stand at its foot with no player near. The bar is the time they
+    are held (`hold_time` holding them all); `time_limit` out first, it
+    fails.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

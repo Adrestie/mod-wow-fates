@@ -257,6 +257,14 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 def.id, def.gatherEntry, def.allyEntry);
             itr = _defs.erase(itr);
         }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_CAPTURE
+            && (!sObjectMgr->GetGameObjectTemplate(def.gatherEntry) || !sObjectMgr->GetGameObjectTemplate(def.takenEntry)
+                || !sObjectMgr->GetCreatureTemplate(def.summonEntry)))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a capture whose banners (gameobjects {} and {}) or foes (summon_entry {}) do not exist; skipped.",
+                def.id, def.gatherEntry, def.takenEntry, def.summonEntry);
+            itr = _defs.erase(itr);
+        }
         else if ((def.objectiveType == WOW_FATES_OBJECTIVE_GATHER || def.objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
             && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
         {
@@ -439,6 +447,8 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_ESCORT), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_RESCUE), CreatureName(def->allyEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_CAPTURE), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -599,6 +609,11 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
             if (GameObject* go = map->GetGameObject(guid))
                 go->DespawnOrUnsummon();
     active.objects.clear();
+    if (map)
+        for (auto const& flag : active.flags)
+            if (GameObject* go = map->GetGameObject(flag.go))
+                go->DespawnOrUnsummon();
+    active.flags.clear();
     // The allies are never left behind, their corpses after a while.
     if (map)
     {
@@ -826,6 +841,8 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_ESCORT), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_RESCUE), CreatureName(def->allyEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_CAPTURE), GameObjectName(def->gatherEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -835,10 +852,21 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
 
 // The tracker's second line: what there is to protect. A wave support: its
 // allies alive out of ally_count; a defence: its ally's health; a rescue: the
-// captives led out and those lost, against the losses that fail it.
+// captives led out and those lost, against the losses that fail it; a
+// capture: the banners held and the time left.
 std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+    {
+        uint32 const held = uint32(std::count_if(active.flags.begin(), active.flags.end(), [](auto const& flag) { return flag.ours; }));
+        uint32 const total = active.flags.empty() ? def->gatherCount : uint32(active.flags.size());
+        int64 const left = TimeLeft(active);
+        if (left < 0)
+            return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_HELD), held, total);
+        uint32 const seconds = uint32((left + 9999) / 10000 * 10); // by steps of ten
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_HELD_TIME), held, total, seconds / 60, seconds % 60);
+    }
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED), active.saved,
             uint32(std::ceil(Needed(active) - 0.001)), active.lost, def->maxLosses + 1);
@@ -1057,6 +1085,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateEscort(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
             UpdateRescue(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map));
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+            UpdateCapture(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -1095,8 +1125,11 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
                 UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
-            int32 const guarded = active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE
-                ? int32(active.saved * 1000 + active.lost) : active.alliesAlive * 1000 + active.allyHealthPct;
+            int32 guarded = active.alliesAlive * 1000 + active.allyHealthPct;
+            if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+                guarded = int32(active.saved * 1000 + active.lost);
+            else if (active.def->timeLimit) // a timed one: the time left, by steps of ten seconds
+                guarded = active.alliesAlive * 1000 + int32((TimeLeft(active) + 9999) / 10000);
             if ((pct != active.sentProgress && pct < 100) || guarded != active.sentGuard)
             {
                 active.sentProgress = pct;
@@ -2085,6 +2118,21 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
 
     for (auto& [id, active] : _active)
     {
+        // a capture's banner of the foe: ours now
+        if (active.def->objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+        {
+            auto flag = std::find_if(active.flags.begin(), active.flags.end(), [go](auto const& f) { return f.go == go->GetGUID(); });
+            if (flag == active.flags.end())
+                continue;
+            if (!flag->ours && !active.failed && active.progressPct < 100.0)
+            {
+                PutFlag(active, go->GetMap(), *flag, true);
+                ++active.contributors[player->GetGUID()].picks;
+                Active(active);
+            }
+            return;
+        }
+
         auto itr = std::find(active.objects.begin(), active.objects.end(), go->GetGUID());
         if (itr == active.objects.end())
             continue;
@@ -3051,6 +3099,185 @@ void WowFatesExpeditionMgr::FreeCaptive(WowFatesActiveExpedition& active, GameOb
 }
 
 // ---------------------------------------------------------------------------
+// Capture
+
+namespace
+{
+    constexpr float CAPTURE_FOE_REACH = 8.0f;              // yards: the foe at the foot of a banner
+    constexpr float CAPTURE_GUARD_REACH = 15.0f;           // yards: a player this near keeps it
+    constexpr int64 CAPTURE_RETAKE = 10 * IN_MILLISECONDS; // the foe there that long, nobody near: his again
+}
+
+// The time left to a timed one (capture, warlord), in ms: its whole time
+// before its first player; -1 when it has none.
+int64 WowFatesExpeditionMgr::TimeLeft(WowFatesActiveExpedition const& active) const
+{
+    if (!active.def->timeLimit)
+        return -1;
+    if (!active.deadline)
+        return int64(active.def->timeLimit) * IN_MILLISECONDS;
+    return std::max<int64>(0, active.deadline - active.elapsed);
+}
+
+// A capture's banner put up on its place: the foe's (gather_entry, taken by a
+// one second cast) or ours (taken_entry, nothing to do with it); the one
+// standing there goes.
+void WowFatesExpeditionMgr::PutFlag(WowFatesActiveExpedition& active, Map* map, WowFatesActiveExpedition::Flag& flag, bool ours)
+{
+    if (flag.go)
+        if (GameObject* old = map->GetGameObject(flag.go))
+            old->DespawnOrUnsummon();
+    flag.go.Clear();
+    flag.ours = ours;
+    flag.contest = 0;
+    Position const& pos = flag.pos;
+    GameObject* go = new GameObject();
+    if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), ours ? active.def->takenEntry : active.def->gatherEntry, map,
+            PHASEMASK_NORMAL, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(),
+            G3D::Quat(), 100, GO_STATE_READY))
+    {
+        delete go;
+        return;
+    }
+    go->SetRespawnTime(0);
+    go->SetSpellId(1);
+    go->SetSpawnedByDefault(false);
+    map->AddToMap(go);
+    flag.go = go->GetGUID();
+}
+
+// Its banners, gather_count of them (two at least), the foe's, placed once
+// the area is loaded, far apart (FlagPoint: each walked from the centre);
+// none placed, tried again ten seconds later. The first player starts the
+// clock (time_limit). A banner is taken by a one second cast (OnGather): held,
+// it fills the bar, hold_time seconds of holding them all making it full (one
+// of three, three times as long). While one is held, every wave_interval the
+// foe sends a squad (summon_entry, as a wave) at one of ours: his monsters at
+// its foot (CAPTURE_FOE_REACH) with no player near (CAPTURE_GUARD_REACH) for
+// CAPTURE_RETAKE, it is his again. The clock out before the bar is full, it
+// fails. Gone (a grid unloaded), a banner is put back as it was.
+void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0 || active.remaining <= 0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+    if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        return;
+
+    if (active.flags.empty())
+    {
+        if (active.gatherTimer > 0)
+            return;
+        GameObjectTemplate const* info = sObjectMgr->GetGameObjectTemplate(def->gatherEntry);
+        float const footprint = Footprint(info ? info->displayId : 0, info ? info->size : 1.0f);
+        std::vector<Footing> obstacles = Obstacles(active, map);
+        std::vector<Position> placed;
+        for (uint32 i = 0; i < def->gatherCount; ++i)
+        {
+            Position pos;
+            if (!FlagPoint(active, map, footprint, obstacles, placed, pos))
+                break;
+            obstacles.push_back({ pos.GetPositionX(), pos.GetPositionY(), footprint });
+            placed.push_back(pos);
+        }
+        if (placed.size() < 2)
+        {
+            LOG_DEBUG("module", "mod-wow-fates: Expedition {}: room for {} banners, two at least; tried again.", def->id, uint32(placed.size()));
+            active.gatherTimer = 10 * IN_MILLISECONDS;
+            return;
+        }
+        for (Position const& pos : placed)
+        {
+            WowFatesActiveExpedition::Flag flag;
+            flag.pos = pos;
+            PutFlag(active, map, flag, false);
+            active.flags.push_back(flag);
+        }
+    }
+
+    uint32 ours = 0;
+    for (WowFatesActiveExpedition::Flag& flag : active.flags)
+    {
+        GameObject* go = flag.go ? map->GetGameObject(flag.go) : nullptr;
+        if (!go || !go->isSpawned())
+        {
+            if (map->IsGridLoaded(flag.pos.GetPositionX(), flag.pos.GetPositionY()))
+                PutFlag(active, map, flag, flag.ours);
+            ours += flag.ours ? 1 : 0;
+            continue;
+        }
+        if (!flag.ours)
+            continue;
+        ++ours;
+        if (!active.started)
+            continue;
+
+        bool foe = false, kept = false;
+        for (ObjectGuid const& guid : active.summons)
+            if (Creature* creature = map->GetCreature(guid))
+                if (creature->IsAlive() && creature->GetExactDist2d(flag.pos.GetPositionX(), flag.pos.GetPositionY()) <= CAPTURE_FOE_REACH)
+                {
+                    foe = true;
+                    break;
+                }
+        for (ObjectGuid const& guid : active.inside)
+            if (Player* player = ObjectAccessor::FindPlayer(guid))
+                if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map
+                    && player->GetExactDist2d(flag.pos.GetPositionX(), flag.pos.GetPositionY()) <= CAPTURE_GUARD_REACH)
+                {
+                    kept = true;
+                    break;
+                }
+        if (!foe || kept)
+        {
+            flag.contest = 0;
+            continue;
+        }
+        flag.contest += diff;
+        if (flag.contest >= CAPTURE_RETAKE)
+        {
+            PutFlag(active, map, flag, false);
+            --ours;
+            LOG_INFO("module", "mod-wow-fates: Expedition {}: the foe took a banner back, {} held.", def->id, ours);
+        }
+    }
+    active.alliesAlive = int32(ours);
+
+    if (!Start(active, "capture", &WowFatesExpeditionMgr::GameObjectName, def->gatherEntry))
+        return;
+    if (def->timeLimit && !active.deadline)
+        active.deadline = active.elapsed + int64(def->timeLimit) * IN_MILLISECONDS;
+    if (active.deadline && active.elapsed >= active.deadline)
+    {
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: the time is out, {} % held.", def->id, uint32(active.progressPct));
+        active.failed = true;
+        return;
+    }
+
+    if (!ours)
+    {
+        active.waveTimer = int64(def->waveInterval) * IN_MILLISECONDS; // the foe's squads, once one is held
+        return;
+    }
+    double const full = double(std::max<uint32>(def->holdTime, 1)) * IN_MILLISECONDS;
+    active.progressPct = std::min(100.0, active.progressPct + 100.0 * double(diff) * double(ours) / double(active.flags.size()) / full);
+    if (!active.inside.empty())
+        Active(active);
+
+    active.waveTimer -= diff;
+    if (active.waveTimer <= 0)
+    {
+        active.waveTimer = int64(def->waveInterval) * IN_MILLISECONDS;
+        std::vector<Position> held;
+        for (WowFatesActiveExpedition::Flag const& flag : active.flags)
+            if (flag.ours)
+                held.push_back(flag.pos);
+        Position const goal = Acore::Containers::SelectRandomContainerElement(held);
+        SendWave(active, map, nullptr, nullptr, &goal);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -3073,7 +3300,8 @@ bool WowFatesExpeditionMgr::IsForShow(Unit const* unit)
     if (!active || !active->inside.empty())
         return false;
     uint8 const type = active->def->objectiveType;
-    return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT || type == WOW_FATES_OBJECTIVE_RESCUE;
+    return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT || type == WOW_FATES_OBJECTIVE_RESCUE
+        || type == WOW_FATES_OBJECTIVE_CAPTURE;
 }
 
 void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)

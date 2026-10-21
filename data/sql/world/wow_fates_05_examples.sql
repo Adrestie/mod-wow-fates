@@ -31,6 +31,10 @@
 --  12  Zalazane's Captives, Durotar, level 9, rescue: Darkspear captives
 --      (creature 96204) in the Voodoo Cages (gameobject 960002) of Zalazane's
 --      Hexed Trolls on the Echo Isles, five to lead out, the third lost fails
+--  13  Banners over Molsen Farm, Elwynn Forest, level 9, capture: three
+--      Defias Standards (gameobject 960003) to take and hold, Stormwind's
+--      (960004) put up in their place, against squads of Defias Bandits;
+--      ten minutes
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -69,7 +73,9 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (11, 'Remy''s Wares', 6, 9,   0,  1,    94, 0, 20, 110,  0, 0, 1, 1, 'Elwynn Forest: Remy "Two Times" up the hill road, Defias Cutpurses lying in wait',
    'Remy "Two Times" is taking his wares up the hill road, where Defias Cutpurses lie in wait: escort him to the end of the road.', 'Escort Remy "Two Times"', 'Defias Cutpurses spring an ambush!'),
 (12, 'Zalazane''s Captives', 9, 10, 0, 5,  3207, 5, 20, 70,   0, 0, 1, 1, 'Durotar: Darkspear captives caged by Zalazane''s Hexed Trolls on the Echo Isles',
-   'Zalazane''s Hexed Trolls keep Darkspear captives caged on the Echo Isles: open the cages and see the captives safely off the island.', 'Free the Darkspear captives', '');
+   'Zalazane''s Hexed Trolls keep Darkspear captives caged on the Echo Isles: open the cages and see the captives safely off the island.', 'Free the Darkspear captives', ''),
+(13, 'Banners over Molsen Farm', 9, 11, 0, 1,  116, 4, 25, 60,   0, 0, 1, 1, 'Elwynn Forest: the Defias Standards of Molsen Farm, Defias Bandits about',
+   'The Defias have raised their standards over Molsen Farm: take them down, raise Stormwind''s in their place and hold them until the farm is ours again.', 'Hold the farm''s standards', 'The Defias come to take back a standard!');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -87,7 +93,8 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
   `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`,
   `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `comment`) VALUES
 (11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Remy''s Wares: Remy walks the hill road; Defias Cutpurses ambush him at 25, 50 and 75 % of it'),
-(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Zalazane''s Captives: three cages out, five captives to lead out, the third one lost fails it');
+(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Zalazane''s Captives: three cages out, five captives to lead out, the third one lost fails it'),
+(13,    0, 70, 960003, 3, 5,      0, 180, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 2, 960004, '', 'Banners over Molsen Farm: three standards, three minutes holding them all (nine holding one), ten minutes from the first player; a squad every 45 s at one held');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -210,7 +217,17 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (12, 'esMX', 'Los cautivos de Zalazane',
    'Los trols embrujados de Zalazane tienen enjaulados a cautivos Lanza Negra en las islas del Eco: abre las jaulas y saca a los cautivos de la isla sanos y salvos.', 'Libera a los cautivos Lanza Negra', ''),
 (12, 'ruRU', 'Пленники Залазана',
-   'Проклятые тролли Залазана держат в клетках пленников из племени Черного Копья на островах Эха: откройте клетки и выведите пленников с острова живыми.', 'Освободите пленников Черного Копья', '');
+   'Проклятые тролли Залазана держат в клетках пленников из племени Черного Копья на островах Эха: откройте клетки и выведите пленников с острова живыми.', 'Освободите пленников Черного Копья', ''),
+(13, 'frFR', 'Bannières sur la ferme des Molsen',
+   'Les Défias ont planté leurs étendards sur la ferme des Molsen : abattez-les, dressez ceux de Hurlevent à leur place et tenez-les jusqu''à ce que la ferme soit reprise.', 'Tenez les étendards de la ferme', 'Les Défias viennent reprendre un étendard !'),
+(13, 'deDE', 'Banner über Molsens Hof',
+   'Die Defias haben ihre Standarten über Molsens Hof gehisst: Holt sie ein, hisst an ihrer Stelle die von Sturmwind und haltet sie, bis der Hof zurückerobert ist.', 'Haltet die Standarten des Hofs', 'Die Defias wollen eine Standarte zurückerobern!'),
+(13, 'esES', 'Estandartes sobre la granja Molsen',
+   'Los Defias han alzado sus estandartes sobre la granja Molsen: derríbalos, alza los de Ventormenta en su lugar y mantenlos hasta recuperar la granja.', 'Mantén los estandartes de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
+(13, 'esMX', 'Estandartes sobre la granja Molsen',
+   'Los Defias han alzado sus estandartes sobre la granja Molsen: derríbalos, alza los de Ventormenta en su lugar y mantenlos hasta recuperar la granja.', 'Mantén los estandartes de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
+(13, 'ruRU', 'Знамёна над фермой Молсенов',
+   'Братство Справедливости подняло свои штандарты над фермой Молсенов: сорвите их, поднимите на их месте штандарты Штормграда и удерживайте их, пока ферма не будет отбита.', 'Удерживайте штандарты фермы', 'Братство идёт отбить штандарт!');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -240,7 +257,8 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (20, 11, 0, -9175.0,     78.0,    77.7,    0, 'Elwynn Forest, the hill road north-east of Goldshire',
    '-9244.0,122.0,72.5;-9184.0,83.0,77.9;-9144.0,54.0,77.7;-9109.0,7.0,88.3'),
 (21, 12, 1, -1188.0,  -5512.0,     5.7,    0, 'Durotar, the Echo Isles, Zalazane''s trolls',
-   '-1153.0,-5446.0,8.7');
+   '-1153.0,-5446.0,8.7'),
+(22, 13, 0, -9867.0,   -156.0,    32.0,    0, 'Elwynn Forest, Molsen Farm, the Defias Bandits south of Goldshire', '');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES
