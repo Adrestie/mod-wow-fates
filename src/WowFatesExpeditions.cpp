@@ -33,6 +33,7 @@
 #include "MapMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
+#include "PathGenerator.h"
 #include "Player.h"
 #include "Random.h"
 #include "StringConvert.h"
@@ -1307,6 +1308,165 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     return Position(x, y, z, angle);
 }
 
+// The radius of an object's model on the ground, as the client draws it.
+float WowFatesExpeditionMgr::Footprint(uint32 displayId, float scale)
+{
+    GameObjectDisplayInfoEntry const* info = sGameObjectDisplayInfoStore.LookupEntry(displayId);
+    if (!info)
+        return 0.5f * scale;
+    float const r = std::max({ std::fabs(info->minX), std::fabs(info->maxX), std::fabs(info->minY), std::fabs(info->maxY) });
+    return std::max(r, 0.3f) * scale;
+}
+
+// What stands in the area already: the world's own objects (the tents and
+// huts of a camp) and the Expedition's.
+std::vector<WowFatesExpeditionMgr::Footing> WowFatesExpeditionMgr::Obstacles(WowFatesActiveExpedition const& active, Map* map) const
+{
+    std::vector<Footing> out;
+    WowFatesSpawnPoint const& c = active.spawn;
+    float const range = active.def->radius + 30.0f;
+    for (auto const& [spawnId, go] : map->GetGameObjectBySpawnIdStore())
+    {
+        if (!go || !go->IsInWorld() || go->GetExactDist2d(c.x, c.y) > range)
+            continue;
+        GameObjectTemplate const* info = go->GetGOInfo();
+        out.push_back({ go->GetPositionX(), go->GetPositionY(), Footprint(info ? info->displayId : 0, go->GetObjectScale()) });
+    }
+    for (ObjectGuid const& guid : active.objects)
+        if (GameObject* go = map->GetGameObject(guid))
+            out.push_back({ go->GetPositionX(), go->GetPositionY(), Footprint(go->GetGOInfo()->displayId, go->GetObjectScale()) });
+    return out;
+}
+
+// In the water, or under it; outdoors told on the way.
+bool WowFatesExpeditionMgr::Wet(Map* map, float x, float y, float z, bool* outdoors)
+{
+    PositionFullTerrainStatus status;
+    map->GetFullTerrainStatusForPosition(PHASEMASK_NORMAL, x, y, z, 2.0f, status);
+    if (outdoors)
+        *outdoors = status.outdoors;
+    return (status.liquidInfo.Status & (LIQUID_MAP_WATER_WALK | LIQUID_MAP_IN_WATER | LIQUID_MAP_UNDER_WATER)) != 0;
+}
+
+// Flat ground: around the point, at reach, the ground rises or falls little,
+// and no wall nor rock stands in between.
+bool WowFatesExpeditionMgr::Level(Map* map, float x, float y, float z, float reach) const
+{
+    float const slope = WowFatesConf().objectMaxSlope;
+    float const turn = frand(0.0f, 2.0f * float(M_PI));
+    for (uint32 i = 0; i < 4; ++i)
+    {
+        float const angle = turn + float(i) * float(M_PI) / 2.0f;
+        float const sx = x + reach * std::cos(angle);
+        float const sy = y + reach * std::sin(angle);
+        float const sz = map->GetHeight(PHASEMASK_NORMAL, sx, sy, z + reach * slope + 1.0f, true, 2.0f * reach * slope + 2.0f);
+        if (sz <= INVALID_HEIGHT || std::fabs(sz - z) > reach * slope)
+            return false;
+        if (!map->isInLineOfSight(x, y, z + 1.5f, sx, sy, sz + 1.5f, PHASEMASK_NORMAL,
+                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+            return false;
+    }
+    return true;
+}
+
+// A point for an object of a gathering or a sabotage: on the ground, about the
+// level of the centre (the ground searched down from just above that level,
+// never on the hill over the camp), flat, dry, under the sky for a sabotage,
+// reached on foot from the centre by a path of a sensible length, and clear
+// of what stands there already, the object's footprint and theirs apart.
+// False when no such point is found: the object waits.
+bool WowFatesExpeditionMgr::ObjectPoint(WowFatesActiveExpedition const& active, Map* map, WorldObject const* walker, float footprint,
+    std::vector<Footing> const& obstacles, Position& out) const
+{
+    WowFatesConfig const& conf = WowFatesConf();
+    WowFatesSpawnPoint const& c = active.spawn;
+    float const reach = active.def->radius * conf.objectReach;
+    float const high = conf.objectMaxHeight;
+    for (uint32 attempt = 0; attempt < 24; ++attempt)
+    {
+        float const angle = frand(0.0f, 2.0f * float(M_PI));
+        float const dist = reach * std::sqrt(frand(0.0f, 1.0f));
+        float const x = c.x + dist * std::cos(angle);
+        float const y = c.y + dist * std::sin(angle);
+        if (NearPlayer(active, x, y))
+            continue;
+        bool clear = true;
+        for (Footing const& f : obstacles)
+            if (std::hypot(f.x - x, f.y - y) < std::max(conf.objectMinSpacing, (f.r + footprint) * conf.objectSpacing))
+            {
+                clear = false;
+                break;
+            }
+        if (!clear)
+            continue;
+
+        float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + high + 2.0f, true, 2.0f * high + 4.0f);
+        if (z <= INVALID_HEIGHT || std::fabs(z - c.z) > high)
+            continue;
+        bool outdoors = false;
+        if (Wet(map, x, y, z, &outdoors) || (NeedsSky(active.def) && !outdoors))
+            continue;
+        if (!Level(map, x, y, z, std::max(3.0f, footprint * 0.8f)))
+            continue;
+
+        // on foot from the centre; where the paths are not known (no mmap
+        // there), seen from the centre at least
+        PathType type = PATHFIND_NOT_USING_PATH;
+        if (walker)
+        {
+            PathGenerator path(walker);
+            path.CalculatePath(c.x, c.y, c.z, x, y, z, false);
+            type = path.GetPathType();
+            if (!(type & PATHFIND_NOT_USING_PATH)
+                && (!(type & PATHFIND_NORMAL) || (type & (PATHFIND_NOPATH | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY_END))
+                    || path.getPathLength() > dist * conf.objectPathFactor + 10.0f))
+                continue;
+        }
+        if ((type & PATHFIND_NOT_USING_PATH) && !map->isInLineOfSight(c.x, c.y, c.z + 2.0f, x, y, z + 2.0f, PHASEMASK_NORMAL,
+                LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+            continue;
+
+        out = Position(x, y, z, frand(0.0f, 2.0f * float(M_PI)));
+        return true;
+    }
+    return false;
+}
+
+// A guard's place by its object: out of the object's footprint and of what
+// stands around, on the ground at about the object's level, dry. False: the
+// last one tried, out of the footprint all the same.
+bool WowFatesExpeditionMgr::GuardPoint(WowFatesActiveExpedition const& active, Map* map, Position const& object, float footprint,
+    std::vector<Footing> const& obstacles, Position& out) const
+{
+    float const turn = frand(0.0f, 2.0f * float(M_PI));
+    float const dist = footprint + 2.5f;
+    for (uint32 i = 0; i < 8; ++i)
+    {
+        float const angle = turn + float(i) * float(M_PI) / 4.0f;
+        float const x = object.GetPositionX() + dist * std::cos(angle);
+        float const y = object.GetPositionY() + dist * std::sin(angle);
+        float z = map->GetHeight(PHASEMASK_NORMAL, x, y, object.GetPositionZ() + 3.0f, true, 8.0f);
+        bool const ground = z > INVALID_HEIGHT && std::fabs(z - object.GetPositionZ()) <= 3.0f;
+        if (!ground)
+            z = object.GetPositionZ();
+        out = Position(x, y, z, std::atan2(y - object.GetPositionY(), x - object.GetPositionX()));
+        if (!ground)
+            continue;
+        bool clear = true;
+        for (Footing const& f : obstacles)
+            if (std::hypot(f.x - x, f.y - y) < f.r + 1.0f)
+            {
+                clear = false;
+                break;
+            }
+        bool outdoors = false;
+        if (!clear || Wet(map, x, y, z, &outdoors) || (NeedsSky(active.def) && !outdoors))
+            continue;
+        return true;
+    }
+    return false;
+}
+
 // The objective types under the sky (WowFates.Expedition.OutdoorTypes, a
 // sabotage by default: its targets are buildings and engines out in the
 // open); the others may be in a cave or a building as well.
@@ -1590,9 +1750,28 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
 
     uint32 const wanted = all ? def->gatherCount - uint32(active.objects.size()) : 1;
     active.gatherFilled = true;
+
+    // Each object on its own ground, never on another nor in a building of the
+    // place: what does not find room waits, fewer at once rather than piled up.
+    // The paths are walked as a player's, from an object of the centre never
+    // put on the map.
+    GameObjectTemplate const* goInfo = sObjectMgr->GetGameObjectTemplate(def->gatherEntry);
+    float const footprint = Footprint(goInfo ? goInfo->displayId : 0, goInfo ? goInfo->size : 1.0f);
+    std::vector<Footing> obstacles = Obstacles(active, map);
+    GameObject* walker = new GameObject();
+    if (!walker->Create(map->GenerateLowGuid<HighGuid::GameObject>(), def->gatherEntry, map, PHASEMASK_NORMAL,
+            active.spawn.x, active.spawn.y, active.spawn.z, 0.0f, G3D::Quat(), 0, GO_STATE_READY))
+    {
+        delete walker;
+        walker = nullptr;
+    }
+    uint32 placed = 0;
     for (uint32 i = 0; i < wanted; ++i)
     {
-        Position const pos = SpawnPoint(active, map);
+        Position pos;
+        if (!ObjectPoint(active, map, walker, footprint, obstacles, pos))
+            break;
+        obstacles.push_back({ pos.GetPositionX(), pos.GetPositionY(), footprint });
         GameObject* go = new GameObject();
         if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), def->gatherEntry, map, PHASEMASK_NORMAL,
                 pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(),
@@ -1607,6 +1786,7 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         go->SetSpawnedByDefault(false);
         map->AddToMap(go);
         active.objects.push_back(go->GetGUID());
+        ++placed;
         std::vector<ObjectGuid>& itsGuards = active.guards[go->GetGUID()];
 
         // a sabotage's object has its guards (wave_size of summon_entry), close
@@ -1614,13 +1794,8 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         if (def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE && def->summonEntry)
             for (uint32 g = 0; g < def->waveSize; ++g)
             {
-                float const angle = frand(0.0f, 2.0f * float(M_PI));
-                float const gx = pos.GetPositionX() + 4.0f * std::cos(angle);
-                float const gy = pos.GetPositionY() + 4.0f * std::sin(angle);
-                float gz = map->GetHeight(PHASEMASK_NORMAL, gx, gy, pos.GetPositionZ() + 5.0f, true, 20.0f);
-                if (gz <= INVALID_HEIGHT)
-                    gz = pos.GetPositionZ();
-                Position const at(gx, gy, gz, std::atan2(gy - pos.GetPositionY(), gx - pos.GetPositionX()));
+                Position at;
+                GuardPoint(active, map, pos, footprint, obstacles, at);
                 TempSummon* guard = map->SummonCreature(def->summonEntry, at);
                 if (!guard)
                     break;
@@ -1634,7 +1809,12 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
                 itsGuards.push_back(guard->GetGUID());
             }
     }
-    active.gatherTimer = int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
+    delete walker;
+    // no room for all: the others are tried again soon
+    active.gatherTimer = placed < wanted ? int64(10 * IN_MILLISECONDS)
+        : int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
+    if (placed < wanted)
+        LOG_DEBUG("module", "mod-wow-fates: Expedition {}: room for {} of {} objects, the others wait.", def->id, placed, wanted);
 }
 
 // An object taken: the share of an objective that grows with the players in

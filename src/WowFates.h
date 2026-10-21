@@ -141,6 +141,12 @@ struct WowFatesConfig
     uint32 engageBase = 3;           // monsters at the players at once, for one player
     uint32 engagePerPlayer = 2;      // and this many more for each other one
     float spawnPlayerDistance = 20.0f; // no monster nor object comes this near a player
+    float objectReach = 0.6f;        // a gathering's or sabotage's objects within this share of the radius
+    float objectSpacing = 1.5f;      // two objects' centres at least this times their footprints apart
+    float objectMinSpacing = 6.0f;   // yards, and at least this
+    float objectMaxHeight = 6.0f;    // yards above or below the centre at most
+    float objectMaxSlope = 0.5f;     // rise per yard of the ground around it at most
+    float objectPathFactor = 2.0f;   // its walk from the centre at most this times the straight line, + 10 yards
     float bossScale = 1.44f;         // a boss support's ally (its boss), times its template's size
     float wavePerCharacter = 1.0f;   // times wave_size, per character in the area
     float wavePaceFast = 0.5f;       // a wave killed within this share of the interval is fast

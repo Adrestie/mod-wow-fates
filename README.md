@@ -162,6 +162,10 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Expedition.OutdoorTypes` | "8" | objective types kept out from under a roof (8 = sabotage) |
 | `WowFates.Engage.Base` / `PerPlayer` | 3 / 2 | the Expedition's monsters at the players at once; the others wait |
 | `WowFates.Spawn.PlayerDistance` | 20 | yards: nothing of an Expedition comes this near a player |
+| `WowFates.Object.Reach` | 0.6 | a gathering's or sabotage's objects within this share of the radius |
+| `WowFates.Object.Spacing` / `MinSpacing` | 1.5 / 6 | objects apart by their footprints, and from the world's own |
+| `WowFates.Object.MaxHeight` / `MaxSlope` | 6 / 0.5 | objects on flat ground about the centre's level |
+| `WowFates.Object.PathFactor` | 2.0 | objects reached on foot by a sensible walk |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
 | `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |

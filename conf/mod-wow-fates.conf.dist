@@ -183,6 +183,28 @@ WowFates.Expedition.AreaInterval        = 1000
 #        Yards: no monster nor object of an Expedition comes this near a
 #        player.
 #
+#    WowFates.Object.Reach
+#        The objects of a gathering or a sabotage (crates, tents) within this
+#        share of the Expedition's radius: a camp's heart. 0.1 to 1.
+#
+#    WowFates.Object.Spacing
+#    WowFates.Object.MinSpacing
+#        Two objects (the Expedition's, and those of the world there: the
+#        camp's own tents and huts) stand at least Spacing times the sum of
+#        their footprints apart, and at least MinSpacing yards. What finds
+#        no room waits: fewer out at once rather than piled up.
+#
+#    WowFates.Object.MaxHeight
+#    WowFates.Object.MaxSlope
+#        Yards an object stands above or below the Expedition's centre at
+#        most (never on the hill above a camp), and the rise per yard of the
+#        ground around it at most (never on a cliff). Never in water; always
+#        reached on foot from the centre.
+#
+#    WowFates.Object.PathFactor
+#        The walk from the centre to an object at most this many times the
+#        straight line, plus 10 yards.
+#
 #    WowFates.Boss.Scale
 #        The size of a boss support's ally, the figure the players come to
 #        help, times the size of its creature's template. 0.5 to 4.
@@ -213,6 +235,12 @@ WowFates.Expedition.OutdoorTypes        = "8"
 WowFates.Engage.Base                    = 3
 WowFates.Engage.PerPlayer               = 2
 WowFates.Spawn.PlayerDistance           = 20
+WowFates.Object.Reach                   = 0.6
+WowFates.Object.Spacing                 = 1.5
+WowFates.Object.MinSpacing              = 6
+WowFates.Object.MaxHeight               = 6
+WowFates.Object.MaxSlope                = 0.5
+WowFates.Object.PathFactor              = 2.0
 WowFates.Boss.Scale                     = 1.44
 WowFates.Waves.PerCharacter             = 1.0
 WowFates.Waves.PaceFast                 = 0.5

@@ -130,6 +130,12 @@ void WowFatesLoadConfig()
     c.engageBase = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Engage.Base", 3), 1);
     c.engagePerPlayer = sConfigMgr->GetOption<uint32>("WowFates.Engage.PerPlayer", 2);
     c.spawnPlayerDistance = std::max(sConfigMgr->GetOption<float>("WowFates.Spawn.PlayerDistance", 20.0f), 0.0f);
+    c.objectReach = std::clamp(sConfigMgr->GetOption<float>("WowFates.Object.Reach", 0.6f), 0.1f, 1.0f);
+    c.objectSpacing = std::max(sConfigMgr->GetOption<float>("WowFates.Object.Spacing", 1.5f), 0.5f);
+    c.objectMinSpacing = std::max(sConfigMgr->GetOption<float>("WowFates.Object.MinSpacing", 6.0f), 0.0f);
+    c.objectMaxHeight = std::max(sConfigMgr->GetOption<float>("WowFates.Object.MaxHeight", 6.0f), 1.0f);
+    c.objectMaxSlope = std::max(sConfigMgr->GetOption<float>("WowFates.Object.MaxSlope", 0.5f), 0.05f);
+    c.objectPathFactor = std::max(sConfigMgr->GetOption<float>("WowFates.Object.PathFactor", 2.0f), 1.0f);
     c.bossScale = std::clamp(sConfigMgr->GetOption<float>("WowFates.Boss.Scale", 1.44f), 0.5f, 4.0f);
     c.wavePerCharacter = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PerCharacter", 1.0f), 0.0f);
     c.wavePaceFast = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceFast", 0.5f), 0.0f, 1.0f);

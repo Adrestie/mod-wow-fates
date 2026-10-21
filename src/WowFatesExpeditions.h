@@ -79,6 +79,7 @@ class GameObject;
 class Map;
 class Player;
 class Unit;
+class WorldObject;
 class WorldSession;
 
 enum WowFatesObjective : uint8
@@ -321,6 +322,16 @@ private:
     void UpdateSync(uint32 diff);
     void UpdateSummons(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Position SpawnPoint(WowFatesActiveExpedition const& active, Map* map) const;
+    // An object's place: what stands there already (x, y, footprint radius)
+    struct Footing { float x, y, r; };
+    static float Footprint(uint32 displayId, float scale);
+    std::vector<Footing> Obstacles(WowFatesActiveExpedition const& active, Map* map) const;
+    bool ObjectPoint(WowFatesActiveExpedition const& active, Map* map, WorldObject const* walker, float footprint,
+        std::vector<Footing> const& obstacles, Position& out) const;
+    bool GuardPoint(WowFatesActiveExpedition const& active, Map* map, Position const& object, float footprint,
+        std::vector<Footing> const& obstacles, Position& out) const;
+    bool Level(Map* map, float x, float y, float z, float reach) const;
+    static bool Wet(Map* map, float x, float y, float z, bool* outdoors = nullptr);
     bool Outdoors(Map* map, float x, float y, float z) const;
     static bool NeedsSky(WowFatesExpeditionDef const* def);
     bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const;
