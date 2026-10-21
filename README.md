@@ -49,6 +49,11 @@ ones and rewards for those who take part.
   - *Wave support*: allies in the centre push back a set number of waves, one
     after the other; the bar is the waves pushed back, and the Expedition
     fails when every ally is dead.
+  - *Boss support*: a known figure of the zone's side (an Alliance hero in an
+    Alliance zone, a Horde one in a Horde zone, a neutral order's in a
+    contested one; friend of every player whatever his side) fights a unique
+    elite; the bar is the health the elite lost, and the Expedition fails if
+    the ally falls. The ally speaks now and then (said, in five languages).
 - **An objective that grows with the crowd.** Players see a percentage, never a
   count: the more players in the area, the more work each percent takes.
 - **Monsters that keep up.** An Expedition brings its own monsters. The faster
@@ -108,7 +113,7 @@ By hand: copy the module into `modules/`, copy `data/lua/WowFates` into the
 ALE scripts folder, copy `conf/mod-wow-fates.conf.dist` to `configs/modules/`
 as `mod-wow-fates.conf`, rebuild, and add the client patch with the installer.
 
-Eight example Expeditions come with it: Kobold Uprising (Elwynn Forest,
+Nine example Expeditions come with it: Kobold Uprising (Elwynn Forest,
 level 7), Razormane Raid (Durotar, level 8), Restless Dead (Icecrown,
 level 80), Defias Assault (Elwynn Forest, level 10, assault and boss: the
 Defias Ringleader), Kul Tiras Supplies (Durotar, level 7, gathering: supply
@@ -116,7 +121,9 @@ crates by Tiragarde Keep), Riverpaw Raid (Elwynn Forest, level 10, defence:
 the Westbrook Sentinel against Riverpaw Outrunners), Harpy Ritual (Durotar,
 level 8, invocation: the Ritual Altar against Dustwind Pillagers) and
 Quilboar Onslaught (Durotar, level 9, wave support: three Razor Hill Veterans
-against five waves of Razormane Battleguards). Expeditions, spawn points and rewards live in the world
+against five waves of Razormane Battleguards) and The Packleader's End
+(Elwynn Forest, level 10, boss support: Marshal Dughan against Grimmaw the
+Packleader). Expeditions, spawn points and rewards live in the world
 database (`mod_wow_fates_expedition`, `mod_wow_fates_expedition_locale`,
 `mod_wow_fates_spawn`, `mod_wow_fates_reward`), and the settings of the
 objectives other than kills in `mod_wow_fates_objective` (for an assault, the

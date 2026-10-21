@@ -73,6 +73,14 @@
           "where": "entry BETWEEN 960000 AND 963999"
         },
         {
+          "table": "creature_text",
+          "where": "CreatureID BETWEEN 96000 AND 96399"
+        },
+        {
+          "table": "creature_text_locale",
+          "where": "CreatureID BETWEEN 96000 AND 96399"
+        },
+        {
           "table": "updates",
           "where": "name IN ({sql_files:world})"
         }

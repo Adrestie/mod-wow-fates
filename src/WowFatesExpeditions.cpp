@@ -130,7 +130,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             def.trackerText = f[14].Get<std::string>();
             def.waveText = f[15].Get<std::string>();
 
-            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_SUPPORT)
+            if (def.objectiveType < WOW_FATES_OBJECTIVE_KILL || def.objectiveType > WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
             {
                 LOG_ERROR("module", "mod-wow-fates: Expedition {} has objective type {}, which is not handled yet; skipped.", def.id, def.objectiveType);
                 continue;
@@ -181,9 +181,15 @@ void WowFatesExpeditionMgr::LoadFromDB()
     for (auto itr = _defs.begin(); itr != _defs.end();)
     {
         WowFatesExpeditionDef const& def = itr->second;
-        if (def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
+        if ((def.objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+            && !sObjectMgr->GetCreatureTemplate(def.bossEntry))
         {
             LOG_ERROR("module", "mod-wow-fates: Expedition {} is an assault whose boss, creature {}, does not exist; skipped.", def.id, def.bossEntry);
+            itr = _defs.erase(itr);
+        }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT && !sObjectMgr->GetCreatureTemplate(def.allyEntry))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a boss support whose ally, creature {}, does not exist; skipped.", def.id, def.allyEntry);
             itr = _defs.erase(itr);
         }
         else if ((def.objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def.objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
@@ -353,6 +359,8 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
             (def->holdTime + 59) / 60);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_INVOKE), GameObjectName(def->channelEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_KILL), CreatureName(def->bossEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_SUPPORT), CreatureName(def->allyEntry, session), def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
@@ -729,7 +737,7 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(Localized(def->trackerText, def->trackerTexts, session), active.repelled, def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_GATHER)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_GATHER), GameObjectName(def->gatherEntry, session));
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE)
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_DEFENCE), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_INVOKE)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_INVOKE), GameObjectName(def->channelEntry, session));
@@ -750,7 +758,8 @@ std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& 
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
             uint32(active.alliesAlive), def->allyCount);
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE && active.allyHealthPct >= 0)
+    if ((def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+        && active.allyHealthPct >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLY_HEALTH), CreatureName(def->allyEntry, session),
             uint32(active.allyHealthPct));
     return "";
@@ -954,6 +963,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateInvoke(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT)
             UpdateSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+            UpdateBossSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
 
         if (areaTick)
         {
@@ -1393,7 +1404,8 @@ void WowFatesExpeditionMgr::SpawnBoss(WowFatesActiveExpedition& active, Map* map
     active.bossOut = true;
     active.bossHealth = boss->GetMaxHealth();
     active.bossPlayers = 1;
-    UpdateBoss(active, map); // its health for the players already there
+    if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
+        UpdateBoss(active, map); // its health for the players already there
 
     LOG_INFO("module", "mod-wow-fates: Expedition {}: its leader appears ({} health).", active.def->id, boss->GetMaxHealth());
     if (!first)
@@ -1914,6 +1926,141 @@ void WowFatesExpeditionMgr::UpdateSupport(WowFatesActiveExpedition& active, Map*
 }
 
 // ---------------------------------------------------------------------------
+// Boss support
+
+// The first player in the area brings them out: the elite in the centre, its
+// renowned foe a little away, at each other's throats. The bar is the health
+// the elite lost (never going back); both grow with the players in the area.
+// The elite dead, by a player or by the ally, the Expedition is done; the ally
+// dead, it fails. Gone alive (a grid unloaded), they come back where they were.
+namespace
+{
+    // The lines of a boss support's ally (its creature_text groups).
+    enum WowFatesAllyTalk : uint8
+    {
+        ALLY_SAY_START   = 0,
+        ALLY_SAY_FIGHT   = 1, // every 20 to 40 s
+        ALLY_SAY_HALF    = 2, // the elite at half health
+        ALLY_SAY_VICTORY = 3,
+        ALLY_SAY_FALL    = 4
+    };
+
+    void Say(Creature* creature, uint8 group)
+    {
+        if (creature && creature->AI())
+            creature->AI()->Talk(group);
+    }
+}
+
+void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff)
+{
+    if (!map || active.failed || active.progressPct >= 100.0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+
+    if (!active.started)
+    {
+        if (active.inside.empty() || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        active.started = true;
+    }
+
+    Creature* boss = active.boss ? map->GetCreature(active.boss) : nullptr;
+    if (!boss && map->IsGridLoaded(active.spawn.x, active.spawn.y))
+    {
+        bool const first = !active.bossOut;
+        SpawnBoss(active, map); // its banner, the first time, to those inside
+        boss = active.boss ? map->GetCreature(active.boss) : nullptr;
+        if (boss && !first)
+            boss->SetHealth(std::max<uint32>(1, uint32(boss->GetMaxHealth() * (1.0 - active.progressPct / 100.0))));
+    }
+
+    Creature* ally = active.ally ? map->GetCreature(active.ally) : nullptr;
+    if (ally && !ally->IsAlive())
+    {
+        active.allyHealthPct = 0;
+        Say(ally, ALLY_SAY_FALL);
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died, the elite at {} %.", def->id, uint32(active.progressPct));
+        active.failed = true;
+        return;
+    }
+    if (!ally && boss)
+    {
+        float const angle = frand(0.0f, 2.0f * float(M_PI));
+        Position pos = Centre(active, map);
+        float x = pos.GetPositionX() + 8.0f * std::cos(angle);
+        float y = pos.GetPositionY() + 8.0f * std::sin(angle);
+        float z = map->GetHeight(PHASEMASK_NORMAL, x, y, pos.GetPositionZ() + 5.0f, true, 20.0f);
+        if (z <= INVALID_HEIGHT)
+        {
+            x = pos.GetPositionX();
+            y = pos.GetPositionY();
+            z = pos.GetPositionZ();
+        }
+        ally = SpawnAlly(active, map, Position(x, y, z, std::atan2(pos.GetPositionY() - y, pos.GetPositionX() - x)));
+        if (ally)
+        {
+            active.ally = ally->GetGUID();
+            active.allyPlayers = 1;
+        }
+    }
+
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    if (ally)
+    {
+        ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
+        active.allyHealthPct = std::max<int32>(5, int32(std::ceil(ally->GetHealthPct() / 5.0f)) * 5);
+    }
+    if (!boss)
+        return;
+    if (!boss->IsAlive())
+    {
+        Say(ally, ALLY_SAY_VICTORY);
+        active.progressPct = 100.0;
+        return;
+    }
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+
+    // the ally's words: at the start, now and then, at the elite's half health
+    if (ally && ally->IsAlive())
+    {
+        if (!(active.said & 1))
+        {
+            active.said |= 1;
+            Say(ally, ALLY_SAY_START);
+            active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+        }
+        else if (!(active.said & 2) && boss->GetHealthPct() <= 50.0f)
+        {
+            active.said |= 2;
+            Say(ally, ALLY_SAY_HALF);
+            active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+        }
+        else
+        {
+            active.talkTimer -= diff;
+            if (active.talkTimer <= 0)
+            {
+                Say(ally, ALLY_SAY_FIGHT);
+                active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+            }
+        }
+    }
+
+    // at each other's throats
+    if (ally && ally->IsAlive())
+    {
+        if (!boss->IsInCombat() && boss->AI())
+            boss->AI()->AttackStart(ally);
+        if (!ally->IsInCombat() && ally->AI())
+            ally->AI()->AttackStart(boss);
+    }
+
+    double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
+    active.progressPct = std::max(active.progressPct, std::min(100.0 * lost, 99.0));
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -1985,7 +2132,8 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
     Active(*active);
 
     // The leader of an assault: the end of the bar.
-    if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active->bossOut && creature->GetGUID() == active->boss)
+    if ((def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT)
+        && active->bossOut && creature->GetGUID() == active->boss)
     {
         active->progressPct = 100.0;
         ++active->contributors[player->GetGUID()].kills;

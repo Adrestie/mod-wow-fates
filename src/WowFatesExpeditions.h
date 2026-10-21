@@ -41,7 +41,10 @@
  *     at them; the bar fills while someone channels and never goes back;
  *   6 wave support: allies in the centre push back wave_count waves, one
  *     after the other; the bar is the waves pushed back, the Expedition fails
- *     when every ally is dead.
+ *     when every ally is dead;
+ *   7 boss support: a renowned ally fights a unique elite in the centre; the
+ *     bar is the health the elite lost, the Expedition fails when the ally
+ *     dies.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -83,7 +86,8 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_GATHER  = 3, // objects to pick up
     WOW_FATES_OBJECTIVE_DEFENCE = 4, // an ally to keep alive against waves
     WOW_FATES_OBJECTIVE_INVOKE  = 5, // channel at an altar against waves
-    WOW_FATES_OBJECTIVE_SUPPORT = 6  // allies pushing back a number of waves
+    WOW_FATES_OBJECTIVE_SUPPORT = 6, // allies pushing back a number of waves
+    WOW_FATES_OBJECTIVE_BOSS_SUPPORT = 7 // an ally against an elite
 };
 
 // The channel of an invocation: Ritual (tools/gen_spells.py), thirty seconds at
@@ -229,6 +233,10 @@ struct WowFatesActiveExpedition
 
     // The tracker's second line (the allies alive, the ally's health): what it
     // showed when it was last sent, to send it again only when it changes.
+    // A boss support's ally speaks (creature_text): at the start, now and then
+    // in the fight, at the elite's half health, at the end.
+    uint8 said = 0;             // the groups already said: 1 start, 2 half
+    int64 talkTimer = 0;        // ms before the next line in the fight
     int32 alliesAlive = -1;
     int32 allyHealthPct = -1;   // by steps of five
     int32 sentGuard = -1;
@@ -302,6 +310,7 @@ private:
     void UpdateInvoke(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     static int64 ChannelDuration();
     void UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void UpdateBossSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;

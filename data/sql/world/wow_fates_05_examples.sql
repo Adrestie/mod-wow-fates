@@ -1,4 +1,4 @@
--- mod-wow-fates — eight example Expeditions, with the rewards every
+-- mod-wow-fates — nine example Expeditions, with the rewards every
 -- Expedition gives by default. Ids 1 to 99 of the module's tables are the
 -- module's own: give yours 100 and up, an update writes these rows again.
 --
@@ -19,6 +19,9 @@
 --   8  Quilboar Onslaught, Durotar, level 9, wave support: three Razor Hill
 --      Veterans (creature 96201) push back five waves of Razormane
 --      Battleguards
+--   9  The Packleader's End, Elwynn Forest, level 10, boss support: Marshal
+--      Dughan (creature 96202) against Grimmaw the Packleader (96101), with
+--      a few Riverpaw Outrunners about
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -49,7 +52,9 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (7, 'Harpy Ritual',     8, 5,     0,  1,  3116, 0, 15, 40,   0, 0, 1, 1, 'Durotar: channel at the Ritual Altar against waves of Dustwind Pillagers',
    'Complete the ritual at the altar while the Dustwind harpies try to stop you.', 'Ritual completed', 'The harpies swoop in!'),
 (8, 'Quilboar Onslaught', 9, 6,   0,  1,  3114, 0, 15, 40,   0, 0, 1, 1, 'Durotar: three Razor Hill Veterans against five waves of Razormane Battleguards',
-   'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!');
+   'Help the Razor Hill Veterans push back five Razormane assaults.', 'Push back the Razormane assaults', 'The Razormane charge!'),
+(9, 'The Packleader''s End', 10, 7,   0,  1,   478, 3, 20, 35,   0, 0, 1, 1, 'Elwynn Forest: Marshal Dughan against Grimmaw the Packleader',
+   'Marshal Dughan has tracked down Grimmaw, the Riverpaw packleader: help the marshal bring the gnoll down.', 'Help Marshal Dughan defeat Grimmaw', '');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -58,7 +63,8 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (5,     0, 70, 960000, 8, 5,     0, 240, 40, 3, 1,      0, 1, 5, 'Kul Tiras Supplies: 8 crates out, one back 5 s after it is taken'),
 (6,     0, 70,      0, 8, 5, 96200, 240, 40, 2, 1,      0, 1, 5, 'Riverpaw Raid: four minutes, a wave every 40 s, 2 then 3, 4... Outrunners'),
 (7,     0, 70,      0, 8, 5,     0, 120, 30, 2, 1, 960100, 1, 5, 'Harpy Ritual: two minutes of channel for one player, a wave every 30 s'),
-(8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart');
+(8,     0, 70,      0, 8, 5, 96201, 240, 15, 3, 1,      0, 3, 5, 'Quilboar Onslaught: three Veterans, five waves of 3, 4... Battleguards, 15 s apart'),
+(9, 96101, 70,      0, 8, 5, 96202, 240, 40, 3, 1,      0, 1, 5, 'The Packleader''s End: Marshal Dughan against Grimmaw');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -141,7 +147,17 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (8, 'esMX', 'Embestida Crines de Acero',
    'Ayuda a los veteranos de Cerrotajo a rechazar cinco asaltos de los Crines de Acero.', 'Rechaza los asaltos de los Crines de Acero', '¡Cargan los Crines de Acero!'),
 (8, 'ruRU', 'Натиск Иглогривых',
-   'Помогите ветеранам Колючего Холма отбить пять атак Иглогривых.', 'Отбейте атаки Иглогривых', 'Иглогривые идут в атаку!');
+   'Помогите ветеранам Колючего Холма отбить пять атак Иглогривых.', 'Отбейте атаки Иглогривых', 'Иглогривые идут в атаку!'),
+(9, 'frFR', 'La fin du chef de meute',
+   'Le maréchal Dughan a retrouvé Grimmaw, le chef de meute des Rivepattes : aidez le maréchal à abattre le gnoll.', 'Aidez le maréchal Dughan à vaincre Grimmaw', ''),
+(9, 'deDE', 'Das Ende des Rudelführers',
+   'Marschall Dughan hat Grimmaw, den Rudelführer der Flusspfoten, aufgespürt: Helft dem Marschall, den Gnoll zu Fall zu bringen.', 'Helft Marschall Dughan, Grimmaw zu besiegen', ''),
+(9, 'esES', 'El fin del líder de la manada',
+   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', ''),
+(9, 'esMX', 'El fin del líder de la manada',
+   'El alguacil Dughan ha dado con Grimmaw, el líder de la manada Zarparrío: ayuda al alguacil a abatir al gnoll.', 'Ayuda al alguacil Dughan a derrotar a Grimmaw', ''),
+(9, 'ruRU', 'Конец вожака стаи',
+   'Маршал Дугхан выследил Гриммо, вожака стаи Речной Лапы: помогите маршалу одолеть гнолла.', 'Помогите маршалу Дугхану одолеть Гриммо', '');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -159,7 +175,9 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (12, 7,  1,   793.9,  -4849.5,    38.0,    0, 'Durotar, south of Drygulch Ravine'),
 (13, 7,  1,   641.3,  -4664.4,    22.1,    0, 'Durotar, west of Drygulch Ravine'),
 (14, 8,  1,   298.0,  -4269.0,    31.1,    0, 'Durotar, east of the Razormane grounds'),
-(15, 8,  1,   -29.5,  -4265.1,    66.6,    0, 'Durotar, north of the Razormane grounds');
+(15, 8,  1,   -29.5,  -4265.1,    66.6,    0, 'Durotar, north of the Razormane grounds'),
+(16, 9,  0, -9795.0,    389.0,    39.6,    0, 'Elwynn Forest, the hills west of Westbrook'),
+(17, 9,  0, -9945.1,    423.8,    34.8,    0, 'Elwynn Forest, the fields south of the Riverpaw camp');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES
