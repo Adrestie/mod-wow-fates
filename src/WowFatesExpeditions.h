@@ -290,6 +290,8 @@ struct WowFatesActiveExpedition
 
     // What walks its paths (WalkPath), made once its map is there; deleted at the end.
     GameObject* walker = nullptr;
+    bool walkerFailed = false;  // it could not be made: said once, not tried again
+    uint32 placeFails = 0;      // rounds in a row its objects found no room at all
     int64 deadline = 0;         // elapsed when a timed one fails (capture, warlord), 0 = none
     int64 hideTimer = 0;        // ms before the next look for the figure a warlord stands for
 
@@ -395,7 +397,7 @@ private:
         std::vector<Position> const& placed, Position& out) const;
     bool Outdoors(Map* map, float x, float y, float z) const;
     static bool NeedsSky(WowFatesExpeditionDef const* def);
-    bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const;
+    bool NearPlayer(WowFatesActiveExpedition const& active, float x, float y, float share = 1.0f) const;
     uint32 EngageCap(WowFatesActiveExpedition const& active) const;
     uint32 Engaged(WowFatesActiveExpedition const& active, Map* map) const;
     void Send(WowFatesActiveExpedition& active, Creature* creature, Unit* target, Position const& goal);

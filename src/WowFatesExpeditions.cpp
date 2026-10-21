@@ -106,6 +106,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
     _spawns.clear();
     _rewards.clear();
     _cooldowns.clear();
+    _indoors.clear();
+    _broken.clear();
 
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `id`, `name`, `level`, `objective_type`, `objective_entry`, `objective_count`, "
@@ -191,6 +193,8 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.timeLimit = f[15].Get<uint32>();
             itr->second.maxLosses = f[16].Get<uint32>();
             itr->second.takenEntry = f[17].Get<uint32>();
+            if (itr->second.objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
+                itr->second.gatherCount = std::max<uint32>(itr->second.gatherCount, 2); // a banner alone is no capture
             // "6730,6016,8599": a warlord's blows, the first from the start, one more with each phase
             itr->second.bossSpells.clear();
             std::string const spells = f[18].Get<std::string>();
@@ -1445,8 +1449,8 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
     float const angle = frand(0.0f, 2.0f * float(M_PI));
     float const x = c.x + 3.0f * std::cos(angle);
     float const y = c.y + 3.0f * std::sin(angle);
-    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 5.0f, true, 20.0f);
-    if (z <= INVALID_HEIGHT)
+    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 2.5f, true, 20.0f); // the ground, not a crate's top
+    if (z <= INVALID_HEIGHT || Wet(map, x, y, z))
         return Position(c.x, c.y, c.z, angle);
     return Position(x, y, z, angle);
 }
@@ -1455,13 +1459,16 @@ Position WowFatesExpeditionMgr::SpawnPoint(WowFatesActiveExpedition const& activ
 // on the map: one per Expedition, made once its map is there, deleted at its end.
 GameObject* WowFatesExpeditionMgr::Walker(WowFatesActiveExpedition& active, Map* map)
 {
-    if (active.walker || !map)
+    if (active.walker || active.walkerFailed || !map)
         return active.walker;
     GameObject* go = new GameObject();
     if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), WOW_FATES_WALKER_ENTRY, map, PHASEMASK_NORMAL,
             active.spawn.x, active.spawn.y, active.spawn.z, 0.0f, G3D::Quat(), 0, GO_STATE_READY))
     {
         delete go;
+        active.walkerFailed = true;
+        LOG_ERROR("module", "mod-wow-fates: Expedition {}: no walker (gameobject {}); its paths are only seen, not walked.",
+            active.def->id, WOW_FATES_WALKER_ENTRY);
         return nullptr;
     }
     active.walker = go;
@@ -1472,8 +1479,9 @@ GameObject* WowFatesExpeditionMgr::Walker(WowFatesActiveExpedition& active, Map*
 // mesh, whole (not cut short, not from or to a point off the mesh), not much
 // longer than the straight line (WowFates.Object.PathFactor), with no step
 // steeper than WowFates.Path.MaxSlope between two of its points (no jump, no
-// cliff) and none in water. Where the paths are not known (no mmap there),
-// one seen from the other. The points of the path in points, when asked.
+// cliff) and none in water, its ends where they were asked (a point on a
+// rock or a cart above the mesh is not walked to). On a map with no mmaps
+// only, one seen from the other. The points of the path in points, when asked.
 bool WowFatesExpeditionMgr::WalkPath(Map* map, WorldObject const* walker, Position const& from, Position const& to,
     std::vector<Position>* points) const
 {
@@ -1485,6 +1493,9 @@ bool WowFatesExpeditionMgr::WalkPath(Map* map, WorldObject const* walker, Positi
         path.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
             to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false);
         PathType const type = path.GetPathType();
+        // no polygon at one end (the mesh has none there: a roof, a rock, a tree)
+        if ((type & PATHFIND_NOT_USING_PATH) && map->GetMapCollisionData().GetMMapData().GetNavMesh())
+            return false;
         if (!(type & PATHFIND_NOT_USING_PATH))
         {
             if (!(type & PATHFIND_NORMAL) || (type & (PATHFIND_NOPATH | PATHFIND_INCOMPLETE | PATHFIND_SHORT | PATHFIND_FARFROMPOLY)))
@@ -1492,6 +1503,15 @@ bool WowFatesExpeditionMgr::WalkPath(Map* map, WorldObject const* walker, Positi
             if (path.getPathLength() > straight * conf.objectPathFactor + 10.0f)
                 return false;
             Movement::PointsArray const& steps = path.GetPath();
+            if (steps.empty())
+                return false;
+            auto off = [](G3D::Vector3 const& step, Position const& asked)
+            {
+                return std::hypot(step.x - asked.GetPositionX(), step.y - asked.GetPositionY()) > 2.5f
+                    || std::fabs(step.z - asked.GetPositionZ()) > 3.0f;
+            };
+            if (off(steps.front(), from) || off(steps.back(), to))
+                return false;
             for (std::size_t i = 1; i < steps.size(); ++i)
             {
                 float const flat = std::hypot(steps[i].x - steps[i - 1].x, steps[i].y - steps[i - 1].y);
@@ -1603,20 +1623,22 @@ bool WowFatesExpeditionMgr::FlagPoint(WowFatesActiveExpedition const& active, Ma
 }
 
 // A point near another (an ambush around an escort's ally, reinforcements
-// around a warlord): 18 to 28 yards from it, near the angle, on the ground
-// about its level, dry, in the area, and reached on foot to it. A few angles
-// around; false when none.
+// around a warlord): 24 to 34 yards from it, near the angle, half of
+// Spawn.PlayerDistance from the players at least (they stand by the ally, or
+// around the warlord: an ambush comes close), on the ground about its level,
+// dry, in the area, and reached on foot to it. A few angles around, then the
+// other side; false when none.
 bool WowFatesExpeditionMgr::AroundPoint(WowFatesActiveExpedition const& active, Map* map, Position const& around, float angle,
     Position& out) const
 {
     WowFatesSpawnPoint const& c = active.spawn;
-    for (uint32 attempt = 0; attempt < 8; ++attempt)
+    for (uint32 attempt = 0; attempt < 10; ++attempt)
     {
-        float const a = angle + (attempt ? frand(-0.6f, 0.6f) : 0.0f);
-        float const dist = frand(18.0f, 28.0f);
+        float const a = angle + (attempt ? frand(-0.6f, 0.6f) : 0.0f) + (attempt >= 5 ? float(M_PI) : 0.0f);
+        float const dist = frand(24.0f, 34.0f);
         float const x = around.GetPositionX() + dist * std::cos(a);
         float const y = around.GetPositionY() + dist * std::sin(a);
-        if (std::hypot(x - c.x, y - c.y) > active.def->radius || NearPlayer(active, x, y))
+        if (std::hypot(x - c.x, y - c.y) > active.def->radius || NearPlayer(active, x, y, 0.5f))
             continue;
         float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, around.GetPositionZ() + 8.0f, true, 16.0f);
         if (z <= INVALID_HEIGHT || std::fabs(z - around.GetPositionZ()) > 8.0f)
@@ -1801,9 +1823,9 @@ bool WowFatesExpeditionMgr::Outdoors(Map* map, float x, float y, float z) const
     return status.outdoors;
 }
 
-bool WowFatesExpeditionMgr::NearPlayer(WowFatesActiveExpedition const& active, float x, float y) const
+bool WowFatesExpeditionMgr::NearPlayer(WowFatesActiveExpedition const& active, float x, float y, float share) const
 {
-    float const distance = WowFatesConf().spawnPlayerDistance;
+    float const distance = WowFatesConf().spawnPlayerDistance * share;
     for (ObjectGuid const& guid : active.inside)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
             if (player->GetExactDist2d(x, y) < distance)
@@ -2120,6 +2142,14 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
                 itsGuards.push_back(guard->GetGUID());
             }
     }
+    // no room at all, round after round (a minute): the point is never used again
+    if (!placed && active.objects.empty() && ++active.placeFails >= 6)
+    {
+        Broken(active, "no room for any of its objects");
+        return;
+    }
+    if (placed)
+        active.placeFails = 0;
     // no room for all: the others are tried again soon
     active.gatherTimer = placed < wanted ? int64(10 * IN_MILLISECONDS)
         : int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
@@ -2252,8 +2282,8 @@ Position WowFatesExpeditionMgr::Centre(WowFatesActiveExpedition const& active, M
     float const angle = frand(0.0f, 2.0f * float(M_PI));
     float const x = c.x + spread * std::cos(angle);
     float const y = c.y + spread * std::sin(angle);
-    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 5.0f, true, 20.0f);
-    if (z <= INVALID_HEIGHT)
+    float z = map->GetHeight(PHASEMASK_NORMAL, x, y, c.z + 2.5f, true, 20.0f); // the ground, not a crate's top
+    if (z <= INVALID_HEIGHT || Wet(map, x, y, z))
         return Position(c.x, c.y, c.z, c.o);
     return Position(x, y, z, c.o);
 }
@@ -3211,6 +3241,8 @@ void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map*
         {
             LOG_DEBUG("module", "mod-wow-fates: Expedition {}: room for {} banners, two at least; tried again.", def->id, uint32(placed.size()));
             active.gatherTimer = 10 * IN_MILLISECONDS;
+            if (++active.placeFails >= 6)
+                Broken(active, "no room for two of its banners");
             return;
         }
         for (Position const& pos : placed)
@@ -3309,8 +3341,8 @@ void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map*
 
 // A unique elite (boss_entry, always an elite, bigger by Boss.Scale) in the
 // centre as soon as the area is loaded; the game's own figure it stands for
-// (objective_entry, if any) kept out of the area meanwhile, back two minutes
-// after it goes. The first player starts the fight and its clock
+// (objective_entry, if any) kept out of the area meanwhile (despawned, back
+// at its own respawn time). The first player starts the fight and its clock
 // (time_limit). Its health follows the players in the area; the bar is the
 // health it lost, never going back. Each mark of boss_waves passed is a
 // phase: its words, reinforcements (summon_entry, as a wave) from around it
@@ -3336,7 +3368,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
                 && creature->GetExactDist2d(active.spawn.x, active.spawn.y) <= def->radius + 20.0f)
                 others.push_back(creature);
         for (Creature* creature : others)
-            creature->DespawnOrUnsummon(0ms, Seconds(120));
+            creature->DespawnOrUnsummon(); // its own respawn time: back after, as ever
     }
 
     Creature* boss = active.boss ? map->GetCreature(active.boss) : nullptr;
@@ -3383,6 +3415,10 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
         if (def->timeLimit)
             active.deadline = active.elapsed + int64(def->timeLimit) * IN_MILLISECONDS;
         active.spellTimer = urand(4, 8) * IN_MILLISECONDS;
+        if (!def->bossSpells.empty())
+            if (SpellInfo const* info = sSpellMgr->GetSpellInfo(def->bossSpells.front()))
+                if (info->IsPositive())
+                    boss->CastSpell(boss, info->Id, true);
     }
     if (active.deadline && active.elapsed >= active.deadline)
     {
@@ -3406,9 +3442,10 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
                 if (info->IsPositive())
                     boss->CastSpell(boss, info->Id, true);
         Unit* target = boss->GetVictim();
-        if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
-            if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map)
-                target = player;
+        if (!active.inside.empty())
+            if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
+                if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map)
+                    target = player;
         Position const around = boss->GetPosition();
         SendWave(active, map, target, &around);
         break;
@@ -3526,6 +3563,8 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
             || def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
         && active->bossOut && creature->GetGUID() == active->boss)
     {
+        if (def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
+            Say(victim->ToCreature(), BOSS_SAY_DEATH);
         active->progressPct = 100.0;
         ++active->contributors[player->GetGUID()].kills;
         return;
@@ -3640,7 +3679,10 @@ void WowFatesExpeditionMgr::Check(ChatHandler* handler, uint32 id)
             continue;
         for (uint32 spawnId : def.spawns)
         {
-            WowFatesSpawnPoint const& spawn = _spawns[spawnId];
+            auto found = _spawns.find(spawnId);
+            if (found == _spawns.end())
+                continue;
+            WowFatesSpawnPoint const& spawn = found->second;
             Map* map = sMapMgr->CreateBaseMap(spawn.map);
             if (!map)
                 continue;
