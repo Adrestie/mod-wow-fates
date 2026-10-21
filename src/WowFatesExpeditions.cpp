@@ -250,6 +250,13 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 def.id, def.allyEntry, def.summonEntry);
             itr = _defs.erase(itr);
         }
+        else if (def.objectiveType == WOW_FATES_OBJECTIVE_RESCUE
+            && (!sObjectMgr->GetGameObjectTemplate(def.gatherEntry) || !sObjectMgr->GetCreatureTemplate(def.allyEntry)))
+        {
+            LOG_ERROR("module", "mod-wow-fates: Expedition {} is a rescue whose cage (gameobject {}) or captive (creature {}) does not exist; skipped.",
+                def.id, def.gatherEntry, def.allyEntry);
+            itr = _defs.erase(itr);
+        }
         else if ((def.objectiveType == WOW_FATES_OBJECTIVE_GATHER || def.objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
             && !sObjectMgr->GetGameObjectTemplate(def.gatherEntry))
         {
@@ -430,6 +437,8 @@ std::string WowFatesExpeditionMgr::Objective(WowFatesActiveExpedition const& act
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_SUPPORT), CreatureName(def->allyEntry, session), def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_ESCORT), CreatureName(def->allyEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_OBJECTIVE_RESCUE), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
     {
         std::string const boss = CreatureName(def->bossEntry, session);
@@ -815,6 +824,8 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_SUPPORT), active.repelled, def->waveCount);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_ESCORT), CreatureName(def->allyEntry, session));
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_RESCUE), CreatureName(def->allyEntry, session));
     if (def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT && active.bossOut)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TRACKER_KILL), CreatureName(def->bossEntry, session));
     if (!def->objectiveEntry)
@@ -823,10 +834,14 @@ std::string WowFatesExpeditionMgr::TrackerLabel(WowFatesActiveExpedition const& 
 }
 
 // The tracker's second line: what there is to protect. A wave support: its
-// allies alive out of ally_count; a defence: its ally's health.
+// allies alive out of ally_count; a defence: its ally's health; a rescue: the
+// captives led out and those lost, against the losses that fail it.
 std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& active, WorldSession* session) const
 {
     WowFatesExpeditionDef const* def = active.def;
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED), active.saved,
+            uint32(std::ceil(Needed(active) - 0.001)), active.lost, def->maxLosses + 1);
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
             uint32(active.alliesAlive), def->allyCount);
@@ -1040,6 +1055,8 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateBossSupport(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
         else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT)
             UpdateEscort(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map), diff);
+        else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+            UpdateRescue(active, sMapMgr->FindBaseNonInstanceMap(active.spawn.map));
 
         if (areaTick)
         {
@@ -1073,11 +1090,13 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             if (active.def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT)
                 UpdateBoss(active, map);
             else if (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER
-                || active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
+                || active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE
+                || active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
                 UpdateGather(active, map);
 
             uint32 const pct = uint32(active.progressPct);
-            int32 const guarded = active.alliesAlive * 1000 + active.allyHealthPct;
+            int32 const guarded = active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE
+                ? int32(active.saved * 1000 + active.lost) : active.alliesAlive * 1000 + active.allyHealthPct;
             if ((pct != active.sentProgress && pct < 100) || guarded != active.sentGuard)
             {
                 active.sentProgress = pct;
@@ -1981,6 +2000,9 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
     WowFatesExpeditionDef const* def = active.def;
     if (active.objects.size() >= def->gatherCount || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
+    // a rescue's cages, once its way out is known (UpdateRescue): each walked to it
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE && active.route.empty())
+        return;
     // the first ones together; then one at a time, each in its own time
     bool const all = !active.gatherFilled;
     if (!all && active.gatherTimer > 0)
@@ -2072,10 +2094,16 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
         if (active.progressPct >= 100.0)
             return;
 
-        ++active.progress;
-        active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
         ++active.contributors[player->GetGUID()].picks;
         Active(active);
+        // a rescue's cage: the bar fills as its captive is led out, not now
+        if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
+            FreeCaptive(active, go);
+        else
+        {
+            ++active.progress;
+            active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
+        }
 
         // a sabotage: the object blows up, its guards (and those near) come
         if (active.def->objectiveType == WOW_FATES_OBJECTIVE_SABOTAGE)
@@ -2919,6 +2947,110 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
 }
 
 // ---------------------------------------------------------------------------
+// Rescue
+
+namespace
+{
+    // The lines of a rescue's captives (their creature_text groups).
+    enum WowFatesCaptiveTalk : uint8
+    {
+        CAPTIVE_SAY_FREED = 0, // out of his cage
+        CAPTIVE_SAY_OUT   = 1  // at the way out
+    };
+}
+
+// The way out, the last point of the spawn point's path, walked from the
+// centre once the area is loaded (else the point is never used again); the
+// cages are a gathering's objects (UpdateGather), each walked to the way out
+// as well. A cage opened (FreeCaptive), its captive runs for the way out by
+// the paths, fights what stops him and runs on; there, he is led out. The bar
+// is the captives led out against objective_count (more with the players, as
+// the kills); more than max_losses dead, it fails.
+void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* map)
+{
+    if (!map || active.failed || active.progressPct >= 100.0 || active.remaining <= 0)
+        return;
+    WowFatesExpeditionDef const* def = active.def;
+
+    if (active.route.empty())
+    {
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
+            return;
+        map->LoadGridsInRange(Position(active.spawn.x, active.spawn.y, active.spawn.z, 0.0f), def->radius + 30.0f);
+        Position const& way = active.spawn.path.back();
+        if (!WalkPath(map, Walker(active, map), Position(active.spawn.x, active.spawn.y, active.spawn.z, 0.0f), way))
+        {
+            Broken(active, Acore::StringFormat("its way out ({:.1f} {:.1f} {:.1f}) is not walked from the centre",
+                way.GetPositionX(), way.GetPositionY(), way.GetPositionZ()));
+            return;
+        }
+        active.route = { way };
+    }
+    Start(active, "rescue", &WowFatesExpeditionMgr::CreatureName, def->allyEntry);
+
+    Position const& way = active.route.front();
+    for (auto itr = active.allies.begin(); itr != active.allies.end();)
+    {
+        Creature* captive = map->GetCreature(*itr);
+        if (!captive)
+        {
+            itr = active.allies.erase(itr); // gone with his grid: neither led out nor lost
+            continue;
+        }
+        if (!captive->IsAlive())
+        {
+            itr = active.allies.erase(itr);
+            captive->DespawnOrUnsummon(Milliseconds(SUMMON_CORPSE_MS));
+            ++active.lost;
+            LOG_INFO("module", "mod-wow-fates: Expedition {}: a captive died, {} lost ({} may be).", def->id, active.lost, def->maxLosses);
+            if (active.lost > def->maxLosses)
+            {
+                active.failed = true;
+                return;
+            }
+            continue;
+        }
+        if (captive->GetExactDist2d(way.GetPositionX(), way.GetPositionY()) < 5.0f)
+        {
+            itr = active.allies.erase(itr);
+            Say(captive, CAPTIVE_SAY_OUT);
+            captive->DespawnOrUnsummon(Milliseconds(3000));
+            ++active.saved;
+            ++active.progress;
+            active.progressPct = std::min(100.0, active.progressPct + 100.0 / Needed(active));
+            Active(active);
+            continue;
+        }
+        if (!captive->IsInCombat())
+        {
+            captive->SetHomePosition(captive->GetPosition()); // back from a fight: here, not at his cage
+            if (captive->GetMotionMaster()->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
+                captive->GetMotionMaster()->MovePoint(1, way);
+        }
+        ++itr;
+    }
+}
+
+// A cage opened (OnGather, its map's thread): its captive out, thankful,
+// running for the way out.
+void WowFatesExpeditionMgr::FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage)
+{
+    Map* map = cage->GetMap();
+    TempSummon* captive = map->SummonCreature(active.def->allyEntry, cage->GetPosition());
+    if (!captive)
+        return;
+    captive->SetTempSummonType(TEMPSUMMON_MANUAL_DESPAWN);
+    captive->SetPvP(false); // faction 495: healing him would flag the healer
+    captive->SetHomePosition(cage->GetPosition());
+    captive->SetDefaultMovementType(IDLE_MOTION_TYPE);
+    captive->GetMotionMaster()->Initialize();
+    Say(captive, CAPTIVE_SAY_FREED);
+    if (!active.route.empty())
+        captive->GetMotionMaster()->MovePoint(1, active.route.front());
+    active.allies.push_back(captive->GetGUID());
+}
+
+// ---------------------------------------------------------------------------
 // Queries and hooks
 
 uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
@@ -2941,7 +3073,7 @@ bool WowFatesExpeditionMgr::IsForShow(Unit const* unit)
     if (!active || !active->inside.empty())
         return false;
     uint8 const type = active->def->objectiveType;
-    return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT;
+    return type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT || type == WOW_FATES_OBJECTIVE_RESCUE;
 }
 
 void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)

@@ -58,6 +58,10 @@ ones and rewards for those who take part.
     players are near him, waits otherwise; ambushes at fixed marks of it.
     The bar is the route behind him; he dies, it fails. The route is the
     spawn point's `path`, each leg walked as a player would.
+  - *Rescue*: cages to open (a one second cast) spread over the area, each
+    walked to the way out (the last point of the spawn point's `path`);
+    each captive runs for it. The bar is the captives led out; more than
+    `max_losses` dead, it fails.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

@@ -49,7 +49,10 @@
  *     back as they go (a gathering whose objects each have their guards);
  *   9 escort: an ally walks a route while players are near him, ambushed at
  *     the bar's marks; the bar is the route behind him, the Expedition fails
- *     when he dies.
+ *     when he dies;
+ *  10 rescue: cages to open, spread over the area as a gathering's objects;
+ *     each captive runs for the way out, the bar is those led out, the
+ *     Expedition fails when more than max_losses die.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -406,6 +409,8 @@ private:
     void UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateBossSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateEscort(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void UpdateRescue(WowFatesActiveExpedition& active, Map* map);
+    void FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;

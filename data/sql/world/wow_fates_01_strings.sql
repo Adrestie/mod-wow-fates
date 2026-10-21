@@ -58,7 +58,10 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates', 114, 'Nobody is in the area of an Expedition.'),
 ('mod-wow-fates', 115, 'No such player in the world.'),
 ('mod-wow-fates',  36, 'escort {} to the end of the road'),
-('mod-wow-fates',  37, 'Escort {}');
+('mod-wow-fates',  37, 'Escort {}'),
+('mod-wow-fates',  38, 'free the {} and lead them out'),
+('mod-wow-fates',  39, 'Free: {}'),
+('mod-wow-fates',  40, 'Led out: {}/{} - lost: {}/{}');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -252,4 +255,16 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  36, 'esES', 'escolta a {} hasta el final del camino'),
 ('mod-wow-fates',  37, 'esES', 'Escolta a {}'),
 ('mod-wow-fates',  36, 'ruRU', 'сопроводите: {} — до конца пути'),
-('mod-wow-fates',  37, 'ruRU', 'Сопроводите: {}');
+('mod-wow-fates',  37, 'ruRU', 'Сопроводите: {}'),
+('mod-wow-fates',  38, 'frFR', 'libérer : {} — et les faire sortir'),
+('mod-wow-fates',  39, 'frFR', 'Libérer : {}'),
+('mod-wow-fates',  40, 'frFR', 'Sortis : {}/{} — perdus : {}/{}'),
+('mod-wow-fates',  38, 'deDE', 'befreit: {} — und bringt sie hinaus'),
+('mod-wow-fates',  39, 'deDE', 'Befreit: {}'),
+('mod-wow-fates',  40, 'deDE', 'Hinausgebracht: {}/{} — verloren: {}/{}'),
+('mod-wow-fates',  38, 'esES', 'libera: {} — y sácalos de aquí'),
+('mod-wow-fates',  39, 'esES', 'Libera: {}'),
+('mod-wow-fates',  40, 'esES', 'Rescatados: {}/{} — perdidos: {}/{}'),
+('mod-wow-fates',  38, 'ruRU', 'освободите: {} — и выведите их'),
+('mod-wow-fates',  39, 'ruRU', 'Освободите: {}'),
+('mod-wow-fates',  40, 'ruRU', 'Выведено: {}/{} — потеряно: {}/{}');

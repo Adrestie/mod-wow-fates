@@ -16,6 +16,9 @@
 --          the Goldshire merchant with his own name and model (241, display
 --          3254), of faction 495, without his town's immunity (unit_flags
 --          512) nor his shop, with his words (creature_text).
+--   96204  Darkspear Captive: the captives of Zalazane's Captives (Durotar,
+--          level 8), Darkspear trolls of four looks (the trolls of Sen'jin,
+--          displays 4070, 4073 to 4075), of faction 495, with their words.
 --   96202  Marshal Dughan: the ally of The Packleader's End, the marshal of
 --          Goldshire with his own name and model (240, display 1985), of
 --          faction 495 as every ally, with his words (creature_text);
@@ -117,6 +120,17 @@ UPDATE `wow_fates_creature` SET
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
 
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 3190;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96204, `name` = 'Darkspear Captive', `subname` = '',
+  `minlevel` = 8, `maxlevel` = 8, `rank` = 0, `faction` = 495,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
+  `HealthModifier` = 1.5, `DamageModifier` = 0.6, `ArmorModifier` = 1,
+  `RegenHealth` = 1, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
 DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (96100, 0, 2357, 1.35, 1, 0),
@@ -125,7 +139,11 @@ INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`,
 (96201, 0, 4259, 1, 1, 0),
 (96202, 0, 1985, 1, 1, 0),
 (96300, 0, 11686, 1, 1, 0),
-(96203, 0, 3254, 1, 1, 0);
+(96203, 0, 3254, 1, 1, 0),
+(96204, 0, 4070, 1, 1, 0),
+(96204, 1, 4073, 1, 1, 0),
+(96204, 2, 4074, 1, 1, 0),
+(96204, 3, 4075, 1, 1, 0);
 
 DELETE FROM `creature_template_locale` WHERE `entry` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `VerifiedBuild`) VALUES
@@ -158,7 +176,12 @@ INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `Ver
 (96203, 'deDE', 'Remy "Zweifach"', '', 0),
 (96203, 'esES', 'Remy "Dos Veces"', '', 0),
 (96203, 'esMX', 'Remy "Dos Veces"', '', 0),
-(96203, 'ruRU', 'Реми Повторюх', '', 0);
+(96203, 'ruRU', 'Реми Повторюх', '', 0),
+(96204, 'frFR', 'Captif sombrelance', '', 0),
+(96204, 'deDE', 'Gefangener der Dunkelspeere', '', 0),
+(96204, 'esES', 'Cautivo Lanza Negra', '', 0),
+(96204, 'esMX', 'Cautivo Lanza Negra', '', 0),
+(96204, 'ruRU', 'Пленник из племени Черного Копья', '', 0);
 
 -- Its blows: the Bandit's Snap Kick, more often, and the Bodyguard's Disarm.
 DELETE FROM `smart_scripts` WHERE `entryorguid` BETWEEN 96100 AND 96399 AND `source_type` = 0;
@@ -167,6 +190,7 @@ INSERT INTO `smart_scripts` (`entryorguid`, `source_type`, `id`, `link`, `event_
 (96100, 0, 1, 0, 0, 0, 100, 0, 8000, 10000, 25000, 30000, 0, 0, 11, 6713, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Defias Ringleader - In Combat - Cast Disarm'),
 (96101, 0, 0, 0, 0, 0, 100, 0, 4000, 6000, 7000, 11000, 0, 0, 11, 8646, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - In Combat - Cast Snap Kick');
 
+-- A rescue's captives': 0 out of the cage, 1 at the way out.
 -- An escort's ally's: 0 when he sets off, 1 at an ambush, 2 waiting for the
 -- players (every 30 s), 3 at the end of the road, 4 when he falls.
 -- The words of the boss supports' creatures: said (a bubble, not a yell),
@@ -200,7 +224,10 @@ INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Lan
 (96203, 1, 1, 'Thieves! Keep them off the crates!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - an ambush'),
 (96203, 2, 0, 'Hey! I''m not going on alone, these hills aren''t safe!', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - waits for the players'),
 (96203, 3, 0, 'We made it, and not a crate lost! You have my thanks, friends.', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - the end of the road'),
-(96203, 4, 0, 'My... wares...', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - falls');
+(96203, 4, 0, 'My... wares...', 12, 0, 100, 0, 0, 0, 0, 0, 'Remy "Two Times" - falls'),
+(96204, 0, 0, 'Thank the loa! I be out of here, mon!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - out of the cage'),
+(96204, 0, 1, 'You be a true friend of the Darkspear!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - out of the cage'),
+(96204, 1, 0, 'Sen''jin, here I come!', 12, 0, 100, 0, 0, 0, 0, 0, 'Darkspear Captive - at the way out');
 
 DELETE FROM `creature_text_locale` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Text`) VALUES
@@ -318,4 +345,19 @@ INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Te
 (96203, 4, 0, 'deDE', 'Meine... Waren...'),
 (96203, 4, 0, 'esES', 'Mi... mercancía...'),
 (96203, 4, 0, 'esMX', 'Mi... mercancía...'),
-(96203, 4, 0, 'ruRU', 'Мой... товар...');
+(96203, 4, 0, 'ruRU', 'Мой... товар...'),
+(96204, 0, 0, 'frFR', 'Merci aux loas ! Je file, mon !'),
+(96204, 0, 0, 'deDE', 'Dank sei den Loa! Ich verschwinde, Mann!'),
+(96204, 0, 0, 'esES', '¡Gracias a los loas! ¡Me largo, hermano!'),
+(96204, 0, 0, 'esMX', '¡Gracias a los loas! ¡Me largo, hermano!'),
+(96204, 0, 0, 'ruRU', 'Хвала лоа! Я сматываюсь, приятель!'),
+(96204, 0, 1, 'frFR', 'T''es un vrai ami des Sombrelances !'),
+(96204, 0, 1, 'deDE', 'Du bist ein wahrer Freund der Dunkelspeere!'),
+(96204, 0, 1, 'esES', '¡Eres un verdadero amigo de los Lanza Negra!'),
+(96204, 0, 1, 'esMX', '¡Eres un verdadero amigo de los Lanza Negra!'),
+(96204, 0, 1, 'ruRU', 'Ты настоящий друг Черного Копья!'),
+(96204, 1, 0, 'frFR', 'Sen''jin, me voilà !'),
+(96204, 1, 0, 'deDE', 'Sen''jin, ich komme!'),
+(96204, 1, 0, 'esES', '¡Sen''jin, allá voy!'),
+(96204, 1, 0, 'esMX', '¡Sen''jin, allá voy!'),
+(96204, 1, 0, 'ruRU', 'Сен''джин, я иду!');

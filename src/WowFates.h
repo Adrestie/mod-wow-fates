@@ -82,6 +82,9 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_ALLY_HEALTH        = 35,  // the tracker's second line: the ally's health
     WOW_FATES_STR_OBJECTIVE_ESCORT   = 36,
     WOW_FATES_STR_TRACKER_ESCORT     = 37,
+    WOW_FATES_STR_OBJECTIVE_RESCUE   = 38,
+    WOW_FATES_STR_TRACKER_RESCUE     = 39,
+    WOW_FATES_STR_RESCUED            = 40,  // the tracker's second line: led out, lost
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,
