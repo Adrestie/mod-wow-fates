@@ -4,7 +4,8 @@
 -- module's gameobject templates are its numbers times ten).
 --
 --   960000  Kul Tiras Supply Crate: Kul Tiras Supplies (Durotar, level 7).
---   960001  Kolkar War Tent: The Kolkar War Camp (Durotar, level 8), to burn,
+--   960001  Kolkar War Tent: The Kolkar War Camp (Durotar, level 8), the
+--           centaurs' own tent (display 2352, CentaurTent01), to burn,
 --           as a gathering's object: the same lock and cast. A sabotage's
 --           targets are buildings or engines of worth (tents, huts, wagons,
 --           catapults), never a small fire.
@@ -28,7 +29,7 @@ INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconNa
 (960000, 10, 336, 'Kul Tiras Supply Crate', '', '', '', 1,
   43, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   '', 'go_wow_fates_gather', 0),
-(960001, 10, 9303, 'Kolkar War Tent', '', '', '', 1,
+(960001, 10, 2352, 'Kolkar War Tent', '', '', '', 1,
   43, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   '', 'go_wow_fates_gather', 0),
 (960100, 10, 328, 'Ritual Altar', '', '', '', 1,
