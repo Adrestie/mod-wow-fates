@@ -14,7 +14,9 @@
 --          level 9), Orgrimmar grunts of the same faction 495.
 --   96202  Marshal Dughan: the ally of The Packleader's End, the marshal of
 --          Goldshire with his own name and model (240, display 1985), of
---          faction 495 as every ally, with his words (creature_text).
+--          faction 495 as every ally, with his words (creature_text);
+--          without the town's immunity to creatures (unit_flags 512), to
+--          fight.
 --
 -- The ally of a boss support is a known figure of the zone's side, by his
 -- name and his model only: of the Alliance in an Alliance zone, of the Horde
@@ -61,7 +63,7 @@ CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WH
 UPDATE `wow_fates_creature` SET
   `entry` = 96202, `subname` = '',
   `minlevel` = 12, `maxlevel` = 12, `rank` = 0, `faction` = 495,
-  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
   `HealthModifier` = 8, `DamageModifier` = 1.4, `ArmorModifier` = 1.5,
   `RegenHealth` = 0, `AIName` = '', `ScriptName` = '',
   `KillCredit1` = 0, `KillCredit2` = 0;
@@ -143,12 +145,20 @@ INSERT INTO `smart_scripts` (`entryorguid`, `source_type`, `id`, `link`, `event_
 (96100, 0, 1, 0, 0, 0, 100, 0, 8000, 10000, 25000, 30000, 0, 0, 11, 6713, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Defias Ringleader - In Combat - Cast Disarm'),
 (96101, 0, 0, 0, 0, 0, 100, 0, 4000, 6000, 7000, 11000, 0, 0, 11, 8646, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - In Combat - Cast Snap Kick');
 
--- The words of the allies of the boss supports: said (a bubble, not a yell),
+-- The words of the boss supports' creatures: said (a bubble, not a yell),
 -- in the universal language, through creature_text groups the module calls: 0 at the
 -- start, 1 in the fight (every 20 to 40 s, one at random), 2 at the elite's
--- half health, 3 at the victory, 4 when he falls.
+-- half health, 3 at the victory, 4 when he falls; the elite's, 0 when the
+-- true fight begins (a player in the area), 1 to 4 at 75, 50, 25 and 10 % of
+-- its health, 5 at its death.
 DELETE FROM `creature_text` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Language`, `Probability`, `Emote`, `Duration`, `Sound`, `BroadcastTextId`, `TextRange`, `comment`) VALUES
+(96101, 0, 0, 'Grimmaw smells fresh meat! Kill! Kill!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - the true fight begins'),
+(96101, 1, 0, 'You scratch Grimmaw? Grimmaw bites back!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 75 %'),
+(96101, 2, 0, 'Pack! To me! Tear them apart!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 50 %'),
+(96101, 3, 0, 'Grimmaw... will not run!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 25 %'),
+(96101, 4, 0, 'No... Grimmaw is the packleader...!', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - 10 %'),
+(96101, 5, 0, 'The pack... will avenge... Grimmaw...', 12, 0, 100, 0, 0, 0, 0, 0, 'Grimmaw the Packleader - death'),
 (96202, 0, 0, 'To arms! Stand with me!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - start of the fight'),
 (96202, 1, 0, 'Hold the line!', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - in the fight'),
 (96202, 1, 1, 'Is that all you''ve got?', 12, 0, 100, 0, 0, 0, 0, 0, 'Marshal Dughan - in the fight'),
@@ -159,6 +169,36 @@ INSERT INTO `creature_text` (`CreatureID`, `GroupID`, `ID`, `Text`, `Type`, `Lan
 
 DELETE FROM `creature_text_locale` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_text_locale` (`CreatureID`, `GroupID`, `ID`, `Locale`, `Text`) VALUES
+(96101, 0, 0, 'frFR', 'Grimmaw sent la viande fraîche ! Tuez ! Tuez !'),
+(96101, 0, 0, 'deDE', 'Grimmaw riecht frisches Fleisch! Tötet! Tötet!'),
+(96101, 0, 0, 'esES', '¡Grimmaw huele carne fresca! ¡Matad! ¡Matad!'),
+(96101, 0, 0, 'esMX', '¡Grimmaw huele carne fresca! ¡Matad! ¡Matad!'),
+(96101, 0, 0, 'ruRU', 'Гриммо чует свежее мясо! Убить! Убить!'),
+(96101, 1, 0, 'frFR', 'Tu griffes Grimmaw ? Grimmaw mord !'),
+(96101, 1, 0, 'deDE', 'Du kratzt Grimmaw? Grimmaw beißt zurück!'),
+(96101, 1, 0, 'esES', '¿Arañas a Grimmaw? ¡Grimmaw muerde!'),
+(96101, 1, 0, 'esMX', '¿Arañas a Grimmaw? ¡Grimmaw muerde!'),
+(96101, 1, 0, 'ruRU', 'Царапаешь Гриммо? Гриммо кусает!'),
+(96101, 2, 0, 'frFR', 'La meute ! À moi ! Déchirez-les !'),
+(96101, 2, 0, 'deDE', 'Rudel! Zu mir! Zerfetzt sie!'),
+(96101, 2, 0, 'esES', '¡Manada! ¡A mí! ¡Despedazadlos!'),
+(96101, 2, 0, 'esMX', '¡Manada! ¡A mí! ¡Despedazadlos!'),
+(96101, 2, 0, 'ruRU', 'Стая! Ко мне! Порвите их!'),
+(96101, 3, 0, 'frFR', 'Grimmaw... ne fuira pas !'),
+(96101, 3, 0, 'deDE', 'Grimmaw... flieht nicht!'),
+(96101, 3, 0, 'esES', '¡Grimmaw... no huirá!'),
+(96101, 3, 0, 'esMX', '¡Grimmaw... no huirá!'),
+(96101, 3, 0, 'ruRU', 'Гриммо... не побежит!'),
+(96101, 4, 0, 'frFR', 'Non... Grimmaw est le chef de meute... !'),
+(96101, 4, 0, 'deDE', 'Nein... Grimmaw ist der Rudelführer...!'),
+(96101, 4, 0, 'esES', 'No... ¡Grimmaw es el líder de la manada...!'),
+(96101, 4, 0, 'esMX', 'No... ¡Grimmaw es el líder de la manada...!'),
+(96101, 4, 0, 'ruRU', 'Нет... Гриммо — вожак стаи...!'),
+(96101, 5, 0, 'frFR', 'La meute... vengera... Grimmaw...'),
+(96101, 5, 0, 'deDE', 'Das Rudel... wird Grimmaw... rächen...'),
+(96101, 5, 0, 'esES', 'La manada... vengará... a Grimmaw...'),
+(96101, 5, 0, 'esMX', 'La manada... vengará... a Grimmaw...'),
+(96101, 5, 0, 'ruRU', 'Стая... отомстит... за Гриммо...'),
 (96202, 0, 0, 'frFR', 'Aux armes ! Avec moi !'),
 (96202, 0, 0, 'deDE', 'Zu den Waffen! Steht mir bei!'),
 (96202, 0, 0, 'esES', '¡A las armas! ¡Conmigo!'),

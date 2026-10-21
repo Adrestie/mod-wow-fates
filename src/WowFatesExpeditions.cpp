@@ -1945,6 +1945,17 @@ namespace
         ALLY_SAY_FALL    = 4
     };
 
+    // The elite's (its creature_text groups).
+    enum WowFatesBossTalk : uint8
+    {
+        BOSS_SAY_START = 0,
+        BOSS_SAY_75    = 1,
+        BOSS_SAY_50    = 2,
+        BOSS_SAY_25    = 3,
+        BOSS_SAY_10    = 4,
+        BOSS_SAY_DEATH = 5
+    };
+
     void Say(Creature* creature, uint8 group)
     {
         if (creature && creature->AI())
@@ -1958,9 +1969,10 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         return;
     WowFatesExpeditionDef const* def = active.def;
 
+    // out as soon as the area is loaded, fighting for show until a player comes
     if (!active.started)
     {
-        if (active.inside.empty() || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
+        if (!map->IsGridLoaded(active.spawn.x, active.spawn.y))
             return;
         active.started = true;
     }
@@ -2015,14 +2027,37 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         return;
     if (!boss->IsAlive())
     {
+        Say(boss, BOSS_SAY_DEATH);
         Say(ally, ALLY_SAY_VICTORY);
         active.progressPct = 100.0;
         return;
     }
     ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
 
-    // the ally's words: at the start, now and then, at the elite's half health
-    if (ally && ally->IsAlive())
+    // their words, only with players to hear them: the elite's when the true
+    // fight begins and at 75, 50, 25 and 10 % of its health, once each
+    if (!active.inside.empty() && boss->IsAlive())
+    {
+        if (!(active.bossSaid & 1))
+        {
+            active.bossSaid |= 1;
+            Say(boss, BOSS_SAY_START);
+        }
+        static uint8 const marks[] = { 75, 50, 25, 10 };
+        for (uint8 i = 0; i < 4; ++i)
+        {
+            uint8 const bit = uint8(2 << i);
+            if (!(active.bossSaid & bit) && boss->GetHealthPct() <= float(marks[i]))
+            {
+                active.bossSaid |= bit;
+                Say(boss, uint8(BOSS_SAY_75 + i));
+                break;
+            }
+        }
+    }
+
+    // the ally's: at the start, now and then, at the elite's half health
+    if (ally && ally->IsAlive() && !active.inside.empty())
     {
         if (!(active.said & 1))
         {
@@ -2074,10 +2109,24 @@ uint8 WowFatesExpeditionMgr::SyncLevel(Player const* player)
     return active == _active.end() ? 0 : active->second.def->level;
 }
 
-void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32 damage)
+bool WowFatesExpeditionMgr::IsForShow(Unit const* unit)
+{
+    if (!_activeCount || !unit || !unit->IsCreature() || IsFromPlayer(unit))
+        return false;
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    WowFatesActiveExpedition* active = FindAt(unit);
+    return active && active->def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT && active->inside.empty();
+}
+
+void WowFatesExpeditionMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)
 {
     if (!_activeCount || !damage || !attacker || !victim || attacker == victim)
         return;
+    if (!IsFromPlayer(attacker) && IsForShow(victim))
+    {
+        damage = 0;
+        return;
+    }
     if (!victim->IsCreature() || IsFromPlayer(victim))
         return;
     Player* player = attacker->GetCharmerOrOwnerPlayerOrPlayerItself();

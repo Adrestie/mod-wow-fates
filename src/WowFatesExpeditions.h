@@ -236,6 +236,7 @@ struct WowFatesActiveExpedition
     // A boss support's ally speaks (creature_text): at the start, now and then
     // in the fight, at the elite's half health, at the end.
     uint8 said = 0;             // the groups already said: 1 start, 2 half
+    uint8 bossSaid = 0;         // the elite's: 1 start, 2/4/8/16 at 75/50/25/10 %
     int64 talkTimer = 0;        // ms before the next line in the fight
     int32 alliesAlive = -1;
     int32 allyHealthPct = -1;   // by steps of five
@@ -265,8 +266,12 @@ public:
     // The level a player is synced to, 0 when he is in no Expedition.
     uint8 SyncLevel(Player const* player);
 
-    // Combat hooks, from any map thread.
-    void OnDamage(Unit* attacker, Unit* victim, uint32 damage);
+    // Combat hooks, from any map thread. The damage of a fight with nobody
+    // to see it (a boss support with no player in its area) is undone.
+    void OnDamage(Unit* attacker, Unit* victim, uint32& damage);
+    // A boss support's creatures fight for show while nobody is in its area:
+    // no blow hurts, no spell is cast.
+    bool IsForShow(Unit const* unit);
     void OnHeal(Unit* healer, Unit* target, uint32 gain);
     void OnDeath(Unit* victim, Unit* killer);
     // A gathering's object used, from its map's thread.

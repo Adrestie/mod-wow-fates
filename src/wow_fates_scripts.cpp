@@ -26,6 +26,7 @@
 #include "GameObject.h"
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "Spell.h"
 
 class WowFatesWorldScript : public WorldScript
 {
@@ -160,6 +161,22 @@ public:
     }
 };
 
+// A boss support's creatures cast nothing while they fight for show.
+class WowFatesSpellScript : public AllSpellScript
+{
+public:
+    WowFatesSpellScript() : AllSpellScript("WowFatesSpellScript", { ALLSPELLHOOK_ON_SPELL_CHECK_CAST }) { }
+
+    void OnSpellCheckCast(Spell* spell, bool /*strict*/, SpellCastResult& res) override
+    {
+        if (res != SPELL_CAST_OK)
+            return;
+        if (Unit* caster = spell->GetCaster() ? spell->GetCaster()->ToUnit() : nullptr)
+            if (sWowFatesExpeditionMgr->IsForShow(caster))
+                res = SPELL_FAILED_DONT_REPORT;
+    }
+};
+
 void AddSC_wow_fates_commands();
 
 void AddSC_wow_fates_scripts()
@@ -169,5 +186,6 @@ void AddSC_wow_fates_scripts()
     new WowFatesUnitScript();
     new WowFatesGatherScript();
     new WowFatesChannelScript();
+    new WowFatesSpellScript();
     AddSC_wow_fates_commands();
 }
