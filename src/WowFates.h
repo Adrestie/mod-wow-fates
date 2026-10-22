@@ -159,6 +159,7 @@ struct WowFatesConfig
     float objectMaxHeight = 6.0f;    // yards above or below the centre at most
     float objectMaxSlope = 0.5f;     // rise per yard of the ground around it at most
     float objectPathFactor = 2.0f;   // its walk from the centre at most this times the straight line, + 10 yards
+    float captiveSpeed = 1.0f;       // a rescue's captives: their walk, times a walk's (2.5 yards a second); they never run faster
     float pathMaxSlope = 1.0f;       // a path's rise per yard between two of its points at most (+ 1.5 yards): no jump, no cliff
     float bossScale = 1.44f;         // a boss support's ally (its boss), times its template's size
     float wavePerCharacter = 1.0f;   // times wave_size, per character in the area

@@ -367,6 +367,7 @@ struct WowFatesActiveExpedition
     };
     std::vector<Member> members;
     bool narrow = false;        // the route too narrow for the pack in places: the caravan in a file behind him
+    float caravanPace = 0.0f;   // yards a second: the caravan's walk, its slowest's
 
     // Rescue: captives led out, captives lost (the way out in route)
     uint32 saved = 0;
@@ -514,6 +515,7 @@ private:
     static float CaravanWidth(WowFatesExpeditionDef const* def);
     void UpdateRescue(WowFatesActiveExpedition& active, Map* map);
     void FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage);
+    static void Pace(Creature* creature, float walk);
     void UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void PutFlag(WowFatesActiveExpedition& active, Map* map, WowFatesActiveExpedition::Flag& flag, bool ours);
     int64 TimeLeft(WowFatesActiveExpedition const& active) const;

@@ -3176,12 +3176,24 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
         ally->SetWalk(true);
         active.ally = ally->GetGUID();
         active.allyPlayers = 1;
+        active.caravanPace = active.caravanPace > 0.0f ? std::min(active.caravanPace, ally->GetSpeed(MOVE_WALK)) : ally->GetSpeed(MOVE_WALK);
         SpawnCaravan(active, map, ally);
     }
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
     active.allyHealthPct = std::max<int32>(5, int32(std::ceil(ally->GetHealthPct() / 5.0f)) * 5);
+
+    // all at the walk of the slowest of the caravan, his own too
+    if (active.caravanPace > 0.0f)
+    {
+        float const rate = active.caravanPace / baseMoveSpeed[MOVE_WALK];
+        Pace(ally, rate);
+        for (WowFatesActiveExpedition::Member const& member : active.members)
+            if (Creature* creature = member.dead || !member.guid ? nullptr : map->GetCreature(member.guid))
+                if (creature->IsAlive())
+                    Pace(creature, rate);
+    }
 
     // the caravan in a pack around him, at its places, at his pace; one that
     // lags behind out of a fight holds the pack back, and stuck there a while
@@ -3378,6 +3390,7 @@ void WowFatesExpeditionMgr::SpawnCaravan(WowFatesActiveExpedition& active, Map* 
         creature->GetMotionMaster()->MoveFollow(leader, member.dist, member.angle);
         member.guid = creature->GetGUID();
         member.baseHealth = creature->GetMaxHealth();
+        active.caravanPace = active.caravanPace > 0.0f ? std::min(active.caravanPace, creature->GetSpeed(MOVE_WALK)) : creature->GetSpeed(MOVE_WALK);
         member.setFor = 1;
         member.behind = 0;
         active.allies.push_back(member.guid); // healed as an ally, gone at the end
@@ -3478,6 +3491,7 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
             Active(active);
             continue;
         }
+        Pace(captive, WowFatesConf().captiveSpeed);
         if (!captive->IsInCombat())
         {
             captive->SetHomePosition(captive->GetPosition()); // back from a fight: here, not at his cage
@@ -3490,6 +3504,18 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
     // none left to free nor on the map
     if (active.rescueTotal && active.freed >= active.rescueTotal && active.allies.empty())
         end("no captive is left");
+}
+
+// A creature's walk at a rate of a walk's (2.5 yards a second), and its run
+// no faster: no flight, no chase, no run for the way out outruns it. Again
+// when something set them back (an aura's end updates the speeds).
+void WowFatesExpeditionMgr::Pace(Creature* creature, float walk)
+{
+    float const run = walk * baseMoveSpeed[MOVE_WALK] / baseMoveSpeed[MOVE_RUN];
+    if (std::fabs(creature->GetSpeedRate(MOVE_WALK) - walk) > 0.01f)
+        creature->SetSpeed(MOVE_WALK, walk);
+    if (std::fabs(creature->GetSpeedRate(MOVE_RUN) - run) > 0.01f)
+        creature->SetSpeed(MOVE_RUN, run);
 }
 
 // A cage opened (OnGather, its map's thread): its captive out, thankful,
@@ -3505,6 +3531,7 @@ void WowFatesExpeditionMgr::FreeCaptive(WowFatesActiveExpedition& active, GameOb
     captive->SetHomePosition(cage->GetPosition());
     captive->SetDefaultMovementType(IDLE_MOTION_TYPE);
     captive->SetWalk(true);
+    Pace(captive, WowFatesConf().captiveSpeed);
     captive->GetMotionMaster()->Initialize();
     Say(captive, CAPTIVE_SAY_FREED);
     if (!active.route.empty())

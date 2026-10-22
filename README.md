@@ -195,6 +195,7 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Object.MaxHeight` / `MaxSlope` | 6 / 0.5 | objects on flat ground about the centre's level |
 | `WowFates.Object.PathFactor` | 2.0 | objects reached on foot by a sensible walk |
 | `WowFates.Path.MaxSlope` | 1.0 | no path with a jump or a cliff |
+| `WowFates.Rescue.CaptiveSpeed` | 1.0 | the captives' walk, times a walk's; never faster |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
 | `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |
