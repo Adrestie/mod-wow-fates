@@ -2163,7 +2163,11 @@ bool WowFatesExpeditionMgr::ObjectPoint(WowFatesActiveExpedition const& active, 
         float const dist = reach * std::sqrt(frand(0.0f, 1.0f));
         float const x = c.x + dist * std::cos(angle);
         float const y = c.y + dist * std::sin(angle);
-        if (NearPlayer(active, x, y))
+        // away from the players first; a crate's or a cage's place, the second
+        // half of the tries, wherever: a crowd never keeps it from coming back
+        bool const anywhere = attempt >= 12 && (active.def->objectiveType == WOW_FATES_OBJECTIVE_GATHER
+            || active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE);
+        if (!anywhere && NearPlayer(active, x, y))
             continue;
         bool clear = true;
         for (Footing const& f : obstacles)
@@ -2526,12 +2530,21 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
     // a rescue's cages, once its way out is known (UpdateRescue): each walked to it
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE && active.route.empty())
         return;
-    // the first ones together; then one at a time, each in its own time
+    // the first ones together; then each one taken back in its own time
+    // (objectDue, GatherDelay from when it was taken), as many at once as are
+    // due; one gone otherwise (not taken), at once. After a round with no
+    // room, tried again two seconds later.
     bool const all = !active.gatherFilled;
-    if (!all && active.gatherTimer > 0)
+    if (active.gatherTimer > 0)
         return;
-
-    uint32 wanted = all ? def->gatherCount - uint32(active.objects.size()) : 1;
+    uint32 const missing = def->gatherCount - uint32(active.objects.size());
+    while (active.objectDue.size() > missing)
+        active.objectDue.erase(std::max_element(active.objectDue.begin(), active.objectDue.end()));
+    uint32 const ready = uint32(std::count_if(active.objectDue.begin(), active.objectDue.end(),
+        [&active](int64 due) { return due <= active.elapsed; })) + (missing - uint32(active.objectDue.size()));
+    uint32 wanted = all ? missing : ready;
+    if (!wanted)
+        return;
     // a rescue's: no more cages than captives left to free
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
     {
@@ -2602,9 +2615,12 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
     }
     if (placed)
         active.placeFails = 0;
-    // no room for all: the others are tried again soon
-    active.gatherTimer = placed < wanted ? int64(10 * IN_MILLISECONDS)
-        : GatherDelay(active);
+    // those put back out of the due ones (the earliest first); no room for
+    // all: the others are tried again two seconds later
+    std::sort(active.objectDue.begin(), active.objectDue.end());
+    for (uint32 i = 0; i < placed && !active.objectDue.empty() && active.objectDue.front() <= active.elapsed; ++i)
+        active.objectDue.erase(active.objectDue.begin());
+    active.gatherTimer = placed < wanted ? int64(2 * IN_MILLISECONDS) : 0;
     if (placed < wanted)
         LOG_DEBUG("module", "mod-wow-fates: Expedition {}: room for {} of {} objects, the others wait.", def->id, placed, wanted);
 }
@@ -2679,8 +2695,8 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
                     }
             active.guards.erase(go->GetGUID());
         }
-        if (active.gatherTimer <= 0)
-            active.gatherTimer = GatherDelay(active);
+        // back in its own time, the players there now
+        active.objectDue.push_back(active.elapsed + GatherDelay(active));
         return;
     }
 

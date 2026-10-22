@@ -319,7 +319,8 @@ struct WowFatesActiveExpedition
     // Gathering
     std::vector<ObjectGuid> objects; // out in the area
     int64 gatherTimer = 0;      // ms before the next one is put back
-    bool gatherFilled = false;  // the first ones are out: then one at a time
+    bool gatherFilled = false;  // the first ones are out: then each back in its own time
+    std::vector<int64> objectDue; // elapsed when each object taken is to be put back
     std::unordered_map<ObjectGuid, std::vector<ObjectGuid>> guards; // a sabotage's object: its guards
 
     // Monsters held back, the players having enough on them: sent when fewer fight
