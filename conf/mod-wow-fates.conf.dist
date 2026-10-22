@@ -243,9 +243,21 @@ WowFates.Expedition.AreaInterval        = 1000
 #    WowFates.Scaling.Ally
 #        See above.
 #
-#    WowFates.Chief.TalkGap
-#        A chief warns before his heaviest attacks only (an area, a cast to
-#        interrupt, a change of aggro), this many seconds apart at least.
+#    WowFates.Talk.WarningGap
+#        A chief warns before his heaviest attack only (his area, else his
+#        cast to interrupt, else his strike), this many seconds apart at least.
+#
+#    WowFates.Talk.Gap
+#        Seconds between two lines of a creature at least, whatever they are
+#        (a chief, an ally, an escort, a captive); its last words (a death, a
+#        fall, a victory, the end) always.
+#
+#    WowFates.Talk.GenericMin
+#    WowFates.Talk.GenericMax
+#        An ally's lines in the fight (a boss support's, an escort's waiting
+#        for the players): one every Min to Max seconds, at random, with a
+#        player near him only. Their health lines: at 75, 50 and 25 %, once
+#        each.
 #
 #    WowFates.Target.AddSeconds
 #    WowFates.Target.AddStep
@@ -295,7 +307,10 @@ WowFates.Scaling.Health                 = 0.75
 WowFates.Scaling.Damage                 = 0.4
 WowFates.Scaling.Boss                   = 1.11
 WowFates.Scaling.Ally                   = 1.0
-WowFates.Chief.TalkGap                  = 30
+WowFates.Talk.WarningGap                = 30
+WowFates.Talk.Gap                       = 20
+WowFates.Talk.GenericMin                = 60
+WowFates.Talk.GenericMax                = 120
 WowFates.Target.AddSeconds              = 15
 WowFates.Target.AddStep                 = 0.2
 WowFates.Waves.NextAt                   = 0.25

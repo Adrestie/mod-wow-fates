@@ -149,7 +149,10 @@ void WowFatesLoadConfig()
     c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.4f), 0.0f);
     c.scaleBoss = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Boss", 1.11f), 0.0f);
     c.scaleAlly = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Ally", 1.0f), 0.0f);
-    c.chiefTalkGap = sConfigMgr->GetOption<uint32>("WowFates.Chief.TalkGap", 30);
+    c.talkWarningGap = sConfigMgr->GetOption<uint32>("WowFates.Talk.WarningGap", 30);
+    c.talkGap = sConfigMgr->GetOption<uint32>("WowFates.Talk.Gap", 20);
+    c.talkGenericMin = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Talk.GenericMin", 60), 1);
+    c.talkGenericMax = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Talk.GenericMax", 120), c.talkGenericMin);
     c.targetAddSeconds = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddSeconds", 15.0f), 1.0f);
     c.targetAddStep = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddStep", 0.2f), 0.0f);
     c.waveNextAt = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.NextAt", 0.25f), 0.0f, 1.0f);

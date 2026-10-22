@@ -26,6 +26,7 @@
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "GameObject.h"
+#include "GameTime.h"
 #include "Item.h"
 #include "Log.h"
 #include "Mail.h"
@@ -3045,10 +3046,29 @@ namespace
         BOSS_SAY_TIMEOUT = 6 // a warlord: the time out, the players beaten
     };
 
-    void Say(Creature* creature, uint8 group)
+    // A creature's line (its creature_text group), Talk.Gap seconds after its
+    // last one at least, whatever they are; its last words (a death, a fall,
+    // a victory, the end) always.
+    void Say(Creature* creature, uint8 group, bool always = false)
     {
-        if (creature && creature->AI())
-            creature->AI()->Talk(group);
+        if (!creature || !creature->AI())
+            return;
+        static std::unordered_map<ObjectGuid, uint32> said;
+        uint32 const now = GameTime::GetGameTimeMS().count();
+        if (said.size() > 512)
+            std::erase_if(said, [now](auto const& pair) { return now - pair.second > 600000; });
+        auto itr = said.find(creature->GetGUID());
+        if (!always && itr != said.end() && now - itr->second < WowFatesConf().talkGap * IN_MILLISECONDS)
+            return;
+        said[creature->GetGUID()] = now;
+        creature->AI()->Talk(group);
+    }
+
+    // An ally's next line in the fight: Talk.GenericMin to GenericMax seconds.
+    int64 NextLine()
+    {
+        WowFatesConfig const& c = WowFatesConf();
+        return int64(urand(c.talkGenericMin, c.talkGenericMax)) * IN_MILLISECONDS;
     }
 }
 
@@ -3080,7 +3100,7 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
     if (ally && !ally->IsAlive())
     {
         active.allyHealthPct = 0;
-        Say(ally, ALLY_SAY_FALL);
+        Say(ally, ALLY_SAY_FALL, true);
         LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died, the elite at {} %.", def->id, uint32(active.progressPct));
         active.failed = true;
         return;
@@ -3118,8 +3138,8 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         return;
     if (!boss->IsAlive())
     {
-        Say(boss, BOSS_SAY_DEATH);
-        Say(ally, ALLY_SAY_VICTORY);
+        Say(boss, BOSS_SAY_DEATH, true);
+        Say(ally, ALLY_SAY_VICTORY, true);
         active.progressPct = 100.0;
         return;
     }
@@ -3140,8 +3160,8 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
             active.bossSaid |= 1;
             Say(boss, BOSS_SAY_START);
         }
-        static uint8 const marks[] = { 75, 50, 25, 10 };
-        for (uint8 i = 0; i < 4; ++i)
+        static uint8 const marks[] = { 75, 50, 25 };
+        for (uint8 i = 0; i < 3; ++i)
         {
             uint8 const bit = uint8(2 << i);
             if (!(active.bossSaid & bit) && boss->GetHealthPct() <= float(marks[i]))
@@ -3153,18 +3173,18 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         }
     }
 
-    // the ally's at 75, 50, 25 and 10 % of his own health, once each
+    // the ally's at 75, 50 and 25 % of his own health, once each
     if (ally && ally->IsAlive() && !active.inside.empty())
     {
-        static uint8 const marks[] = { 75, 50, 25, 10 };
-        for (uint8 i = 0; i < 4; ++i)
+        static uint8 const marks[] = { 75, 50, 25 };
+        for (uint8 i = 0; i < 3; ++i)
         {
             uint8 const bit = uint8(1 << i);
             if (!(active.allySaidHealth & bit) && ally->GetHealthPct() <= float(marks[i]))
             {
                 active.allySaidHealth |= bit;
                 Say(ally, uint8(ALLY_SAY_HEALTH_75 + i));
-                active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+                active.talkTimer = NextLine();
                 break;
             }
         }
@@ -3195,21 +3215,30 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         {
             active.said |= 1;
             Say(ally, ALLY_SAY_START);
-            active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+            active.talkTimer = NextLine();
         }
         else if (!(active.said & 2) && boss->GetHealthPct() <= 50.0f)
         {
             active.said |= 2;
             Say(ally, ALLY_SAY_HALF);
-            active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+            active.talkTimer = NextLine();
         }
         else
         {
+            // now and then, with a player near him to hear it
             active.talkTimer -= diff;
-            if (active.talkTimer <= 0)
+            bool heard = false;
+            for (ObjectGuid const& guid : active.inside)
+                if (Player* player = ObjectAccessor::FindPlayer(guid))
+                    if (player->IsInWorld() && player->GetMap() == map && player->IsWithinDist(ally, 40.0f))
+                    {
+                        heard = true;
+                        break;
+                    }
+            if (active.talkTimer <= 0 && heard)
             {
                 Say(ally, ALLY_SAY_FIGHT);
-                active.talkTimer = urand(20, 40) * IN_MILLISECONDS;
+                active.talkTimer = NextLine();
             }
         }
     }
@@ -3286,7 +3315,7 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
     if (ally && !ally->IsAlive())
     {
         active.allyHealthPct = 0;
-        Say(ally, ESCORT_SAY_FALL);
+        Say(ally, ESCORT_SAY_FALL, true);
         LOG_INFO("module", "mod-wow-fates: Expedition {}: its ally died, {} % of the route behind him.", def->id, uint32(active.progressPct));
         active.failed = true;
         return;
@@ -3372,7 +3401,7 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
     {
         active.said |= 1;
         Say(ally, ESCORT_SAY_START);
-        active.talkTimer = 30 * IN_MILLISECONDS;
+        active.talkTimer = NextLine();
     }
 
     // how far along: the farthest of the next points he stands at
@@ -3381,7 +3410,7 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
             active.routeIndex = uint32(j);
     if (active.routeIndex >= last)
     {
-        Say(ally, ESCORT_SAY_END);
+        Say(ally, ESCORT_SAY_END, true);
         ally->StopMoving();
         active.progressPct = 100.0;
         return;
@@ -3439,12 +3468,12 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
             if (active.talkTimer <= 0)
             {
                 Say(ally, ESCORT_SAY_WAIT);
-                active.talkTimer = 30 * IN_MILLISECONDS;
+                active.talkTimer = NextLine();
             }
         }
         return;
     }
-    active.talkTimer = std::max<int64>(active.talkTimer, 15 * IN_MILLISECONDS);
+    active.talkTimer = std::max<int64>(active.talkTimer, int64(WowFatesConf().talkGenericMin) * IN_MILLISECONDS / 2);
     if (motion->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
         motion->MovePoint(1, active.route[std::min<std::size_t>(active.routeIndex + 5, last)], FORCED_MOVEMENT_WALK);
 }
@@ -4028,6 +4057,19 @@ void WowFatesExpeditionMgr::DrawMechanics(WowFatesActiveExpedition& active, bool
         drawn.cooldown = int64(urand(mechanic->cooldownMin, mechanic->cooldownMax)) * IN_MILLISECONDS / 2;
         active.mechanics.push_back(drawn);
     }
+    // the one he warns of: his area, else his cast, else his strike
+    active.warning = nullptr;
+    for (uint8 role : { WOW_FATES_ROLE_AREA, WOW_FATES_ROLE_CAST, WOW_FATES_ROLE_STRIKE })
+    {
+        for (WowFatesActiveExpedition::Drawn const& drawn : active.mechanics)
+            if (drawn.mechanic->role == role)
+            {
+                active.warning = drawn.mechanic;
+                break;
+            }
+        if (active.warning)
+            break;
+    }
     LOG_INFO("module", "mod-wow-fates: Expedition {}: its chief, creature {}: {}.", def->id, Leader(active), Actions(active));
 }
 
@@ -4080,20 +4122,15 @@ void WowFatesExpeditionMgr::UseMechanic(WowFatesActiveExpedition& active, Map* m
             farthest = player;
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
 
-    // his words before the heaviest only (an area, a cast to interrupt, a
-    // change of aggro), Chief.TalkGap seconds apart at least: a warning, not
-    // a chatter
-    uint32 warning = 0;
-    if (mechanic->role == WOW_FATES_ROLE_AREA)
-        warning = WOW_FATES_STR_SAY_AREA;
-    else if (mechanic->role == WOW_FATES_ROLE_CAST)
-        warning = WOW_FATES_STR_SAY_CAST;
-    else if (mechanic->role == WOW_FATES_ROLE_AGGRO)
-        warning = WOW_FATES_STR_SAY_AGGRO;
-    if (warning && active.elapsed - active.lastWarning >= int64(WowFatesConf().chiefTalkGap) * IN_MILLISECONDS)
+    // his words before his heaviest attack only (DrawMechanics: his area,
+    // else his cast, else his strike), Talk.WarningGap seconds apart at least:
+    // a warning, not a chatter
+    if (mechanic == active.warning
+        && active.elapsed - active.lastWarning >= int64(WowFatesConf().talkWarningGap) * IN_MILLISECONDS)
     {
         active.lastWarning = active.elapsed;
-        Announce(boss, warning);
+        Announce(boss, mechanic->role == WOW_FATES_ROLE_AREA ? WOW_FATES_STR_SAY_AREA
+            : (mechanic->role == WOW_FATES_ROLE_CAST ? WOW_FATES_STR_SAY_CAST : WOW_FATES_STR_SAY_STRIKE));
     }
 
     // a spell's damage for the players: its damaging effects' points
@@ -4368,7 +4405,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
     }
     if (!boss->IsAlive())
     {
-        Say(boss, BOSS_SAY_DEATH);
+        Say(boss, BOSS_SAY_DEATH, true);
         active.progressPct = 100.0;
         return;
     }
@@ -4403,7 +4440,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
     }
     if (active.deadline && active.elapsed >= active.deadline)
     {
-        Say(boss, BOSS_SAY_TIMEOUT);
+        Say(boss, BOSS_SAY_TIMEOUT, true);
         LOG_INFO("module", "mod-wow-fates: Expedition {}: the time is out, its warlord at {} %.", def->id, uint32(100.0 - active.progressPct));
         active.failed = true;
         return;
@@ -4540,7 +4577,7 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
         && active->bossOut && creature->GetGUID() == active->boss)
     {
         if (def->objectiveType == WOW_FATES_OBJECTIVE_WARLORD)
-            Say(victim->ToCreature(), BOSS_SAY_DEATH);
+            Say(victim->ToCreature(), BOSS_SAY_DEATH, true);
         active->progressPct = 100.0;
         ++active->contributors[player->GetGUID()].kills;
         return;
