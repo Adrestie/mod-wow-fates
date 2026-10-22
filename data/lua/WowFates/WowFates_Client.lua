@@ -53,7 +53,9 @@
     8 sabotage, 9 escort, 10 rescue, 11 capture, 12 warlord:
     named in the map's tooltip), 1 when players are at it ("in progress" on the map), the tracker's
     second line (what there is to protect, or empty); "del" with id; "enter" and "leave"
-    with id; "end" with id and 1 or 0; "me" with id, kills and participation
+    with id; "zones" with id and a capture's positions, "x,y,radius,state,bar" separated by ";"
+    (state 0 the foe's, 1 being taken, 2 ours, 3 fought over: drawn on the maps in their colour);
+    "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
     "defend" with id and the ally's name, "escort" with id and the ally's name, "rescue" with id and the captives' name, "capture" with id and the banners' name, "warlord" with id and its name, "invoke" with id and the altar's
     name, "wave" with id, its number and the Expedition's words for it (a banner each); "sync" with level and percent kept.
@@ -74,6 +76,10 @@ local TEXTURE = "Interface\\WowFates\\Area"
 local TRACKER = "Interface\\WowFates\\Tracker"
 local SYNCED_SPELL = 96000
 local LINGER = 10                           -- seconds the block stays after leaving or the end
+-- A capture's positions on the maps: the foe's, being taken, ours, fought over
+local WHITE = { 1, 1, 1 }
+local ZONE_COLORS = { [0] = { 1, 0.25, 0.2 }, [1] = { 1, 0.85, 0.2 }, [2] = { 0.3, 0.6, 1 }, [3] = { 1, 0.5, 0.1 } }
+local zones = {}                            -- by Expedition id: its positions
 local STRIPS = 24                           -- strips across the minimap's diameter
 local MINIMAP_WAIT = 0.05                   -- the minimap is drawn again at most twenty times a second
 local TITLE_COLOR = { 1, 0.55, 0.2 }
@@ -165,6 +171,7 @@ local function onMessage(message)
     if command == "reset" then
         for k in pairs(expeditions) do expeditions[k] = nil end
         for k in pairs(rewards) do rewards[k] = nil end
+        for k in pairs(zones) do zones[k] = nil end
     elseif command == "set" and #f >= 12 and id then
         expeditions[id] = {
             id = id, map = tonumber(f[3]), x = tonumber(f[4]), y = tonumber(f[5]), r = tonumber(f[6]),
@@ -177,6 +184,13 @@ local function onMessage(message)
     elseif command == "del" and id then
         expeditions[id] = nil
         rewards[id] = nil
+        zones[id] = nil
+    elseif command == "zones" and id then
+        local list = {}
+        for x, y, r, state, bar in string.gmatch(f[3] or "", "(%-?[%d.]+),(%-?[%d.]+),([%d.]+),(%d),(%d+)") do
+            list[#list + 1] = { x = tonumber(x), y = tonumber(y), r = tonumber(r), state = tonumber(state), bar = tonumber(bar) }
+        end
+        zones[id] = list
     elseif command == "enter" and id then
         track.enter(id)
     elseif command == "leave" and id then
@@ -469,9 +483,30 @@ local function layoutWorld()
                     tex:SetWidth(ir - il)
                     tex:SetHeight(id - it)
                     tex:SetTexCoord((il - l) / (r - l), (ir - l) / (r - l), (it - t) / (d - t), (id - t) / (d - t))
+                    tex:SetVertexColor(1, 1, 1)
                     tex:Show()
                     placed[#placed + 1] = { e = e, cx = cx, cy = cy, rw = rw, rh = rh,
                                             vl = vl, vr = vr, vt = vt, vb = vb }
+                end
+            end
+            -- a capture's positions, in their colour, over its area
+            for _, z in ipairs(zones[e.id] or {}) do
+                local zx, zy, zrx, zry = onMap({ map = e.map, x = z.x, y = z.y, r = z.r }, b)
+                if zx then
+                    local cx, cy, rw, rh = zx * W, zy * H, zrx * W, zry * H
+                    local l, r, t, d = cx - rw, cx + rw, cy - rh, cy + rh
+                    local il, ir, it, id = math.max(l, vl), math.min(r, vr), math.max(t, vt), math.min(d, vb)
+                    if ir > il and id > it then
+                        used = used + 1
+                        local tex = worldTexture(used)
+                        tex:ClearAllPoints()
+                        tex:SetPoint("TOPLEFT", f, "TOPLEFT", il, -it)
+                        tex:SetWidth(ir - il)
+                        tex:SetHeight(id - it)
+                        tex:SetTexCoord((il - l) / (r - l), (ir - l) / (r - l), (it - t) / (d - t), (id - t) / (d - t))
+                        tex:SetVertexColor(unpack(ZONE_COLORS[z.state] or ZONE_COLORS[0]))
+                        tex:Show()
+                    end
                 end
             end
         end
@@ -605,6 +640,19 @@ local function minimapAreas()
             if reach < R + r then
                 list[#list + 1] = { e = e, cx = cx, cy = cy, r = r }
             end
+            -- a capture's positions, in their colour
+            for _, z in ipairs(zones[e.id] or {}) do
+                local ze, zn = wy - z.y, z.x - wx
+                local zx, zy = ze, zn
+                if facing then
+                    local c, s = math.cos(facing), math.sin(facing)
+                    zx, zy = ze * c + zn * s, -ze * s + zn * c
+                end
+                local zcx, zcy, zr = R + zx * u, R - zy * u, z.r * u
+                if math.sqrt((zcx - R) ^ 2 + (zcy - R) ^ 2) < R + zr then
+                    list[#list + 1] = { e = e, cx = zcx, cy = zcy, r = zr, color = ZONE_COLORS[z.state] or ZONE_COLORS[0] }
+                end
+            end
         end
     end
     mini.kept = list
@@ -630,6 +678,7 @@ local function drawMinimap()
                     t:SetPoint("CENTER", s.child, "TOPLEFT", a.cx - x0, -(a.cy - s.top))
                     t:SetWidth(a.r * 2)
                     t:SetHeight(a.r * 2)
+                    t:SetVertexColor(unpack(a.color or WHITE))
                     t:Show()
                 end
             end

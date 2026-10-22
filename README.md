@@ -66,11 +66,13 @@ ones and rewards for those who take part.
     `time_limit` runs out, one led out is enough (the rewards by the share
     led out); it fails only when none is led out (`max_losses` is no longer
     read).
-  - *Capture*: two or three of the foe's banners, far apart, to take (a
-    one second cast) and hold against his squads, which take one back when
-    they stand at its foot with no player near. The bar is the time they
-    are held (`hold_time` holding them all); `time_limit` out first, it
-    fails.
+  - *Capture*: two or three positions, far apart, each a circle shown on
+    the maps and by torches on the ground, the foe's banner in its middle,
+    taken as the towers of Hellfire Peninsula: players in it and no foe,
+    its bar fills (`hold_time` seconds for one player, faster with more); a
+    foe in it, it waits until all are dead; foes alone, it empties. Full,
+    Stormwind's banner goes up. The bar is theirs together; squads of the
+    foe come at them; `time_limit` out first, it fails.
   - *Warlord*: a unique elite (always an elite, bigger) whose phases, at
     the marks of `boss_waves`, bring his words, reinforcements and one
     more of his blows (`boss_spells`). The bar is the health he lost;

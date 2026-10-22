@@ -35,9 +35,10 @@
 --      Hexed Trolls on the Echo Isles, five to lead out in ten minutes; one
 --      led out by then is enough, all of them lost fails it
 --  13  Banners over Molsen Farm, Elwynn Forest, level 9, capture: three
---      Defias Standards (gameobject 960003) to take and hold, Stormwind's
---      (960004) put up in their place, against squads of Defias Bandits;
---      ten minutes
+--      positions, a Defias Standard (gameobject 960003) in the middle of
+--      each, torches around (960005), taken by standing in them as the
+--      towers of Hellfire Peninsula, Stormwind's banner (960004) then;
+--      squads of Defias Bandits come to take them back; ten minutes
 --  14  Hogger's Rampage, Elwynn Forest, level 11, warlord: Hogger (creature
 --      96102) at his camp, the game's own Hogger kept away meanwhile; his
 --      pack at 25, 50 and 75 % of the bar, a blow more each time; eight
@@ -82,7 +83,7 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (12, 'Zalazane''s Captives', 9, 10, 0, 5,  3207, 5, 20, 70,   0, 0, 1, 1, 'Durotar: Darkspear captives caged by Zalazane''s Hexed Trolls on the Echo Isles',
    'Zalazane''s Hexed Trolls keep Darkspear captives caged on the Echo Isles: open the cages and see the captives safely off the island.', 'Free the Darkspear captives', ''),
 (13, 'Banners over Molsen Farm', 9, 11, 0, 1,  116, 4, 25, 60,   0, 0, 1, 1, 'Elwynn Forest: the Defias Standards of Molsen Farm, Defias Bandits about',
-   'The Defias have raised their standards over Molsen Farm: take them down, raise Stormwind''s in their place and hold them until the farm is ours again.', 'Hold the farm''s standards', 'The Defias come to take back a standard!'),
+   'The Defias have raised their standards over Molsen Farm: take each of their positions by standing your ground there until Stormwind''s banner flies over it, and clear the Defias out of them.', 'Take the farm''s positions', 'The Defias come to take back a standard!'),
 (14, 'Hogger''s Rampage', 11, 12, 448, 1, 478, 3, 25, 45,   0, 0, 1, 1, 'Elwynn Forest: Hogger, the gnoll warlord, at his camp, Riverpaw Outrunners about',
    'Hogger has gathered the Riverpaw gnolls at his camp and leads them himself: bring the gnoll warlord down before he slips away into the forest.', 'Defeat Hogger', 'Hogger calls the Riverpaw!');
 
@@ -103,7 +104,7 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
   `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `caravan`, `comment`) VALUES
 (11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '96205,96205,96206', 'Remy''s Wares: Remy and his caravan (two militiamen, his packhorse) walk the hill road; Defias Cutpurses ambush them at 25, 50 and 75 % of it'),
 (12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 600, 0,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out in ten minutes; one led out by then is enough (rewards by the share led out), all lost fails it'),
-(13,    0, 70, 960003, 3, 5,      0, 180, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 2, 960004, '', '', 'Banners over Molsen Farm: three standards, three minutes holding them all (nine holding one), ten minutes from the first player; a squad every 45 s at one held'),
+(13,    0, 70, 960003, 3, 5,      0,  60, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 0, 960004, '', '', 'Banners over Molsen Farm: three positions, a minute standing in one alone takes it, ten minutes from the first player; a squad every 45 s or so'),
 (14, 96102, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '6730,6016,6268,8599', '', 'Hogger''s Rampage: Head Butt, then Pierce Armor, Rushing Charge and Enrage at 25, 50 and 75 % of the bar, the pack each time; eight minutes');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
@@ -229,15 +230,15 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (12, 'ruRU', 'Пленники Залазана',
    'Проклятые тролли Залазана держат в клетках пленников из племени Черного Копья на островах Эха: откройте клетки и выведите пленников с острова живыми.', 'Освободите пленников Черного Копья', ''),
 (13, 'frFR', 'Bannières sur la ferme des Molsen',
-   'Les Défias ont planté leurs étendards sur la ferme des Molsen : abattez-les, dressez ceux de Hurlevent à leur place et tenez-les jusqu''à ce que la ferme soit reprise.', 'Tenez les étendards de la ferme', 'Les Défias viennent reprendre un étendard !'),
+   'Les Défias ont planté leurs étendards sur la ferme des Molsen : prenez chacune de leurs positions en y tenant bon jusqu''à ce que flotte la bannière de Hurlevent, et chassez-en les Défias.', 'Prenez les positions de la ferme', 'Les Défias viennent reprendre un étendard !'),
 (13, 'deDE', 'Banner über Molsens Hof',
-   'Die Defias haben ihre Standarten über Molsens Hof gehisst: Holt sie ein, hisst an ihrer Stelle die von Sturmwind und haltet sie, bis der Hof zurückerobert ist.', 'Haltet die Standarten des Hofs', 'Die Defias wollen eine Standarte zurückerobern!'),
+   'Die Defias haben ihre Standarten über Molsens Hof gehisst: Nehmt jede ihrer Stellungen ein, indem Ihr dort ausharrt, bis das Banner von Sturmwind darüber weht, und vertreibt die Defias daraus.', 'Nehmt die Stellungen des Hofs ein', 'Die Defias wollen eine Standarte zurückerobern!'),
 (13, 'esES', 'Estandartes sobre la granja Molsen',
-   'Los Defias han alzado sus estandartes sobre la granja Molsen: derríbalos, alza los de Ventormenta en su lugar y mantenlos hasta recuperar la granja.', 'Mantén los estandartes de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
+   'Los Defias han alzado sus estandartes sobre la granja Molsen: toma cada una de sus posiciones resistiendo en ella hasta que ondee el estandarte de Ventormenta, y expulsa de allí a los Defias.', 'Toma las posiciones de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
 (13, 'esMX', 'Estandartes sobre la granja Molsen',
-   'Los Defias han alzado sus estandartes sobre la granja Molsen: derríbalos, alza los de Ventormenta en su lugar y mantenlos hasta recuperar la granja.', 'Mantén los estandartes de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
+   'Los Defias han alzado sus estandartes sobre la granja Molsen: toma cada una de sus posiciones resistiendo en ella hasta que ondee el estandarte de Ventormenta, y expulsa de allí a los Defias.', 'Toma las posiciones de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
 (13, 'ruRU', 'Знамёна над фермой Молсенов',
-   'Братство Справедливости подняло свои штандарты над фермой Молсенов: сорвите их, поднимите на их месте штандарты Штормграда и удерживайте их, пока ферма не будет отбита.', 'Удерживайте штандарты фермы', 'Братство идёт отбить штандарт!'),
+   'Братство Справедливости подняло свои штандарты над фермой Молсенов: займите каждую их позицию, удерживая её, пока над ней не взовьётся знамя Штормграда, и выбейте оттуда разбойников.', 'Займите позиции фермы', 'Братство идёт отбить штандарт!'),
 (14, 'frFR', 'Le saccage de Lardeur',
    'Lardeur a rassemblé les gnolls Rivepatte dans son camp et les mène lui-même : abattez le chef de guerre gnoll avant qu''il ne disparaisse dans la forêt.', 'Abattez Lardeur', 'Lardeur appelle les Rivepatte !'),
 (14, 'deDE', 'Hoggers Raserei',

@@ -13,11 +13,13 @@
 --           cage of Stranglethorn's trolls (display 6858, Cage01), a
 --           gathering's object: its captive comes out (creature 96204).
 --   960003  Defias Standard: Banners over Molsen Farm (Elwynn Forest, level
---           9), the foe's banner, a battlefield's neutral one (display
---           6211): a one second cast takes it, as a gathering's object.
+--           9), the foe's banner in the middle of a position, a
+--           battlefield's neutral one (display 6211); nothing to do with it
+--           (type 5, no script): a position is taken by standing in it.
 --   960004  Stormwind Standard: the same, once taken, a battlefield's of the
---           Alliance (display 5651), of the zone's side; nothing to do with
---           it (type 5, no script).
+--           Alliance (display 5651), of the zone's side.
+--   960005  Position Torch: the torches around a capture's position, its
+--           circle on the ground (display 4094, a freestanding torch).
 --   960100  Ritual Altar: Harpy Ritual (Durotar, level 8).
 --
 -- Each is a goober (type 10) whose ScriptName hands the click to the module:
@@ -44,9 +46,12 @@ INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconNa
 (960002, 10, 6858, 'Voodoo Cage', '', '', '', 1,
   43, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   '', 'go_wow_fates_gather', 0),
-(960003, 10, 6211, 'Defias Standard', '', '', '', 1,
-  43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  '', 'go_wow_fates_gather', 0),
+(960003, 5, 6211, 'Defias Standard', '', '', '', 1,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  '', '', 0),
+(960005, 5, 4094, 'Position Torch', '', '', '', 1,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  '', '', 0),
 (960004, 5, 5651, 'Stormwind Standard', '', '', '', 1,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   '', '', 0),
@@ -85,4 +90,9 @@ INSERT INTO `gameobject_template_locale` (`entry`, `locale`, `name`, `castBarCap
 (960004, 'deDE', 'Standarte von Sturmwind', '', 0),
 (960004, 'esES', 'Estandarte de Ventormenta', '', 0),
 (960004, 'esMX', 'Estandarte de Ventormenta', '', 0),
-(960004, 'ruRU', 'Штандарт Штормграда', '', 0);
+(960004, 'ruRU', 'Штандарт Штормграда', '', 0),
+(960005, 'frFR', 'Torche de position', '', 0),
+(960005, 'deDE', 'Stellungsfackel', '', 0),
+(960005, 'esES', 'Antorcha de posición', '', 0),
+(960005, 'esMX', 'Antorcha de posición', '', 0),
+(960005, 'ruRU', 'Факел позиции', '', 0);

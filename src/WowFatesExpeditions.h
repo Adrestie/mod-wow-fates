@@ -54,9 +54,11 @@
  *     each captive runs for the way out, the bar is those led out; when
  *     time_limit runs out, one led out is enough (the rewards by the share
  *     led out); it fails only when none is led out and all are lost;
- *  11 capture: two or three of the foe's banners to take and hold against
- *     his squads; the bar is the time they are held, the Expedition fails
- *     when time_limit runs out first;
+ *  11 capture: two or three positions, circles shown on the map and on the
+ *     ground, taken as the towers of Hellfire Peninsula: players in one and
+ *     no foe, its bar fills; a foe in it, it waits until all are dead; only
+ *     foes, it empties. The bar is theirs together, the Expedition fails when
+ *     time_limit runs out first;
  *  12 warlord: a unique elite with phases (its words, reinforcements, one
  *     more blow at each mark of boss_waves); the bar is the health it lost,
  *     the Expedition fails when time_limit runs out first.
@@ -321,9 +323,20 @@ struct WowFatesActiveExpedition
     uint32 lost = 0;
     double rewardShare = 1.0;   // of each reward: a rescue done when its time ran out, the share led out
 
-    // Capture: its banners, the foe's or taken; the foe at the foot of a taken one
-    struct Flag { ObjectGuid go; Position pos; bool ours = false; int64 contest = 0; };
+    // Capture: its positions, each a circle with a banner in its middle and
+    // torches around; its bar (0 the foe's, 100 ours), whose it is, what the
+    // map shows of it (0 the foe's, 1 being taken, 2 ours, 3 fought over)
+    struct Flag
+    {
+        ObjectGuid go;
+        Position pos;
+        bool ours = false;
+        float bar = 0.0f;
+        uint8 state = 0;
+        std::vector<ObjectGuid> markers;
+    };
     std::vector<Flag> flags;
+    std::string sentZones;      // the positions the clients last heard of
 
     // Warlord: its phase (the marks of boss_waves passed), the next blow
     uint32 phase = 0;
@@ -441,6 +454,9 @@ private:
     void UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void PutFlag(WowFatesActiveExpedition& active, Map* map, WowFatesActiveExpedition::Flag& flag, bool ours);
     int64 TimeLeft(WowFatesActiveExpedition const& active) const;
+    void PutMarkers(Map* map, WowFatesActiveExpedition::Flag& flag);
+    std::string ZonesLine(WowFatesActiveExpedition const& active) const;
+    void BroadcastZones(WowFatesActiveExpedition& active, bool force = false);
     void UpdateWarlord(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
