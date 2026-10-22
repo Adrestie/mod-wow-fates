@@ -4080,16 +4080,20 @@ void WowFatesExpeditionMgr::UseMechanic(WowFatesActiveExpedition& active, Map* m
             farthest = player;
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
 
-    // his words before it
-    switch (mechanic->role)
+    // his words before the heaviest only (an area, a cast to interrupt, a
+    // change of aggro), Chief.TalkGap seconds apart at least: a warning, not
+    // a chatter
+    uint32 warning = 0;
+    if (mechanic->role == WOW_FATES_ROLE_AREA)
+        warning = WOW_FATES_STR_SAY_AREA;
+    else if (mechanic->role == WOW_FATES_ROLE_CAST)
+        warning = WOW_FATES_STR_SAY_CAST;
+    else if (mechanic->role == WOW_FATES_ROLE_AGGRO)
+        warning = WOW_FATES_STR_SAY_AGGRO;
+    if (warning && active.elapsed - active.lastWarning >= int64(WowFatesConf().chiefTalkGap) * IN_MILLISECONDS)
     {
-        case WOW_FATES_ROLE_STRIKE:  if (urand(0, 1)) Announce(boss, WOW_FATES_STR_SAY_STRIKE); break;
-        case WOW_FATES_ROLE_AREA:    Announce(boss, WOW_FATES_STR_SAY_AREA); break;
-        case WOW_FATES_ROLE_CONTROL: if (urand(0, 1)) Announce(boss, WOW_FATES_STR_SAY_CONTROL); break;
-        case WOW_FATES_ROLE_AGGRO:   Announce(boss, WOW_FATES_STR_SAY_AGGRO); break;
-        case WOW_FATES_ROLE_CAST:    Announce(boss, WOW_FATES_STR_SAY_CAST); break;
-        case WOW_FATES_ROLE_BUFF:    Announce(boss, WOW_FATES_STR_SAY_BUFF); break;
-        default: break;
+        active.lastWarning = active.elapsed;
+        Announce(boss, warning);
     }
 
     // a spell's damage for the players: its damaging effects' points

@@ -243,6 +243,10 @@ WowFates.Expedition.AreaInterval        = 1000
 #    WowFates.Scaling.Ally
 #        See above.
 #
+#    WowFates.Chief.TalkGap
+#        A chief warns before his heaviest attacks only (an area, a cast to
+#        interrupt, a change of aggro), this many seconds apart at least.
+#
 #    WowFates.Target.AddSeconds
 #    WowFates.Target.AddStep
 #        The kills' speed: the time a monster of an Expedition should take to
@@ -291,6 +295,7 @@ WowFates.Scaling.Health                 = 0.75
 WowFates.Scaling.Damage                 = 0.4
 WowFates.Scaling.Boss                   = 1.11
 WowFates.Scaling.Ally                   = 1.0
+WowFates.Chief.TalkGap                  = 30
 WowFates.Target.AddSeconds              = 15
 WowFates.Target.AddStep                 = 0.2
 WowFates.Waves.NextAt                   = 0.25

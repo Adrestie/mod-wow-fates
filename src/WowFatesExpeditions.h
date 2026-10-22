@@ -419,6 +419,7 @@ struct WowFatesActiveExpedition
     bool drawn = false;
     uint32 mechanicPhase = 0;   // his health past 75, 50, 25 %: 0 to 3
     float cooldownScale = 1.0f; // each phase his mechanics come back sooner
+    int64 lastWarning = -1000000; // elapsed, his last warning before a heavy attack
     int64 leapAt = 0;           // elapsed when a leap lands, its spell then
     uint32 leapSpell = 0;
     uint32 summonEntry = 0;     // its monsters, when not summon_entry (a warlord's band)

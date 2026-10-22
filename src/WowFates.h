@@ -174,6 +174,7 @@ struct WowFatesConfig
     float scaleDamage = 0.4f;        // a monster's or a chief's damage: times the players to this power
     float scaleBoss = 1.11f;         // a boss's or a chief's health: x the players to this power (x60 for forty)
     float scaleAlly = 1.0f;          // an ally's health: x (1 + this x (players - 1))
+    uint32 chiefTalkGap = 30;        // s between two of a chief's warnings at least
     float targetAddSeconds = 15.0f;  // the time a monster should take to kill: their health follows it, wave after wave
     float targetAddStep = 0.2f;      // how far their health moves toward it at once (0.2: by a fifth)
     float waveNextAt = 0.25f;        // a wave comes once the last one is down to this share alive: they follow, never pile up
