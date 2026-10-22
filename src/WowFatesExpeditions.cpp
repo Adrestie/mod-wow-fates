@@ -2604,7 +2604,7 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
         active.placeFails = 0;
     // no room for all: the others are tried again soon
     active.gatherTimer = placed < wanted ? int64(10 * IN_MILLISECONDS)
-        : int64(float(def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
+        : GatherDelay(active);
     if (placed < wanted)
         LOG_DEBUG("module", "mod-wow-fates: Expedition {}: room for {} of {} objects, the others wait.", def->id, placed, wanted);
 }
@@ -2680,7 +2680,7 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
             active.guards.erase(go->GetGUID());
         }
         if (active.gatherTimer <= 0)
-            active.gatherTimer = int64(float(active.def->gatherRespawn) * frand(0.6f, 1.4f) * IN_MILLISECONDS);
+            active.gatherTimer = GatherDelay(active);
         return;
     }
 
@@ -4821,8 +4821,28 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
 double WowFatesExpeditionMgr::Needed(WowFatesActiveExpedition const& active) const
 {
     float const players = float(std::max<std::size_t>(active.inside.size(), 1));
-    double const needed = double(active.def->objectiveCount) * (1.0 + WowFatesConf().participantScaling * (players - 1.0f));
+    WowFatesConfig const& c = WowFatesConf();
+    // objects to take (a gathering, a sabotage, a rescue): x the players to
+    // the power Gather.Scaling (the square root), the objects put back as
+    // much faster (GatherDelay); the kills: ParticipantScaling as ever
+    uint8 const type = active.def->objectiveType;
+    double const needed = type == WOW_FATES_OBJECTIVE_GATHER || type == WOW_FATES_OBJECTIVE_SABOTAGE || type == WOW_FATES_OBJECTIVE_RESCUE
+        ? std::min(double(active.def->objectiveCount) * std::pow(double(players), double(c.gatherScaling)), double(c.objectMaxCount))
+        : double(active.def->objectiveCount) * (1.0 + c.participantScaling * (players - 1.0f));
     return std::max(needed, 1.0);
+}
+
+// The time before a gathering's object taken is put back: gather_respawn,
+// 0.6 to 1.4 times, shorter as the players are more (their number to the
+// power Gather.Scaling), Object.RespawnFloor at least: never more objects on
+// the ground, but back fast, one at a time.
+int64 WowFatesExpeditionMgr::GatherDelay(WowFatesActiveExpedition const& active) const
+{
+    WowFatesConfig const& c = WowFatesConf();
+    float const players = float(std::max<std::size_t>(active.inside.size(), 1));
+    float const quicker = std::pow(players, c.gatherScaling);
+    return std::max<int64>(int64(c.objectRespawnFloor) * IN_MILLISECONDS,
+        int64(float(active.def->gatherRespawn) * frand(0.6f, 1.4f) / quicker * IN_MILLISECONDS));
 }
 
 void WowFatesExpeditionMgr::OnLogout(Player* player)
@@ -5054,6 +5074,13 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
             if (type == WOW_FATES_OBJECTIVE_SABOTAGE)
                 alive += def.gatherCount * def.waveSize;
             std::string line = Acore::StringFormat("  {} players: ", n);
+            if (type == WOW_FATES_OBJECTIVE_GATHER || type == WOW_FATES_OBJECTIVE_SABOTAGE || type == WOW_FATES_OBJECTIVE_RESCUE)
+            {
+                double const asked = std::min(double(def.objectiveCount) * std::pow(double(n), double(c.gatherScaling)), double(c.objectMaxCount));
+                float const delay = std::max(float(c.objectRespawnFloor), float(def.gatherRespawn) / std::pow(float(n), c.gatherScaling));
+                line += Acore::StringFormat("objects: {:.0f} asked ({:.1f} % each), {} out at once, one back every {:.1f} s or so; ",
+                    std::ceil(asked - 0.001), 100.0 / std::max(asked, 1.0), def.gatherCount, delay);
+            }
             if (waves)
                 line += Acore::StringFormat("wave 1: {} ({}-{}), wave 4: {} ({}-{}); ", wave(0, 1.0f), wave(0, c.wavePaceMin),
                     wave(0, c.wavePaceMax), wave(3, 1.0f), wave(3, c.wavePaceMin), wave(3, c.wavePaceMax));

@@ -243,6 +243,17 @@ WowFates.Expedition.AreaInterval        = 1000
 #    WowFates.Scaling.Ally
 #        See above.
 #
+#    WowFates.Gather.Scaling
+#        A gathering's, a sabotage's or a rescue's objects asked: their number
+#        for one player times the players to this power (0.5, the square root:
+#        x6.3 for forty), instead of ParticipantScaling; the objects out at
+#        once stay as many, each put back that many times faster.
+#
+#    WowFates.Object.RespawnFloor
+#    WowFates.Object.MaxCount
+#        Such an object put back no sooner than RespawnFloor seconds; no
+#        more than MaxCount of them asked.
+#
 #    WowFates.Chain.MinStages
 #    WowFates.Chain.MaxStages
 #        A chain (type 13): its stages, Expeditions of its zone, drawn
@@ -320,6 +331,9 @@ WowFates.Scaling.Health                 = 0.75
 WowFates.Scaling.Damage                 = 0.4
 WowFates.Scaling.Boss                   = 1.11
 WowFates.Scaling.Ally                   = 1.0
+WowFates.Gather.Scaling                 = 0.5
+WowFates.Object.RespawnFloor            = 1
+WowFates.Object.MaxCount                = 50
 WowFates.Chain.MinStages                = 2
 WowFates.Chain.MaxStages                = 5
 WowFates.Chain.Pause                    = 15

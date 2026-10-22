@@ -175,6 +175,9 @@ struct WowFatesConfig
     float scaleDamage = 0.4f;        // a monster's or a chief's damage: times the players to this power
     float scaleBoss = 1.11f;         // a boss's or a chief's health: x the players to this power (x60 for forty)
     float scaleAlly = 1.0f;          // an ally's health: x (1 + this x (players - 1))
+    float gatherScaling = 0.5f;      // a gathering's, a sabotage's, a rescue's objects asked: x the players to this power; put back as much faster
+    uint32 objectRespawnFloor = 1;   // s, an object put back no sooner
+    uint32 objectMaxCount = 50;      // objects asked at most
     uint32 chainMinStages = 2;       // a chain: its stages, drawn between these
     uint32 chainMaxStages = 5;
     uint32 chainPause = 15;          // s between a stage done and the next

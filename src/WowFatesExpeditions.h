@@ -589,6 +589,7 @@ private:
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;
     double Needed(WowFatesActiveExpedition const& active) const;
+    int64 GatherDelay(WowFatesActiveExpedition const& active) const;
     // Ended: success, failure, or gone for lack of activity (quietly).
     void Finish(WowFatesActiveExpedition& active, bool success, bool expired = false);
     void Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part);
