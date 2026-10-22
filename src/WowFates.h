@@ -90,6 +90,7 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_HELD_TIME          = 43,  // the tracker's second line: banners held, time left
     WOW_FATES_STR_HELD               = 44,  // the same, with no time limit
     WOW_FATES_STR_TIME_LEFT          = 45,  // the tracker's second line: a warlord's time left
+    WOW_FATES_STR_CARAVAN            = 46,  // the tracker's second line: an escort's leader's health, his caravan standing
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,

@@ -21,6 +21,10 @@
 --          3254), of faction 495, without his town's immunity (unit_flags
 --          512) nor his shop, with his words (creature_text). He heals
 --          between two fights: his road is long (RegenHealth 1).
+--   96205  Goldshire Militiaman: the guards of Remy's caravan (level 6), a
+--          Stormwind guard's look (display 3167), of faction 495.
+--   96206  Remy's Packhorse: the beast of his caravan (level 6), a brown
+--          horse of the game (284, display 2404), of faction 495.
 --   96204  Darkspear Captive: the captives of Zalazane's Captives (Durotar,
 --          level 8), Darkspear trolls of four looks (the trolls of Sen'jin,
 --          displays 4070, 4073 to 4075), of faction 495, with their words.
@@ -146,6 +150,28 @@ UPDATE `wow_fates_creature` SET
 INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
 DROP TEMPORARY TABLE `wow_fates_creature`;
 
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 68;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96205, `name` = 'Goldshire Militiaman', `subname` = '',
+  `minlevel` = 6, `maxlevel` = 6, `rank` = 0, `faction` = 495,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
+  `HealthModifier` = 2.5, `DamageModifier` = 1, `ArmorModifier` = 1.2,
+  `RegenHealth` = 1, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
+CREATE TEMPORARY TABLE `wow_fates_creature` SELECT * FROM `creature_template` WHERE `entry` = 284;
+UPDATE `wow_fates_creature` SET
+  `entry` = 96206, `name` = 'Remy''s Packhorse', `subname` = '',
+  `minlevel` = 6, `maxlevel` = 6, `rank` = 0, `faction` = 495,
+  `gossip_menu_id` = 0, `npcflag` = 0, `flags_extra` = 0, `unit_flags` = 0,
+  `HealthModifier` = 2, `DamageModifier` = 0.5, `ArmorModifier` = 1,
+  `RegenHealth` = 1, `AIName` = '', `ScriptName` = '',
+  `KillCredit1` = 0, `KillCredit2` = 0;
+INSERT INTO `creature_template` SELECT * FROM `wow_fates_creature`;
+DROP TEMPORARY TABLE `wow_fates_creature`;
+
 DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (96100, 0, 2357, 1.35, 1, 0),
@@ -159,7 +185,9 @@ INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`,
 (96204, 1, 4073, 1, 1, 0),
 (96204, 2, 4074, 1, 1, 0),
 (96204, 3, 4075, 1, 1, 0),
-(96102, 0, 384, 1, 1, 0);
+(96102, 0, 384, 1, 1, 0),
+(96205, 0, 3167, 1, 1, 0),
+(96206, 0, 2404, 1, 1, 0);
 
 DELETE FROM `creature_template_locale` WHERE `entry` BETWEEN 96100 AND 96399;
 INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `VerifiedBuild`) VALUES
@@ -202,7 +230,17 @@ INSERT INTO `creature_template_locale` (`entry`, `locale`, `Name`, `Title`, `Ver
 (96102, 'deDE', 'Hogger', '', 0),
 (96102, 'esES', 'Hogger', '', 0),
 (96102, 'esMX', 'Hogger', '', 0),
-(96102, 'ruRU', 'Дробитель', '', 0);
+(96102, 'ruRU', 'Дробитель', '', 0),
+(96205, 'frFR', 'Milicien de Goldshire', '', 0),
+(96205, 'deDE', 'Milizsoldat von Goldhain', '', 0),
+(96205, 'esES', 'Miliciano de Villadorada', '', 0),
+(96205, 'esMX', 'Miliciano de Villadorada', '', 0),
+(96205, 'ruRU', 'Ополченец из Златоземья', '', 0),
+(96206, 'frFR', 'Cheval de bât de Remy', '', 0),
+(96206, 'deDE', 'Remys Packpferd', '', 0),
+(96206, 'esES', 'Caballo de carga de Remy', '', 0),
+(96206, 'esMX', 'Caballo de carga de Remy', '', 0),
+(96206, 'ruRU', 'Вьючная лошадь Реми', '', 0);
 
 -- Its blows: the Bandit's Snap Kick, more often, and the Bodyguard's Disarm.
 DELETE FROM `smart_scripts` WHERE `entryorguid` BETWEEN 96100 AND 96399 AND `source_type` = 0;

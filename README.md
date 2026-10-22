@@ -55,7 +55,9 @@ ones and rewards for those who take part.
     elite; the bar is the health the elite lost, and the Expedition fails if
     the ally falls. The ally speaks now and then (said, in five languages).
   - *Escort*: an ally (a known figure of the zone) walks a route while
-    players are near him, waits otherwise; ambushes at fixed marks of it.
+    players are near him, waits otherwise; his caravan (`caravan`: guards,
+    beasts, wagons) in a pack around him, waiting for one that lags behind;
+    ambushes at fixed marks of it.
     The bar is the route behind him; he dies, it fails. The route is the
     spawn point's `path`, each leg walked as a player would.
   - *Rescue*: cages to open (a one second cast) spread over the area, each

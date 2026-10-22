@@ -47,9 +47,9 @@
  *     dies;
  *   8 sabotage: guarded enemy objects to wreck, spread over the area and put
  *     back as they go (a gathering whose objects each have their guards);
- *   9 escort: an ally walks a route while players are near him, ambushed at
- *     the bar's marks; the bar is the route behind him, the Expedition fails
- *     when he dies;
+ *   9 escort: an ally walks a route while players are near him, his caravan
+ *     around him in a pack, ambushed at the bar's marks; the bar is the route
+ *     behind him, the Expedition fails when he dies;
  *  10 rescue: cages to open, spread over the area as a gathering's objects;
  *     each captive runs for the way out, the bar is those led out, the
  *     Expedition fails when more than max_losses die;
@@ -169,6 +169,7 @@ struct WowFatesExpeditionDef
     uint32 maxLosses = 2;                              // rescue: captives that may die
     uint32 takenEntry = 0;                             // capture: the banner once taken (gameobject)
     std::vector<uint32> bossSpells;                    // warlord: its blows, one more with each phase
+    std::vector<uint32> caravan;                       // escort: the others of the caravan, around its leader
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -299,6 +300,20 @@ struct WowFatesActiveExpedition
     std::vector<Position> route;
     std::vector<float> routeAt;
     uint32 routeIndex = 0;
+    // its caravan: each one at its place around the leader (an angle from his
+    // facing, a distance), its health for one player
+    struct Member
+    {
+        ObjectGuid guid;
+        uint32 entry = 0;
+        float angle = 0.0f;
+        float dist = 0.0f;
+        uint32 baseHealth = 0;
+        uint32 setFor = 1;
+        bool dead = false;
+        int64 behind = 0;       // ms it lagged behind out of a fight
+    };
+    std::vector<Member> members;
 
     // Rescue: captives led out, captives lost (the way out in route)
     uint32 saved = 0;
@@ -417,6 +432,8 @@ private:
     void UpdateSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateBossSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateEscort(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void SpawnCaravan(WowFatesActiveExpedition& active, Map* map, Creature* leader);
+    static float CaravanWidth(WowFatesExpeditionDef const* def);
     void UpdateRescue(WowFatesActiveExpedition& active, Map* map);
     void FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage);
     void UpdateCapture(WowFatesActiveExpedition& active, Map* map, uint32 diff);

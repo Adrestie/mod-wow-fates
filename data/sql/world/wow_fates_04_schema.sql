@@ -222,3 +222,11 @@ SET @wow_fates_sql := IF(@wow_fates_col = 0,
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
 DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'caravan');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `caravan` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''escort: creature_template entries of the others of the caravan (ten at most, repeats allowed), in a pack around ally_entry, its leader; they may fall, he may not'' AFTER `boss_spells`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;

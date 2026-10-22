@@ -66,7 +66,8 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  42, 'Hold: {}'),
 ('mod-wow-fates',  43, 'Banners held: {}/{} - {}:{:02} left'),
 ('mod-wow-fates',  44, 'Banners held: {}/{}'),
-('mod-wow-fates',  45, 'Time left: {}:{:02}');
+('mod-wow-fates',  45, 'Time left: {}:{:02}'),
+('mod-wow-fates',  46, '{}: {}% health - caravan: {}/{}');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -292,4 +293,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  45, 'frFR', 'Temps restant : {}:{:02}'),
 ('mod-wow-fates',  45, 'deDE', 'Verbleibende Zeit: {}:{:02}'),
 ('mod-wow-fates',  45, 'esES', 'Tiempo restante: {}:{:02}'),
-('mod-wow-fates',  45, 'ruRU', 'Осталось времени: {}:{:02}');
+('mod-wow-fates',  45, 'ruRU', 'Осталось времени: {}:{:02}'),
+('mod-wow-fates',  46, 'frFR', '{} : {} % de vie — caravane : {}/{}'),
+('mod-wow-fates',  46, 'deDE', '{}: {} % Gesundheit — Karawane: {}/{}'),
+('mod-wow-fates',  46, 'esES', '{}: {} % de salud — caravana: {}/{}'),
+('mod-wow-fates',  46, 'ruRU', '{}: здоровье {}% — караван: {}/{}');

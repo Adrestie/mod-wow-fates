@@ -160,7 +160,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
     if (QueryResult result = WorldDatabase.Query(
         "SELECT `expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`, "
         "`ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`, "
-        "`time_limit`, `max_losses`, `taken_entry`, `boss_spells` "
+        "`time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `caravan` "
         "FROM `mod_wow_fates_objective`"))
     {
         do
@@ -195,6 +195,17 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.takenEntry = f[17].Get<uint32>();
             if (itr->second.objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
                 itr->second.gatherCount = std::max<uint32>(itr->second.gatherCount, 2); // a banner alone is no capture
+            // "96205,96205,96206": an escort's caravan, around its leader
+            itr->second.caravan.clear();
+            std::string const caravan = f[19].Get<std::string>();
+            for (std::string_view member : Acore::Tokenize(caravan, ',', false))
+                if (Optional<uint32> entry = Acore::StringTo<uint32>(member))
+                {
+                    if (sObjectMgr->GetCreatureTemplate(*entry))
+                        itr->second.caravan.push_back(*entry);
+                    else
+                        LOG_ERROR("module", "mod-wow-fates: Expedition {}: creature {} of its caravan does not exist; left out.", itr->first, *entry);
+                }
             // "6730,6016,8599": a warlord's blows, the first from the start, one more with each phase
             itr->second.bossSpells.clear();
             std::string const spells = f[18].Get<std::string>();
@@ -901,6 +912,9 @@ std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& 
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
             uint32(active.alliesAlive), def->allyCount);
+    if (def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT && !active.members.empty() && active.allyHealthPct >= 0)
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_CARAVAN), CreatureName(def->allyEntry, session),
+            uint32(active.allyHealthPct), uint32(std::max(active.alliesAlive, 0)), uint32(active.members.size()));
     if ((def->objectiveType == WOW_FATES_OBJECTIVE_DEFENCE || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT
             || def->objectiveType == WOW_FATES_OBJECTIVE_ESCORT) && active.allyHealthPct >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLY_HEALTH), CreatureName(def->allyEntry, session),
@@ -1579,6 +1593,33 @@ bool WowFatesExpeditionMgr::BuildRoute(WowFatesActiveExpedition& active, Map* ma
         for (std::size_t p = active.route.empty() ? 0 : 1; p < points.size(); ++p)
             active.route.push_back(points[p]);
     }
+    // a caravan's: room for its whole width on both sides, on the ground at
+    // the route's level, dry, no wall in between
+    if (float const half = CaravanWidth(active.def); half > 0.0f)
+        for (std::size_t i = 1; i + 1 < active.route.size(); i += 2)
+        {
+            Position const& at = active.route[i];
+            float const dx = active.route[i + 1].GetPositionX() - active.route[i - 1].GetPositionX();
+            float const dy = active.route[i + 1].GetPositionY() - active.route[i - 1].GetPositionY();
+            float const len = std::max(std::hypot(dx, dy), 0.01f);
+            for (float side : { -1.0f, 1.0f })
+            {
+                float const x = at.GetPositionX() - side * half * dy / len;
+                float const y = at.GetPositionY() + side * half * dx / len;
+                float const z = map->GetHeight(PHASEMASK_NORMAL, x, y, at.GetPositionZ() + 3.0f, true, 6.0f);
+                if (z <= INVALID_HEIGHT || std::fabs(z - at.GetPositionZ()) > 2.5f || Wet(map, x, y, z)
+                    || !map->isInLineOfSight(at.GetPositionX(), at.GetPositionY(), at.GetPositionZ() + 1.5f, x, y, z + 1.5f,
+                        PHASEMASK_NORMAL, LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+                {
+                    if (why)
+                        *why = Acore::StringFormat("too narrow for its caravan ({:.1f} yards each side) at point {} ({:.1f} {:.1f})",
+                            half, i, at.GetPositionX(), at.GetPositionY());
+                    active.route.clear();
+                    return false;
+                }
+            }
+        }
+
     float done = 0.0f;
     for (std::size_t i = 0; i < active.route.size(); ++i)
     {
@@ -2976,11 +3017,60 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
         ally->SetWalk(true);
         active.ally = ally->GetGUID();
         active.allyPlayers = 1;
+        SpawnCaravan(active, map, ally);
     }
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(ally, active.allyHealth, active.allyPlayers, players);
     active.allyHealthPct = std::max<int32>(5, int32(std::ceil(ally->GetHealthPct() / 5.0f)) * 5);
+
+    // the caravan in a pack around him, at its places, at his pace; one that
+    // lags behind out of a fight holds the pack back, and stuck there a while
+    // (or far), it is put back at its place
+    bool straggler = false;
+    uint32 standing = 0;
+    for (WowFatesActiveExpedition::Member& member : active.members)
+    {
+        Creature* creature = member.dead || !member.guid ? nullptr : map->GetCreature(member.guid);
+        if (!creature)
+            continue;
+        if (!creature->IsAlive())
+        {
+            member.dead = true;
+            continue;
+        }
+        ++standing;
+        ScaleHealth(creature, member.baseHealth, member.setFor, players);
+        if (creature->IsInCombat())
+        {
+            member.behind = 0;
+            continue;
+        }
+        creature->SetHomePosition(creature->GetPosition());
+        float const off = creature->GetExactDist2d(ally);
+        if (off > member.dist + 6.0f)
+        {
+            straggler = true;
+            member.behind += diff;
+            if ((member.behind >= 8 * IN_MILLISECONDS || off > 40.0f) && !ally->IsInCombat())
+            {
+                float const a = ally->GetOrientation() + member.angle;
+                float const x = ally->GetPositionX() + member.dist * std::cos(a);
+                float const y = ally->GetPositionY() + member.dist * std::sin(a);
+                float z = map->GetHeight(PHASEMASK_NORMAL, x, y, ally->GetPositionZ() + 3.0f, true, 8.0f);
+                if (z > INVALID_HEIGHT && std::fabs(z - ally->GetPositionZ()) <= 3.0f && !Wet(map, x, y, z))
+                    creature->NearTeleportTo(x, y, z, ally->GetOrientation());
+                else
+                    creature->NearTeleportTo(ally->GetPositionX(), ally->GetPositionY(), ally->GetPositionZ(), ally->GetOrientation());
+                member.behind = 0;
+            }
+        }
+        else
+            member.behind = 0;
+        if (creature->GetMotionMaster()->GetCurrentMovementGeneratorType() != FOLLOW_MOTION_TYPE)
+            creature->GetMotionMaster()->MoveFollow(ally, member.dist, member.angle);
+    }
+    active.alliesAlive = int32(standing);
 
     if (!Start(active, "escort", &WowFatesExpeditionMgr::CreatureName, def->allyEntry))
         return;
@@ -3014,7 +3104,16 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
         active.bossWavesSent |= bit;
         Say(ally, ESCORT_SAY_AMBUSH);
         Position const around = ally->GetPosition();
-        SendWave(active, map, ally, &around);
+        // at him, or at one of his caravan
+        Unit* target = ally;
+        std::vector<Creature*> others;
+        for (WowFatesActiveExpedition::Member const& member : active.members)
+            if (Creature* creature = member.dead ? nullptr : map->GetCreature(member.guid))
+                if (creature->IsAlive())
+                    others.push_back(creature);
+        if (!others.empty() && urand(0, 1))
+            target = Acore::Containers::SelectRandomContainerElement(others);
+        SendWave(active, map, target, &around);
         break;
     }
 
@@ -3031,24 +3130,99 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
                 break;
             }
     MotionMaster* motion = ally->GetMotionMaster();
-    if (!followed)
+    if (!followed || straggler)
     {
         if (motion->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
         {
             motion->Clear();
             ally->StopMoving();
         }
-        active.talkTimer -= diff;
-        if (active.talkTimer <= 0)
+        if (!followed)
         {
-            Say(ally, ESCORT_SAY_WAIT);
-            active.talkTimer = 30 * IN_MILLISECONDS;
+            active.talkTimer -= diff;
+            if (active.talkTimer <= 0)
+            {
+                Say(ally, ESCORT_SAY_WAIT);
+                active.talkTimer = 30 * IN_MILLISECONDS;
+            }
         }
         return;
     }
     active.talkTimer = std::max<int64>(active.talkTimer, 15 * IN_MILLISECONDS);
     if (motion->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
         motion->MovePoint(1, active.route[std::min<std::size_t>(active.routeIndex + 5, last)], FORCED_MOVEMENT_WALK);
+}
+
+namespace
+{
+    // The places of a caravan around its leader: an angle from his facing and
+    // a distance, at his sides first, then behind, then before him; a pack,
+    // not a file.
+    struct CaravanPlace { float angle, dist; };
+    CaravanPlace const CARAVAN_PLACES[] =
+    {
+        { float(M_PI) / 2.0f, 3.5f }, { -float(M_PI) / 2.0f, 3.5f }, { float(M_PI), 4.5f },
+        { 3.0f * float(M_PI) / 4.0f, 5.5f }, { -3.0f * float(M_PI) / 4.0f, 5.5f },
+        { float(M_PI) / 4.0f, 4.0f }, { -float(M_PI) / 4.0f, 4.0f }, { float(M_PI), 8.0f },
+        { float(M_PI) / 2.0f, 7.0f }, { -float(M_PI) / 2.0f, 7.0f }
+    };
+    constexpr std::size_t CARAVAN_MAX = sizeof(CARAVAN_PLACES) / sizeof(CARAVAN_PLACES[0]);
+}
+
+// How far a caravan reaches on each side of its route: its widest place, a
+// yard more; 0 without one.
+float WowFatesExpeditionMgr::CaravanWidth(WowFatesExpeditionDef const* def)
+{
+    float half = 0.0f;
+    for (std::size_t i = 0; i < def->caravan.size() && i < CARAVAN_MAX; ++i)
+        half = std::max(half, std::fabs(CARAVAN_PLACES[i].dist * std::sin(CARAVAN_PLACES[i].angle)));
+    return def->caravan.empty() ? 0.0f : half + 1.0f;
+}
+
+// The caravan around its leader, each at its place (CARAVAN_PLACES), on the
+// ground there, else at his side; those that live and are not there (all, the
+// first time; those gone with a grid) come, the dead stay dead. Its health
+// grows with the players, as every ally's.
+void WowFatesExpeditionMgr::SpawnCaravan(WowFatesActiveExpedition& active, Map* map, Creature* leader)
+{
+    WowFatesExpeditionDef const* def = active.def;
+    for (std::size_t i = 0; i < def->caravan.size() && i < CARAVAN_MAX; ++i)
+    {
+        if (i >= active.members.size())
+        {
+            WowFatesActiveExpedition::Member member;
+            member.entry = def->caravan[i];
+            member.angle = CARAVAN_PLACES[i].angle;
+            member.dist = CARAVAN_PLACES[i].dist;
+            active.members.push_back(member);
+        }
+        WowFatesActiveExpedition::Member& member = active.members[i];
+        if (member.dead || (member.guid && map->GetCreature(member.guid)))
+            continue;
+        float const a = leader->GetOrientation() + member.angle;
+        float x = leader->GetPositionX() + member.dist * std::cos(a);
+        float y = leader->GetPositionY() + member.dist * std::sin(a);
+        float z = map->GetHeight(PHASEMASK_NORMAL, x, y, leader->GetPositionZ() + 3.0f, true, 8.0f);
+        if (z <= INVALID_HEIGHT || std::fabs(z - leader->GetPositionZ()) > 3.0f || Wet(map, x, y, z))
+        {
+            x = leader->GetPositionX();
+            y = leader->GetPositionY();
+            z = leader->GetPositionZ();
+        }
+        TempSummon* creature = map->SummonCreature(member.entry, Position(x, y, z, leader->GetOrientation()));
+        if (!creature)
+            continue;
+        creature->SetTempSummonType(TEMPSUMMON_MANUAL_DESPAWN);
+        creature->SetPvP(false); // faction 495: healing it would flag the healer
+        creature->SetWalk(true);
+        creature->SetHomePosition(creature->GetPosition());
+        creature->GetMotionMaster()->MoveFollow(leader, member.dist, member.angle);
+        member.guid = creature->GetGUID();
+        member.baseHealth = creature->GetMaxHealth();
+        member.setFor = 1;
+        member.behind = 0;
+        active.allies.push_back(member.guid); // healed as an ally, gone at the end
+    }
 }
 
 // ---------------------------------------------------------------------------

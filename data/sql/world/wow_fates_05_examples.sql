@@ -26,7 +26,9 @@
 --      Kolkar centaurs (gameobject 960001), two Outrunners guarding each,
 --      out in the open of their camp
 --  11  Remy's Wares, Elwynn Forest, level 6, escort: Remy "Two Times"
---      (creature 96203) takes his wares up the hill road north-east of
+--      (creature 96203) and his caravan (two militiamen 96205, his
+--      packhorse 96206, in a pack around him) take his wares up the hill
+--      road north-east of
 --      Goldshire, Defias Cutpurses ambushing him at 25, 50 and 75 % of it
 --  12  Zalazane's Captives, Durotar, level 9, rescue: Darkspear captives
 --      (creature 96204) in the Voodoo Cages (gameobject 960002) of Zalazane's
@@ -75,7 +77,7 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (10, 'The Kolkar War Camp', 8, 8,   0,  8,  3120, 0, 20, 40,   0, 0, 1, 1, 'Durotar: the Kolkar war tents, guarded by Outrunners',
    'The Kolkar centaurs are massing in their camp: burn their war tents before they ride on Razor Hill.', 'Burn the Kolkar war tents', ''),
 (11, 'Remy''s Wares', 6, 9,   0,  1,    94, 0, 20, 110,  0, 0, 1, 1, 'Elwynn Forest: Remy "Two Times" up the hill road, Defias Cutpurses lying in wait',
-   'Remy "Two Times" is taking his wares up the hill road, where Defias Cutpurses lie in wait: escort him to the end of the road.', 'Escort Remy "Two Times"', 'Defias Cutpurses spring an ambush!'),
+   'Remy "Two Times" is taking his caravan up the hill road, where Defias Cutpurses lie in wait: escort him and his wares to the end of the road.', 'Escort Remy "Two Times"', 'Defias Cutpurses spring an ambush!'),
 (12, 'Zalazane''s Captives', 9, 10, 0, 5,  3207, 5, 20, 70,   0, 0, 1, 1, 'Durotar: Darkspear captives caged by Zalazane''s Hexed Trolls on the Echo Isles',
    'Zalazane''s Hexed Trolls keep Darkspear captives caged on the Echo Isles: open the cages and see the captives safely off the island.', 'Free the Darkspear captives', ''),
 (13, 'Banners over Molsen Farm', 9, 11, 0, 1,  116, 4, 25, 60,   0, 0, 1, 1, 'Elwynn Forest: the Defias Standards of Molsen Farm, Defias Bandits about',
@@ -97,11 +99,11 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 -- The escort, the rescue, the capture and the warlord, with their own columns.
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
   `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`,
-  `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `comment`) VALUES
-(11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Remy''s Wares: Remy walks the hill road; Defias Cutpurses ambush him at 25, 50 and 75 % of it'),
-(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', 'Zalazane''s Captives: three cages out, five captives to lead out, the third one lost fails it'),
-(13,    0, 70, 960003, 3, 5,      0, 180, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 2, 960004, '', 'Banners over Molsen Farm: three standards, three minutes holding them all (nine holding one), ten minutes from the first player; a squad every 45 s at one held'),
-(14, 96102, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '6730,6016,6268,8599', 'Hogger''s Rampage: Head Butt, then Pierce Armor, Rushing Charge and Enrage at 25, 50 and 75 % of the bar, the pack each time; eight minutes');
+  `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `caravan`, `comment`) VALUES
+(11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '96205,96205,96206', 'Remy''s Wares: Remy and his caravan (two militiamen, his packhorse) walk the hill road; Defias Cutpurses ambush them at 25, 50 and 75 % of it'),
+(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out, the third one lost fails it'),
+(13,    0, 70, 960003, 3, 5,      0, 180, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 2, 960004, '', '', 'Banners over Molsen Farm: three standards, three minutes holding them all (nine holding one), ten minutes from the first player; a squad every 45 s at one held'),
+(14, 96102, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '6730,6016,6268,8599', '', 'Hogger''s Rampage: Head Butt, then Pierce Armor, Rushing Charge and Enrage at 25, 50 and 75 % of the bar, the pack each time; eight minutes');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -206,15 +208,15 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (10, 'ruRU', 'Боевой лагерь колкаров',
    'Кентавры-колкары собираются в своём лагере: сожгите их боевые шатры, пока они не напали на Колючий Холм.', 'Сожгите боевые шатры колкаров', ''),
 (11, 'frFR', 'La marchandise de Remy',
-   'Remy « Deux fois » monte sa marchandise par la route des collines, où guettent des vide-goussets défias : escortez-le jusqu''au bout du chemin.', 'Escortez Remy « Deux fois »', 'Des vide-goussets défias tendent une embuscade !'),
+   'Remy « Deux fois » mène sa caravane par la route des collines, où guettent des vide-goussets défias : escortez-le, lui et sa marchandise, jusqu''au bout du chemin.', 'Escortez Remy « Deux fois »', 'Des vide-goussets défias tendent une embuscade !'),
 (11, 'deDE', 'Remys Waren',
-   'Remy "Zweifach" bringt seine Waren die Hügelstraße hinauf, wo Taschendiebe der Defias lauern: Begleitet ihn bis ans Ende des Weges.', 'Begleitet Remy "Zweifach"', 'Taschendiebe der Defias greifen aus dem Hinterhalt an!'),
+   'Remy "Zweifach" führt seine Karawane die Hügelstraße hinauf, wo Taschendiebe der Defias lauern: Begleitet ihn und seine Waren bis ans Ende des Weges.', 'Begleitet Remy "Zweifach"', 'Taschendiebe der Defias greifen aus dem Hinterhalt an!'),
 (11, 'esES', 'La mercancía de Remy',
-   'Remy "Dos Veces" sube su mercancía por el camino de las colinas, donde acechan rateros Defias: escóltalo hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
+   'Remy "Dos Veces" guía su caravana por el camino de las colinas, donde acechan rateros Defias: escóltalo a él y a su mercancía hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
 (11, 'esMX', 'La mercancía de Remy',
-   'Remy "Dos Veces" sube su mercancía por el camino de las colinas, donde acechan rateros Defias: escóltalo hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
+   'Remy "Dos Veces" guía su caravana por el camino de las colinas, donde acechan rateros Defias: escóltalo a él y a su mercancía hasta el final del camino.', 'Escolta a Remy "Dos Veces"', '¡Los rateros Defias tienden una emboscada!'),
 (11, 'ruRU', 'Товары Реми',
-   'Реми Повторюх везёт товар по холмистой дороге, где подстерегают карманники из Братства Справедливости: сопроводите его до конца пути.', 'Сопроводите Реми Повторюха', 'Карманники из Братства Справедливости устроили засаду!'),
+   'Реми Повторюх ведёт свой караван по холмистой дороге, где подстерегают карманники из Братства Справедливости: сопроводите его и товар до конца пути.', 'Сопроводите Реми Повторюха', 'Карманники из Братства Справедливости устроили засаду!'),
 (12, 'frFR', 'Les captifs de Zalazane',
    'Les trolls maléficiés de Zalazane gardent des captifs sombrelances en cage sur les îles de l''Écho : ouvrez les cages et faites sortir les captifs de l''île sains et saufs.', 'Libérez les captifs sombrelances', ''),
 (12, 'deDE', 'Zalazanes Gefangene',
