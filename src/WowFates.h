@@ -178,6 +178,7 @@ struct WowFatesConfig
     float gatherScaling = 0.5f;      // a gathering's, a sabotage's, a rescue's objects asked: x the players to this power; put back as much faster
     uint32 objectRespawnFloor = 1;   // s, an object put back no sooner
     uint32 objectMaxCount = 50;      // objects asked at most
+    uint32 rescueMaxCount = 10;      // a rescue's captives asked at most
     uint32 chainMinStages = 2;       // a chain: its stages, drawn between these
     uint32 chainMaxStages = 5;
     uint32 chainPause = 15;          // s between a stage done and the next

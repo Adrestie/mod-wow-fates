@@ -4827,7 +4827,8 @@ double WowFatesExpeditionMgr::Needed(WowFatesActiveExpedition const& active) con
     // much faster (GatherDelay); the kills: ParticipantScaling as ever
     uint8 const type = active.def->objectiveType;
     double const needed = type == WOW_FATES_OBJECTIVE_GATHER || type == WOW_FATES_OBJECTIVE_SABOTAGE || type == WOW_FATES_OBJECTIVE_RESCUE
-        ? std::min(double(active.def->objectiveCount) * std::pow(double(players), double(c.gatherScaling)), double(c.objectMaxCount))
+        ? std::min(double(active.def->objectiveCount) * std::pow(double(players), double(c.gatherScaling)),
+            double(type == WOW_FATES_OBJECTIVE_RESCUE ? c.rescueMaxCount : c.objectMaxCount))
         : double(active.def->objectiveCount) * (1.0 + c.participantScaling * (players - 1.0f));
     return std::max(needed, 1.0);
 }
@@ -5076,7 +5077,8 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
             std::string line = Acore::StringFormat("  {} players: ", n);
             if (type == WOW_FATES_OBJECTIVE_GATHER || type == WOW_FATES_OBJECTIVE_SABOTAGE || type == WOW_FATES_OBJECTIVE_RESCUE)
             {
-                double const asked = std::min(double(def.objectiveCount) * std::pow(double(n), double(c.gatherScaling)), double(c.objectMaxCount));
+                double const asked = std::min(double(def.objectiveCount) * std::pow(double(n), double(c.gatherScaling)),
+                    double(type == WOW_FATES_OBJECTIVE_RESCUE ? c.rescueMaxCount : c.objectMaxCount));
                 float const delay = std::max(float(c.objectRespawnFloor), float(def.gatherRespawn) / std::pow(float(n), c.gatherScaling));
                 line += Acore::StringFormat("objects: {:.0f} asked ({:.1f} % each), {} out at once, one back every {:.1f} s or so; ",
                     std::ceil(asked - 0.001), 100.0 / std::max(asked, 1.0), def.gatherCount, delay);

@@ -254,6 +254,9 @@ WowFates.Expedition.AreaInterval        = 1000
 #        Such an object put back no sooner than RespawnFloor seconds; no
 #        more than MaxCount of them asked.
 #
+#    WowFates.Rescue.MaxCount
+#        A rescue's captives asked at most (instead of Object.MaxCount).
+#
 #    WowFates.Chain.MinStages
 #    WowFates.Chain.MaxStages
 #        A chain (type 13): its stages, Expeditions of its zone, drawn
@@ -334,6 +337,7 @@ WowFates.Scaling.Ally                   = 1.0
 WowFates.Gather.Scaling                 = 0.5
 WowFates.Object.RespawnFloor            = 1
 WowFates.Object.MaxCount                = 50
+WowFates.Rescue.MaxCount                = 10
 WowFates.Chain.MinStages                = 2
 WowFates.Chain.MaxStages                = 5
 WowFates.Chain.Pause                    = 15

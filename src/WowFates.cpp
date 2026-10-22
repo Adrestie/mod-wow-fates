@@ -152,6 +152,7 @@ void WowFatesLoadConfig()
     c.gatherScaling = std::max(sConfigMgr->GetOption<float>("WowFates.Gather.Scaling", 0.5f), 0.0f);
     c.objectRespawnFloor = sConfigMgr->GetOption<uint32>("WowFates.Object.RespawnFloor", 1);
     c.objectMaxCount = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Object.MaxCount", 50), 1);
+    c.rescueMaxCount = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Rescue.MaxCount", 10), 1);
     c.chainMinStages = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Chain.MinStages", 2), 2, 5);
     c.chainMaxStages = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Chain.MaxStages", 5), c.chainMinStages, 5);
     c.chainPause = sConfigMgr->GetOption<uint32>("WowFates.Chain.Pause", 15);
