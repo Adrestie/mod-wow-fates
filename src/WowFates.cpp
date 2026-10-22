@@ -147,7 +147,7 @@ void WowFatesLoadConfig()
     c.scaleCount = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Count", 0.5f), 0.0f);
     c.scaleHealth = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Health", 0.75f), 0.0f);
     c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.4f), 0.0f);
-    c.scaleBoss = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Boss", 1.0f), 0.0f);
+    c.scaleBoss = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Boss", 1.11f), 0.0f);
     c.targetAddSeconds = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddSeconds", 15.0f), 1.0f);
     c.targetAddStep = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddStep", 0.2f), 0.0f);
     c.waveNextAt = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.NextAt", 0.25f), 0.0f, 1.0f);

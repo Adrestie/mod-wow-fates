@@ -2553,8 +2553,10 @@ void WowFatesExpeditionMgr::ScaleFoe(Creature* creature, uint32 players) const
     creature->UpdateDamagePhysical(RANGED_ATTACK);
 }
 
-// The health of a boss, a chief or an ally for the players in the area: x
-// (1 + Scaling.Boss x (players - 1)); its maximum follows them up and down, its
+// The health of a boss, a chief or an ally for the players in the area: x the
+// players to the power Scaling.Boss (1.11: x11.5 for nine, x60 for forty, a
+// raid's strength growing faster than its number); its maximum follows them
+// up and down, its
 // share of health stays (78 % with fifteen players more is still 78 %), never
 // a death or a full heal from the rounding.
 void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const
@@ -2562,7 +2564,7 @@ void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, u
     if (players == setFor || !creature->IsAlive() || !baseHealth)
         return;
     double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
-    uint32 const maxHealth = uint32(float(baseHealth) * (1.0f + WowFatesConf().scaleBoss * float(players - 1)));
+    uint32 const maxHealth = uint32(double(baseHealth) * std::pow(double(players), double(WowFatesConf().scaleBoss)));
     creature->SetCreateHealth(maxHealth);
     creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
     creature->UpdateMaxHealth();
@@ -4801,7 +4803,7 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
             line += Acore::StringFormat("about {} (up to {}); at most {} alive; each x{:.2f} health at first (then by the kills' speed, "
                 "{:.0f} s each asked), x{:.2f} damage; a boss, a chief or an ally x{:.2f} health, x{:.2f} damage",
                 about, aboutMax, alive, std::pow(float(n), c.scaleHealth), c.targetAddSeconds, std::pow(float(n), c.scaleDamage),
-                1.0f + c.scaleBoss * float(n - 1), std::pow(float(n), c.scaleDamage));
+                std::pow(float(n), c.scaleBoss), std::pow(float(n), c.scaleDamage));
             handler->SendSysMessage(line);
         }
         // a chief's mechanics: a draw for each, as one at his coming (under the sky)

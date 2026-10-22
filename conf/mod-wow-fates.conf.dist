@@ -236,8 +236,9 @@ WowFates.Expedition.AreaInterval        = 1000
 #        when it comes: n to the power Health (0.75), then by the kills' speed
 #        (Target.*); it keeps it once out. Its damage, and a chief's, his
 #        mechanics' too: n to the power Damage (0.4). A boss's, a chief's or
-#        an ally's health: x (1 + Boss x (n - 1)), 1 = x n, its share kept as
-#        players come and go. No cap.
+#        an ally's health: n to the power Boss (1.11: x11.5 for 9 players,
+#        x27.8 for 20, x60 for 40), its share kept as players come and go.
+#        No cap.
 #
 #    WowFates.Target.AddSeconds
 #    WowFates.Target.AddStep
@@ -285,7 +286,7 @@ WowFates.Waves.PerCharacter             = 1.0
 WowFates.Scaling.Count                  = 0.5
 WowFates.Scaling.Health                 = 0.75
 WowFates.Scaling.Damage                 = 0.4
-WowFates.Scaling.Boss                   = 1.0
+WowFates.Scaling.Boss                   = 1.11
 WowFates.Target.AddSeconds              = 15
 WowFates.Target.AddStep                 = 0.2
 WowFates.Waves.NextAt                   = 0.25
