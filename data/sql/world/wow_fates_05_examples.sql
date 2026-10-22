@@ -32,7 +32,8 @@
 --      Goldshire, Defias Cutpurses ambushing him at 25, 50 and 75 % of it
 --  12  Zalazane's Captives, Durotar, level 9, rescue: Darkspear captives
 --      (creature 96204) in the Voodoo Cages (gameobject 960002) of Zalazane's
---      Hexed Trolls on the Echo Isles, five to lead out, the third lost fails
+--      Hexed Trolls on the Echo Isles, five to lead out in ten minutes; one
+--      led out by then is enough, all of them lost fails it
 --  13  Banners over Molsen Farm, Elwynn Forest, level 9, capture: three
 --      Defias Standards (gameobject 960003) to take and hold, Stormwind's
 --      (960004) put up in their place, against squads of Defias Bandits;
@@ -101,7 +102,7 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
   `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`,
   `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `caravan`, `comment`) VALUES
 (11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '96205,96205,96206', 'Remy''s Wares: Remy and his caravan (two militiamen, his packhorse) walk the hill road; Defias Cutpurses ambush them at 25, 50 and 75 % of it'),
-(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out, the third one lost fails it'),
+(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 600, 0,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out in ten minutes; one led out by then is enough (rewards by the share led out), all lost fails it'),
 (13,    0, 70, 960003, 3, 5,      0, 180, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 2, 960004, '', '', 'Banners over Molsen Farm: three standards, three minutes holding them all (nine holding one), ten minutes from the first player; a squad every 45 s at one held'),
 (14, 96102, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '6730,6016,6268,8599', '', 'Hogger''s Rampage: Head Butt, then Pierce Armor, Rushing Charge and Enrage at 25, 50 and 75 % of the bar, the pack each time; eight minutes');
 

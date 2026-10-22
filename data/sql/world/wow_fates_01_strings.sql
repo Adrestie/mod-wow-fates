@@ -61,13 +61,14 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  37, 'Escort {}'),
 ('mod-wow-fates',  38, 'free the {} and lead them out'),
 ('mod-wow-fates',  39, 'Free: {}'),
-('mod-wow-fates',  40, 'Led out: {}/{} - lost: {}/{}'),
+('mod-wow-fates',  40, 'Led out: {}/{} - lost: {}'),
 ('mod-wow-fates',  41, 'take and hold: {}'),
 ('mod-wow-fates',  42, 'Hold: {}'),
 ('mod-wow-fates',  43, 'Banners held: {}/{} - {}:{:02} left'),
 ('mod-wow-fates',  44, 'Banners held: {}/{}'),
 ('mod-wow-fates',  45, 'Time left: {}:{:02}'),
-('mod-wow-fates',  46, '{}: {}% health - caravan: {}/{}');
+('mod-wow-fates',  46, '{}: {}% health - caravan: {}/{}'),
+('mod-wow-fates',  47, 'Led out: {}/{} - lost: {} - {}:{:02} left');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -264,16 +265,16 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  37, 'ruRU', 'Сопроводите: {}'),
 ('mod-wow-fates',  38, 'frFR', 'libérer : {} — et les faire sortir'),
 ('mod-wow-fates',  39, 'frFR', 'Libérer : {}'),
-('mod-wow-fates',  40, 'frFR', 'Sortis : {}/{} — perdus : {}/{}'),
+('mod-wow-fates',  40, 'frFR', 'Sortis : {}/{} — perdus : {}'),
 ('mod-wow-fates',  38, 'deDE', 'befreit: {} — und bringt sie hinaus'),
 ('mod-wow-fates',  39, 'deDE', 'Befreit: {}'),
-('mod-wow-fates',  40, 'deDE', 'Hinausgebracht: {}/{} — verloren: {}/{}'),
+('mod-wow-fates',  40, 'deDE', 'Hinausgebracht: {}/{} — verloren: {}'),
 ('mod-wow-fates',  38, 'esES', 'libera: {} — y sácalos de aquí'),
 ('mod-wow-fates',  39, 'esES', 'Libera: {}'),
-('mod-wow-fates',  40, 'esES', 'Rescatados: {}/{} — perdidos: {}/{}'),
+('mod-wow-fates',  40, 'esES', 'Rescatados: {}/{} — perdidos: {}'),
 ('mod-wow-fates',  38, 'ruRU', 'освободите: {} — и выведите их'),
 ('mod-wow-fates',  39, 'ruRU', 'Освободите: {}'),
-('mod-wow-fates',  40, 'ruRU', 'Выведено: {}/{} — потеряно: {}/{}'),
+('mod-wow-fates',  40, 'ruRU', 'Выведено: {}/{} — потеряно: {}'),
 ('mod-wow-fates',  41, 'frFR', 'prendre et tenir : {}'),
 ('mod-wow-fates',  42, 'frFR', 'Tenir : {}'),
 ('mod-wow-fates',  43, 'frFR', 'Bannières tenues : {}/{} — reste {}:{:02}'),
@@ -297,4 +298,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  46, 'frFR', '{} : {} % de vie — caravane : {}/{}'),
 ('mod-wow-fates',  46, 'deDE', '{}: {} % Gesundheit — Karawane: {}/{}'),
 ('mod-wow-fates',  46, 'esES', '{}: {} % de salud — caravana: {}/{}'),
-('mod-wow-fates',  46, 'ruRU', '{}: здоровье {}% — караван: {}/{}');
+('mod-wow-fates',  46, 'ruRU', '{}: здоровье {}% — караван: {}/{}'),
+('mod-wow-fates',  47, 'frFR', 'Sortis : {}/{} — perdus : {} — reste {}:{:02}'),
+('mod-wow-fates',  47, 'deDE', 'Hinausgebracht: {}/{} — verloren: {} — noch {}:{:02}'),
+('mod-wow-fates',  47, 'esES', 'Rescatados: {}/{} — perdidos: {} — quedan {}:{:02}'),
+('mod-wow-fates',  47, 'ruRU', 'Выведено: {}/{} — потеряно: {} — осталось {}:{:02}');

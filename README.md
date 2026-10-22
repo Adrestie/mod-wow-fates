@@ -62,8 +62,10 @@ ones and rewards for those who take part.
     spawn point's `path`, each leg walked as a player would.
   - *Rescue*: cages to open (a one second cast) spread over the area, each
     walked to the way out (the last point of the spawn point's `path`);
-    each captive runs for it. The bar is the captives led out; more than
-    `max_losses` dead, it fails.
+    each captive runs for it. The bar is the captives led out. When
+    `time_limit` runs out, one led out is enough (the rewards by the share
+    led out); it fails only when none is led out (`max_losses` is no longer
+    read).
   - *Capture*: two or three of the foe's banners, far apart, to take (a
     one second cast) and hold against his squads, which take one back when
     they stand at its foot with no player near. The bar is the time they

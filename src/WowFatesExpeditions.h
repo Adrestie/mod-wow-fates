@@ -51,8 +51,9 @@
  *     around him in a pack, ambushed at the bar's marks; the bar is the route
  *     behind him, the Expedition fails when he dies;
  *  10 rescue: cages to open, spread over the area as a gathering's objects;
- *     each captive runs for the way out, the bar is those led out, the
- *     Expedition fails when more than max_losses die;
+ *     each captive runs for the way out, the bar is those led out; when
+ *     time_limit runs out, one led out is enough (the rewards by the share
+ *     led out); it fails only when none is led out and all are lost;
  *  11 capture: two or three of the foe's banners to take and hold against
  *     his squads; the bar is the time they are held, the Expedition fails
  *     when time_limit runs out first;
@@ -318,6 +319,7 @@ struct WowFatesActiveExpedition
     // Rescue: captives led out, captives lost (the way out in route)
     uint32 saved = 0;
     uint32 lost = 0;
+    double rewardShare = 1.0;   // of each reward: a rescue done when its time ran out, the share led out
 
     // Capture: its banners, the foe's or taken; the foe at the foot of a taken one
     struct Flag { ObjectGuid go; Position pos; bool ours = false; int64 contest = 0; };

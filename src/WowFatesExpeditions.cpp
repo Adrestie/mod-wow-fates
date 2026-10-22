@@ -756,7 +756,8 @@ std::string WowFatesExpeditionMgr::RewardLine(WowFatesActiveExpedition const& ac
 void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part)
 {
     std::vector<WowFatesReward const*> const rows = RewardRows(active, player);
-    uint32 const pct = PartPct(part);
+    // a rescue done when its time ran out: by the share of captives led out
+    uint32 const pct = uint32(std::lround(double(PartPct(part)) * std::clamp(active.rewardShare, 0.0, 1.0)));
 
     WorldSession* session = player->GetSession();
     std::string const name = Name(active.def, session);
@@ -907,8 +908,15 @@ std::string WowFatesExpeditionMgr::TrackerGuard(WowFatesActiveExpedition const& 
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_TIME_LEFT), seconds / 60, seconds % 60);
     }
     if (def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
-        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED), active.saved,
-            uint32(std::ceil(Needed(active) - 0.001)), active.lost, def->maxLosses + 1);
+    {
+        uint32 const needed = uint32(std::ceil(Needed(active) - 0.001));
+        int64 const left = TimeLeft(active);
+        if (left < 0)
+            return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED), active.saved, needed, active.lost);
+        uint32 const seconds = uint32((left + 9999) / 10000 * 10); // by steps of ten
+        return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_RESCUED_TIME), active.saved, needed, active.lost,
+            seconds / 60, seconds % 60);
+    }
     if (def->objectiveType == WOW_FATES_OBJECTIVE_SUPPORT && active.alliesAlive >= 0)
         return Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_ALLIES_ALIVE), CreatureName(def->allyEntry, session),
             uint32(active.alliesAlive), def->allyCount);
@@ -1171,7 +1179,7 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             uint32 const pct = uint32(active.progressPct);
             int32 guarded = active.alliesAlive * 1000 + active.allyHealthPct;
             if (active.def->objectiveType == WOW_FATES_OBJECTIVE_RESCUE)
-                guarded = int32(active.saved * 1000 + active.lost);
+                guarded = int32(active.saved * 100000 + active.lost * 1000 + (TimeLeft(active) + 9999) / 10000);
             else if (active.def->timeLimit) // a timed one: the time left, by steps of ten seconds
                 guarded = active.alliesAlive * 1000 + int32((TimeLeft(active) + 9999) / 10000);
             if ((pct != active.sentProgress && pct < 100) || guarded != active.sentGuard)
@@ -3244,7 +3252,10 @@ namespace
 // as well. A cage opened (FreeCaptive), its captive runs for the way out by
 // the paths, fights what stops him and runs on; there, he is led out. The bar
 // is the captives led out against objective_count (more with the players, as
-// the kills); more than max_losses dead, it fails.
+// the kills). The first player starts the clock (time_limit): when it runs
+// out, one captive led out is enough, the rewards by the share led out. It
+// fails only when none is led out and all are lost (as many dead as asked
+// for), or none led out when the time is out.
 void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* map)
 {
     if (!map || active.failed || active.progressPct >= 100.0 || active.remaining <= 0)
@@ -3265,7 +3276,22 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
         }
         active.route = { way };
     }
-    Start(active, "rescue", &WowFatesExpeditionMgr::CreatureName, def->allyEntry);
+    if (Start(active, "rescue", &WowFatesExpeditionMgr::CreatureName, def->allyEntry) && def->timeLimit && !active.deadline)
+        active.deadline = active.elapsed + int64(def->timeLimit) * IN_MILLISECONDS;
+    if (active.deadline && active.elapsed >= active.deadline)
+    {
+        double const needed = Needed(active);
+        LOG_INFO("module", "mod-wow-fates: Expedition {}: the time is out, {} captives led out of {:.0f}, {} lost.", def->id,
+            active.saved, needed, active.lost);
+        if (!active.saved)
+        {
+            active.failed = true;
+            return;
+        }
+        active.rewardShare = std::min(1.0, double(active.saved) / std::max(needed, 1.0));
+        active.progressPct = 100.0;
+        return;
+    }
 
     Position const& way = active.route.front();
     for (auto itr = active.allies.begin(); itr != active.allies.end();)
@@ -3281,8 +3307,9 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
             itr = active.allies.erase(itr);
             captive->DespawnOrUnsummon(Milliseconds(SUMMON_CORPSE_MS));
             ++active.lost;
-            LOG_INFO("module", "mod-wow-fates: Expedition {}: a captive died, {} lost ({} may be).", def->id, active.lost, def->maxLosses);
-            if (active.lost > def->maxLosses)
+            LOG_INFO("module", "mod-wow-fates: Expedition {}: a captive died, {} lost, {} led out.", def->id, active.lost, active.saved);
+            // all of them lost, none led out
+            if (!active.saved && double(active.lost) >= std::ceil(Needed(active) - 0.001))
             {
                 active.failed = true;
                 return;
