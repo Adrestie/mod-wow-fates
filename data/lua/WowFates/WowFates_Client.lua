@@ -700,7 +700,8 @@ local function hoverMinimap()
         local R = Minimap:GetWidth() / 2
         if (x - R) ^ 2 + (y - R) ^ 2 <= R * R then
             for _, a in ipairs(areas) do
-                if (x - a.cx) ^ 2 + (y - a.cy) ^ 2 <= a.r * a.r then
+                -- a capture's positions are in its area: the area alone
+                if not a.color and (x - a.cx) ^ 2 + (y - a.cy) ^ 2 <= a.r * a.r then
                     found[#found + 1] = a.e
                 end
             end

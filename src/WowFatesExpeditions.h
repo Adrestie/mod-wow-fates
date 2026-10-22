@@ -364,6 +364,7 @@ struct WowFatesActiveExpedition
         int64 behind = 0;       // ms it lagged behind out of a fight
     };
     std::vector<Member> members;
+    bool narrow = false;        // the route too narrow for the pack in places: the caravan in a file behind him
 
     // Rescue: captives led out, captives lost (the way out in route)
     uint32 saved = 0;
@@ -504,6 +505,8 @@ private:
     void UpdateBossSupport(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void UpdateEscort(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     void SpawnCaravan(WowFatesActiveExpedition& active, Map* map, Creature* leader);
+    Position CaravanSpot(WowFatesActiveExpedition const& active, Map* map, Creature* leader,
+        WowFatesActiveExpedition::Member const& member) const;
     static float CaravanWidth(WowFatesExpeditionDef const* def);
     void UpdateRescue(WowFatesActiveExpedition& active, Map* map);
     void FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage);
