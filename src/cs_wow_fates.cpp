@@ -66,7 +66,8 @@ public:
             { "reload",   HandleReloadCommand,   SEC_ADMINISTRATOR, Console::Yes },
             { "score",    HandleScoreCommand,    SEC_GAMEMASTER,    Console::Yes },
             { "synced",   HandleSyncedCommand,   SEC_GAMEMASTER,    Console::Yes },
-            { "check",    HandleCheckCommand,    SEC_ADMINISTRATOR, Console::Yes }
+            { "check",    HandleCheckCommand,    SEC_ADMINISTRATOR, Console::Yes },
+            { "simulate", HandleSimulateCommand, SEC_GAMEMASTER,    Console::Yes }
         };
 
         static ChatCommandTable commandTable =
@@ -136,6 +137,12 @@ public:
     static bool HandleCheckCommand(ChatHandler* handler, Optional<uint32> id)
     {
         sWowFatesExpeditionMgr->Check(handler, id.value_or(0));
+        return true;
+    }
+
+    static bool HandleSimulateCommand(ChatHandler* handler, Optional<uint32> id, Optional<uint32> players)
+    {
+        sWowFatesExpeditionMgr->Simulate(handler, id.value_or(0), players.value_or(0));
         return true;
     }
 

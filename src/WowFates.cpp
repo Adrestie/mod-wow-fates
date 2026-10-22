@@ -141,13 +141,18 @@ void WowFatesLoadConfig()
     c.bossScale = std::clamp(sConfigMgr->GetOption<float>("WowFates.Boss.Scale", 1.44f), 0.5f, 4.0f);
     c.wavePerCharacter = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PerCharacter", 1.0f), 0.0f);
     c.wavePaceFast = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceFast", 0.5f), 0.0f, 1.0f);
-    c.wavePaceStep = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PaceStep", 0.25f), 0.0f);
-    c.wavePaceMax = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PaceMax", 2.0f), 1.0f);
+    c.wavePaceStep = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PaceStep", 0.1f), 0.0f);
+    c.wavePaceMax = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PaceMax", 1.25f), 1.0f);
+    c.wavePaceMin = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceMin", 0.8f), 0.1f, 1.0f);
+    c.scaleCount = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Count", 0.5f), 0.0f);
+    c.scaleHealth = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Health", 0.5f), 0.0f);
+    c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.15f), 0.0f);
+    c.waveNextAt = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.NextAt", 0.25f), 0.0f, 1.0f);
     c.participantScaling = Positive("WowFates.Expedition.ParticipantScaling", 0.6f);
     c.adaptiveSpawn = sConfigMgr->GetOption<bool>("WowFates.Expedition.AdaptiveSpawn", true);
     c.adaptiveWindow = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Expedition.AdaptiveWindow", 15), 5) * IN_MILLISECONDS;
     c.minRespawn = sConfigMgr->GetOption<uint32>("WowFates.Expedition.MinRespawn", 2) * IN_MILLISECONDS;
-    c.maxPopulation = std::max(sConfigMgr->GetOption<float>("WowFates.Expedition.MaxPopulation", 3.0f), 1.0f);
+    c.maxPopulation = std::max(sConfigMgr->GetOption<float>("WowFates.Expedition.MaxPopulation", 1.25f), 1.0f);
     c.adaptiveAggression = Positive("WowFates.Expedition.AdaptiveAggression", 1.5f);
     c.minAlivePct = std::clamp(sConfigMgr->GetOption<float>("WowFates.Expedition.MinAlivePct", 50.0f), 0.0f, 100.0f);
 

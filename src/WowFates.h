@@ -162,7 +162,12 @@ struct WowFatesConfig
     float captiveSpeed = 1.0f;       // a rescue's captives: their walk, times a walk's (2.5 yards a second); they never run faster
     float pathMaxSlope = 1.0f;       // a path's rise per yard between two of its points at most (+ 1.5 yards): no jump, no cliff
     float bossScale = 1.44f;         // a boss support's ally (its boss), times its template's size
-    float wavePerCharacter = 1.0f;   // times wave_size, per character in the area
+    float wavePerCharacter = 1.0f;   // times wave_size: a wave for one player
+    float scaleCount = 0.5f;         // the monsters of a wave or about: times the players to this power (square root)
+    float scaleHealth = 0.5f;        // each one's health: times the players to this power (count x health ~ the players)
+    float scaleDamage = 0.15f;       // each one's damage: times the players to this power
+    float waveNextAt = 0.25f;        // a wave comes once the last one is down to this share alive: they follow, never pile up
+    float wavePaceMin = 0.8f;        // the pace of the kills: a wave's size between these times
     float wavePaceFast = 0.5f;       // a wave killed within this share of the interval is fast
     float wavePaceStep = 0.25f;      // the pace factor's move after each wave
     float wavePaceMax = 2.0f;        // the pace factor's cap

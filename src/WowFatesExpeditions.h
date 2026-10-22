@@ -325,7 +325,7 @@ struct WowFatesActiveExpedition
     std::vector<ObjectGuid> waveMobs; // the wave on its way
     int64 waveSentAt = 0;       // elapsed, when it came
     int64 waveClearedAt = -1;   // elapsed, when its last monster died; -1 while some live
-    float pace = 1.0f;          // the waves' size for the pace of the kills, 1 to PaceMax
+    float pace = 1.0f;          // the waves' size for the pace of the kills, PaceMin to PaceMax
     uint32 repelled = 0;        // waves pushed back
 
     // The tracker's second line (the allies alive, the ally's health): what it
@@ -403,6 +403,12 @@ struct WowFatesActiveExpedition
     int64 leapAt = 0;           // elapsed when a leap lands, its spell then
     uint32 leapSpell = 0;
     uint32 summonEntry = 0;     // its monsters, when not summon_entry (a warlord's band)
+    bool bossFought = false;    // a warlord in a fight: out of it alive, he is reset
+    bool phaseWave = false;     // a phase's band still to come (the last wave not down yet)
+
+    // Its monsters' health and damage for the players in the area: each one's
+    // health for one player, and the players it was set for
+    std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> toughened;
 };
 
 class WowFatesExpeditionMgr
@@ -437,6 +443,10 @@ public:
     // Every point and path of an Expedition (all of them: 0), as the module
     // would take them: what fails, for the GM.
     void Check(ChatHandler* handler, uint32 id);
+    // What the scaling gives an Expedition (all of them: 0) for some numbers of
+    // players (0: 1, 5, 9, 10, 20, 40): its waves, the monsters about, the most
+    // alive at once, each one's health and damage.
+    void Simulate(ChatHandler* handler, uint32 id, uint32 players);
     void OnHeal(Unit* healer, Unit* target, uint32 gain);
     void OnDeath(Unit* victim, Unit* killer);
     // A gathering's object used, from its map's thread.
@@ -499,8 +509,12 @@ private:
     void UpdateGather(WowFatesActiveExpedition& active, Map* map);
     void UpdateDefence(WowFatesActiveExpedition& active, Map* map, uint32 diff);
     Creature* SpawnAlly(WowFatesActiveExpedition& active, Map* map, Position const& pos);
-    void SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around = nullptr,
+    bool SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around = nullptr,
         Position const* goal = nullptr);
+    static float Crowd(uint32 players);
+    static bool HasWaves(uint8 type);
+    void Toughen(WowFatesActiveExpedition& active, Creature* creature, uint32 players);
+    void ResetWarlord(WowFatesActiveExpedition& active, Map* map, Creature* boss);
     bool EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const;
     bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);
     Position Centre(WowFatesActiveExpedition const& active, Map* map, float spread = 0.0f) const;

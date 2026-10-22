@@ -196,6 +196,9 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Object.PathFactor` | 2.0 | objects reached on foot by a sensible walk |
 | `WowFates.Path.MaxSlope` | 1.0 | no path with a jump or a cliff |
 | `WowFates.Rescue.CaptiveSpeed` | 1.0 | the captives' walk, times a walk's; never faster |
+| `WowFates.Scaling.Count` / `Health` / `Damage` | 0.5 / 0.5 / 0.15 | monsters x players^Count, each one's health x players^Health, damage x players^Damage |
+| `WowFates.Waves.NextAt` | 0.25 | a wave waits for the last one to be down to this share alive |
+| `WowFates.Waves.PaceMin` / `PaceMax` / `PaceStep` | 0.8 / 1.25 / 0.1 | the pace of the kills: a wave's size between these times |
 | `WowFates.Expedition.ParticipantScaling` | 0.6 | how much the objective grows per player |
 | `WowFates.Expedition.AdaptiveSpawn` | 1 | monsters come back faster when the area is cleared fast |
 | `WowFates.Expedition.MinRespawn` | 2 | shortest delay between two waves, in seconds |

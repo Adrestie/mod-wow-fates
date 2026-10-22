@@ -1279,6 +1279,16 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateSummons(active, map, diff);
             UpdateWaiting(active, map);
 
+            // its monsters' health and damage for the players there now
+            if (map)
+            {
+                uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+                std::erase_if(active.toughened, [map](auto const& pair) { return !map->GetCreature(pair.first); });
+                for (ObjectGuid const& guid : active.summons)
+                    if (Creature* creature = map->GetCreature(guid))
+                        Toughen(active, creature, players);
+            }
+
             // its point, once its ground is loaded: under a roof, it is never used again
             if (map && !active.checked && NeedsSky(active.def) && map->IsGridLoaded(active.spawn.x, active.spawn.y))
             {
@@ -2132,11 +2142,17 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
         active.killTimes.pop_front();
     float const pace = c.adaptiveSpawn ? float(active.killTimes.size()) * IN_MILLISECONDS / float(c.adaptiveWindow) : 0.0f;
     float const respawn = float(def->summonRespawn);
-    uint32 const population = std::clamp<uint32>(def->summonCount + uint32(std::lround(pace * respawn * c.adaptiveAggression)),
-        def->summonCount, uint32(std::lround(float(def->summonCount) * c.maxPopulation)));
+    // summon_count for one player, times the square root of the players
+    // (Crowd: their health takes the rest) where no wave comes; where waves
+    // come, they carry the players' number, the monsters about stay as many
+    // (tougher all the same). The pace of the kills a little on top
+    // (MaxPopulation times at most).
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    float const base = float(def->summonCount) * (HasWaves(def->objectiveType) ? 1.0f : Crowd(players));
+    uint32 const population = uint32(std::lround(std::clamp(base + pace * respawn * c.adaptiveAggression, base, base * c.maxPopulation)));
 
     // Nobody near: the grid sleeps, no monster is brought.
-    uint32 const floor = uint32(std::ceil(float(def->summonCount) * c.minAlivePct / 100.0f));
+    uint32 const floor = uint32(std::ceil(base * c.minAlivePct / 100.0f));
     bool const thin = c.adaptiveSpawn && active.filled && alive < floor;
     if (alive >= population || (active.summonTimer > 0 && !thin) || !map->IsGridLoaded(active.spawn.x, active.spawn.y))
         return;
@@ -2160,6 +2176,7 @@ void WowFatesExpeditionMgr::UpdateSummons(WowFatesActiveExpedition& active, Map*
 
         summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
         summon->SetTimer(SUMMON_CORPSE_MS);
+        Toughen(active, summon, players);
 
         // They roam around where they appeared, back to it after a fight: random
         // as their default movement, so that a reset of their AI keeps it.
@@ -2343,6 +2360,7 @@ void WowFatesExpeditionMgr::UpdateGather(WowFatesActiveExpedition& active, Map* 
                 TempSummon* guard = map->SummonCreature(def->summonEntry, at);
                 if (!guard)
                     break;
+                Toughen(active, guard, uint32(std::max<std::size_t>(active.inside.size(), 1)));
                 guard->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
                 guard->SetTimer(SUMMON_CORPSE_MS);
                 guard->SetHomePosition(at);
@@ -2449,6 +2467,50 @@ void WowFatesExpeditionMgr::OnGather(Player* player, GameObject* go)
 
 // ---------------------------------------------------------------------------
 // Defence, and the waves
+
+// How many monsters for the players in the area: the players to the power
+// WowFates.Scaling.Count (a square root): one player 1, nine 3, forty 6.3.
+// Their health (Toughen) takes the rest, so that count x health follows the
+// players.
+// The types whose waves come (from the edge, around an ally or a chief).
+bool WowFatesExpeditionMgr::HasWaves(uint8 type)
+{
+    return type == WOW_FATES_OBJECTIVE_DEFENCE || type == WOW_FATES_OBJECTIVE_INVOKE || type == WOW_FATES_OBJECTIVE_SUPPORT
+        || type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT || type == WOW_FATES_OBJECTIVE_ESCORT || type == WOW_FATES_OBJECTIVE_CAPTURE
+        || type == WOW_FATES_OBJECTIVE_WARLORD;
+}
+
+float WowFatesExpeditionMgr::Crowd(uint32 players)
+{
+    return std::pow(float(std::max<uint32>(players, 1)), WowFatesConf().scaleCount);
+}
+
+// A monster of an Expedition for the players in its area: its health times
+// the players to the power WowFates.Scaling.Health, its damage to the power
+// WowFates.Scaling.Damage; its share of health kept as they come and go.
+void WowFatesExpeditionMgr::Toughen(WowFatesActiveExpedition& active, Creature* creature, uint32 players)
+{
+    if (!creature->IsAlive())
+        return;
+    players = std::max<uint32>(players, 1);
+    auto [itr, fresh] = active.toughened.try_emplace(creature->GetGUID(), creature->GetMaxHealth(), 1);
+    if (!fresh && itr->second.second == players)
+        return;
+    WowFatesConfig const& c = WowFatesConf();
+    double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
+    uint32 const maxHealth = std::max<uint32>(1, uint32(double(itr->second.first) * std::pow(double(players), double(c.scaleHealth))));
+    creature->SetCreateHealth(maxHealth);
+    creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
+    creature->UpdateMaxHealth();
+    uint32 const max = creature->GetMaxHealth();
+    creature->SetHealth(std::clamp<uint32>(uint32(std::lround(double(max) * share)), 1, max));
+    float const hit = std::pow(float(players), c.scaleDamage);
+    creature->SetStatPctModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, hit);
+    creature->SetStatPctModifier(UNIT_MOD_DAMAGE_RANGED, TOTAL_PCT, hit);
+    creature->UpdateDamagePhysical(BASE_ATTACK);
+    creature->UpdateDamagePhysical(RANGED_ATTACK);
+    itr->second.second = players;
+}
 
 // The health of a creature for the players in the area, as the objective:
 // its maximum follows them up and down, its share of health stays (78 % with
@@ -2559,11 +2621,9 @@ void WowFatesExpeditionMgr::UpdateDefence(WowFatesActiveExpedition& active, Map*
     active.progressPct = std::min(100.0, 100.0 * double(active.held) / double(int64(active.def->holdTime) * IN_MILLISECONDS));
 
     active.waveTimer -= diff;
-    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y))
-    {
+    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y)
+        && SendWave(active, map, ally))
         active.waveTimer = int64(active.def->waveInterval) * IN_MILLISECONDS;
-        SendWave(active, map, ally);
-    }
 }
 
 // A point of the edge of the area near an angle, for a wave to come from: the
@@ -2601,7 +2661,7 @@ bool WowFatesExpeditionMgr::EdgePoint(WowFatesActiveExpedition const& active, Ma
 // drawn again for each wave and at least a quarter turn over their number
 // apart, and runs at the target (or the centre, when there is none). Back
 // from a fight with the players, they go back to it.
-void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around,
+bool WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map, Unit* target, Position const* around,
     Position const* goal)
 {
     WowFatesExpeditionDef const* def = active.def;
@@ -2610,17 +2670,33 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         return !map->GetCreature(guid);
     });
 
+    // one after the other, never piled up: the last one down to NextAt of
+    // its monsters alive first (false: the caller tries again later)
     WowFatesConfig const& c = WowFatesConf();
+    if (!active.waveMobs.empty())
+    {
+        std::size_t const alive = std::count_if(active.waveMobs.begin(), active.waveMobs.end(), [map](ObjectGuid const& guid)
+        {
+            Creature* creature = map->GetCreature(guid);
+            return creature && creature->IsAlive();
+        });
+        if (float(alive) > c.waveNextAt * float(active.waveMobs.size()))
+            return false;
+    }
+
     if (active.wave)
     {
         bool const fast = active.waveClearedAt >= 0
             && active.waveClearedAt - active.waveSentAt <= int64(c.wavePaceFast * float(def->waveInterval) * IN_MILLISECONDS);
         active.pace = fast ? std::min(c.wavePaceMax, active.pace + c.wavePaceStep)
-            : std::max(1.0f, active.pace - c.wavePaceStep);
+            : std::max(c.wavePaceMin, active.pace - c.wavePaceStep);
     }
 
+    // wave_size for one player, times the square root of the players
+    // (Crowd: their health takes the rest), the pace of the kills a little
+    // on top (PaceMin to PaceMax), wave_growth more for each wave sent
     uint32 const characters = uint32(std::max<std::size_t>(active.inside.size(), 1));
-    uint32 const count = std::max<uint32>(1, uint32(std::lround(c.wavePerCharacter * float(def->waveSize) * float(characters) * active.pace))
+    uint32 const count = std::max<uint32>(1, uint32(std::lround(c.wavePerCharacter * float(def->waveSize) * Crowd(characters) * active.pace))
         + def->waveGrowth * active.wave);
     ++active.wave;
     active.waveMobs.clear();
@@ -2663,6 +2739,7 @@ void WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
             break;
         summon->SetTempSummonType(TEMPSUMMON_CORPSE_TIMED_DESPAWN);
         summon->SetTimer(SUMMON_CORPSE_MS);
+        Toughen(active, summon, characters);
         active.summons.push_back(summon->GetGUID());
         active.waveMobs.push_back(summon->GetGUID());
         if (engaged < cap)
@@ -2783,11 +2860,9 @@ void WowFatesExpeditionMgr::UpdateInvoke(WowFatesActiveExpedition& active, Map* 
     }
 
     active.waveTimer -= diff;
-    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y))
-    {
+    if (active.waveTimer <= 0 && active.progressPct < 100.0 && map->IsGridLoaded(active.spawn.x, active.spawn.y)
+        && SendWave(active, map, channeling.empty() ? nullptr : Acore::Containers::SelectRandomContainerElement(channeling)))
         active.waveTimer = int64(active.def->waveInterval) * IN_MILLISECONDS;
-        SendWave(active, map, channeling.empty() ? nullptr : Acore::Containers::SelectRandomContainerElement(channeling));
-    }
 }
 
 // The channel's own length, thirty seconds by its row.
@@ -3049,13 +3124,13 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
             uint32 const bit = 1u << i;
             if ((active.bossWavesSent & bit) || active.progressPct < double(def->bossWaves[i]))
                 continue;
-            active.bossWavesSent |= bit;
             Unit* target = ally && ally->IsAlive() ? static_cast<Unit*>(ally) : nullptr;
             if (urand(0, 1) || !target)
                 if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
                     if (player->IsInWorld() && player->IsAlive())
                         target = player;
-            SendWave(active, map, target);
+            if (SendWave(active, map, target)) // else again, once the last pack is down
+                active.bossWavesSent |= bit;
             break;
         }
 
@@ -3266,8 +3341,6 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
         uint32 const bit = 1u << i;
         if ((active.bossWavesSent & bit) || active.progressPct < double(def->bossWaves[i]))
             continue;
-        active.bossWavesSent |= bit;
-        Say(ally, ESCORT_SAY_AMBUSH);
         Position const around = ally->GetPosition();
         // at him, or at one of his caravan
         Unit* target = ally;
@@ -3278,7 +3351,11 @@ void WowFatesExpeditionMgr::UpdateEscort(WowFatesActiveExpedition& active, Map* 
                     others.push_back(creature);
         if (!others.empty() && urand(0, 1))
             target = Acore::Containers::SelectRandomContainerElement(others);
-        SendWave(active, map, target, &around);
+        if (SendWave(active, map, target, &around)) // else again, once the last one is down
+        {
+            active.bossWavesSent |= bit;
+            Say(ally, ESCORT_SAY_AMBUSH);
+        }
         break;
     }
 
@@ -3764,7 +3841,6 @@ void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map*
     active.waveTimer -= diff;
     if (active.waveTimer <= 0 && map->IsGridLoaded(active.spawn.x, active.spawn.y))
     {
-        active.waveTimer = int64(float(def->waveInterval) * frand(0.7f, 1.3f) * IN_MILLISECONDS);
         std::vector<Position> held, all;
         for (WowFatesActiveExpedition::Flag const& flag : active.flags)
         {
@@ -3773,7 +3849,8 @@ void WowFatesExpeditionMgr::UpdateCapture(WowFatesActiveExpedition& active, Map*
                 held.push_back(flag.pos);
         }
         Position const goal = Acore::Containers::SelectRandomContainerElement(held.empty() ? all : held);
-        SendWave(active, map, nullptr, nullptr, &goal);
+        if (SendWave(active, map, nullptr, nullptr, &goal)) // else again, once the last squad is down
+            active.waveTimer = int64(float(def->waveInterval) * frand(0.7f, 1.3f) * IN_MILLISECONDS);
     }
 }
 
@@ -3938,6 +4015,39 @@ void WowFatesExpeditionMgr::UseMechanic(WowFatesActiveExpedition& active, Map* m
     }
 }
 
+// A warlord out of his fight alive (he evaded, went back to his place): his
+// band and its reinforcements go, every monster of the Expedition alive; his
+// phases and mechanics are armed again, his health full for the players
+// there, the bar back to 0; he speaks again when the next fight begins.
+void WowFatesExpeditionMgr::ResetWarlord(WowFatesActiveExpedition& active, Map* map, Creature* boss)
+{
+    active.bossFought = false;
+    for (ObjectGuid const& guid : active.summons)
+        if (Creature* creature = map->GetCreature(guid))
+            if (creature->IsAlive())
+            {
+                creature->CombatStop(true);
+                creature->DespawnOrUnsummon();
+            }
+    active.waveMobs.clear();
+    active.waiting.clear();
+    active.phaseWave = false;
+    active.bossWavesSent = 0;
+    active.phase = 0;
+    active.bossSaid = 0;
+    active.leapAt = 0;
+    active.filled = false;
+    for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
+    {
+        drawn.used = false;
+        drawn.cooldown = int64(urand(drawn.mechanic->cooldownMin, drawn.mechanic->cooldownMax)) * IN_MILLISECONDS / 2;
+    }
+    boss->SetFullHealth();
+    active.progressPct = 0.0;
+    active.sentProgress = 0;
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: its warlord was reset; his band is gone, the bar back to 0.", active.def->id);
+}
+
 // A warlord's chief (PickChief: drawn from mod_wow_fates_chief at the start,
 // always an elite, bigger by Boss.Scale) in the centre as soon as the area is
 // loaded; the game's own figure he stands for kept out of the area meanwhile
@@ -4004,6 +4114,12 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
         active.progressPct = 100.0;
         return;
     }
+    // out of a fight alive (he evaded, went back to his place): reset
+    if (boss->IsInCombat())
+        active.bossFought = true;
+    else if (active.bossFought)
+        ResetWarlord(active, map, boss);
+
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
@@ -4015,7 +4131,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
     {
         active.bossSaid |= 1;
         Say(boss, BOSS_SAY_START);
-        if (def->timeLimit)
+        if (def->timeLimit && !active.deadline) // the clock runs on through a reset
             active.deadline = active.elapsed + int64(def->timeLimit) * IN_MILLISECONDS;
         active.spellTimer = urand(4, 8) * IN_MILLISECONDS;
         for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
@@ -4057,14 +4173,20 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
                 UseMechanic(active, map, boss, drawn.mechanic);
                 drawn.used = true;
             }
+        active.phaseWave = true;
+        break;
+    }
+    // the phase's band, once the last one is down
+    if (active.phaseWave)
+    {
         Unit* target = boss->GetVictim();
         if (!active.inside.empty())
             if (Player* player = ObjectAccessor::FindPlayer(Acore::Containers::SelectRandomContainerElement(active.inside)))
                 if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map)
                     target = player;
         Position const around = boss->GetPosition();
-        SendWave(active, map, target, &around);
-        break;
+        if (SendWave(active, map, target, &around))
+            active.phaseWave = false;
     }
 
     // his mechanics of the phases passed, each at its cooldown, one at a time
@@ -4417,6 +4539,50 @@ void WowFatesExpeditionMgr::Check(ChatHandler* handler, uint32 id)
     std::string const summary = Acore::StringFormat("mod-wow-fates: {} points checked, {} failing.", checked, failing);
     handler->SendSysMessage(summary);
     LOG_INFO("module", "{}", summary);
+}
+
+// The scaling of an Expedition (0: of all) for some numbers of players (0:
+// 1, 5, 9, 10, 20 and 40): the first wave and the fourth (wave_growth), each
+// between PaceMin and PaceMax; the monsters about (MaxPopulation at most);
+// the most alive at once (the monsters about at their most, a wave at its
+// biggest and what is left of the last one, NextAt; a sabotage's guards);
+// each one's health and damage, and those of a boss or an ally.
+void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 players)
+{
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    WowFatesConfig const& c = WowFatesConf();
+    std::vector<uint32> counts = players ? std::vector<uint32>{ players } : std::vector<uint32>{ 1, 5, 9, 10, 20, 40 };
+    for (auto const& [defId, def] : _defs)
+    {
+        if (id && defId != id)
+            continue;
+        uint8 const type = def.objectiveType;
+        bool const waves = HasWaves(type);
+        handler->SendSysMessage(Acore::StringFormat("Expedition {} ({}), type {}: wave_size {}, wave_growth {}, summon_count {}{}",
+            defId, def.name, uint32(type), def.waveSize, def.waveGrowth, def.summonCount, waves ? "" : ", no waves"));
+        for (uint32 n : counts)
+        {
+            float const crowd = Crowd(n);
+            auto wave = [&](uint32 index, float pace)
+            {
+                return std::max<uint32>(1, uint32(std::lround(c.wavePerCharacter * float(def.waveSize) * crowd * pace))) + def.waveGrowth * index;
+            };
+            float const base = float(def.summonCount) * (waves ? 1.0f : crowd);
+            uint32 const about = uint32(std::lround(base)), aboutMax = uint32(std::lround(base * c.maxPopulation));
+            uint32 const biggest = waves ? wave(3, c.wavePaceMax) : 0;
+            uint32 alive = aboutMax + biggest + uint32(std::ceil(float(biggest) * c.waveNextAt));
+            if (type == WOW_FATES_OBJECTIVE_SABOTAGE)
+                alive += def.gatherCount * def.waveSize;
+            std::string line = Acore::StringFormat("  {} players: ", n);
+            if (waves)
+                line += Acore::StringFormat("wave 1: {} ({}-{}), wave 4: {} ({}-{}); ", wave(0, 1.0f), wave(0, c.wavePaceMin),
+                    wave(0, c.wavePaceMax), wave(3, 1.0f), wave(3, c.wavePaceMin), wave(3, c.wavePaceMax));
+            line += Acore::StringFormat("about {} (up to {}); at most {} alive; each x{:.2f} health, x{:.2f} damage; a boss or an ally x{:.2f} health",
+                about, aboutMax, alive, std::pow(float(n), c.scaleHealth), std::pow(float(n), c.scaleDamage),
+                1.0f + c.participantScaling * float(n - 1));
+            handler->SendSysMessage(line);
+        }
+    }
 }
 
 void WowFatesExpeditionMgr::ListDefinitions(ChatHandler* handler)
