@@ -243,6 +243,19 @@ WowFates.Expedition.AreaInterval        = 1000
 #    WowFates.Scaling.Ally
 #        See above.
 #
+#    WowFates.Chain.MinStages
+#    WowFates.Chain.MaxStages
+#        A chain (type 13): its stages, Expeditions of its zone, drawn
+#        between these (2 to 5), never two of a type, never a chain.
+#
+#    WowFates.Chain.Pause
+#        Seconds between a stage done and the next, near it.
+#
+#    WowFates.Chain.BonusPerStage
+#        A chain done: its last stage's rewards, one draw more per stage
+#        beyond the first, times this (1: a chain of four gives four times
+#        the last stage's rewards), by the participation as ever.
+#
 #    WowFates.Talk.WarningGap
 #        A chief warns before his heaviest attack only (his area, else his
 #        cast to interrupt, else his strike), this many seconds apart at least.
@@ -307,6 +320,10 @@ WowFates.Scaling.Health                 = 0.75
 WowFates.Scaling.Damage                 = 0.4
 WowFates.Scaling.Boss                   = 1.11
 WowFates.Scaling.Ally                   = 1.0
+WowFates.Chain.MinStages                = 2
+WowFates.Chain.MaxStages                = 5
+WowFates.Chain.Pause                    = 15
+WowFates.Chain.BonusPerStage            = 1.0
 WowFates.Talk.WarningGap                = 30
 WowFates.Talk.Gap                       = 20
 WowFates.Talk.GenericMin                = 60

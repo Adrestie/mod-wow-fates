@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_expedition` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(100) NOT NULL DEFAULT '' COMMENT 'English; the other languages in mod_wow_fates_expedition_locale',
   `level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Synced level: whoever is stronger than this level in the area is brought down to it',
-  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence, 5 = invocation, 6 = wave support, 7 = boss support, 8 = sabotage, 9 = escort, 10 = rescue, 11 = capture, 12 = warlord (mod_wow_fates_objective)',
+  `objective_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = kill monsters in the area; 2 = assault and boss, 3 = gathering, 4 = defence, 5 = invocation, 6 = wave support, 7 = boss support, 8 = sabotage, 9 = escort, 10 = rescue, 11 = capture, 12 = warlord, 13 = chain: two to five Expeditions of the zone of its spawn point, one after the other (mod_wow_fates_objective)',
   `objective_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry counted; 0 = any monster',
   `objective_count` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'kills to complete it',
   `summon_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'creature_template.entry the Expedition brings; 0 = the monsters already there',

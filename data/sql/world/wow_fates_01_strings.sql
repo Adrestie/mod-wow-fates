@@ -74,7 +74,8 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  50, 'Nowhere to run!'),
 ('mod-wow-fates',  51, 'Who''s next? You!'),
 ('mod-wow-fates',  52, 'Stop me if you can!'),
-('mod-wow-fates',  53, 'My strength grows!');
+('mod-wow-fates',  53, 'My strength grows!'),
+('mod-wow-fates',  54, 'Stage {}/{}: {}');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -332,4 +333,8 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  50, 'ruRU', 'Бежать некуда!'),
 ('mod-wow-fates',  51, 'ruRU', 'Кто следующий? Ты!'),
 ('mod-wow-fates',  52, 'ruRU', 'Остановите меня, если сможете!'),
-('mod-wow-fates',  53, 'ruRU', 'Моя сила растёт!');
+('mod-wow-fates',  53, 'ruRU', 'Моя сила растёт!'),
+('mod-wow-fates',  54, 'frFR', 'Étape {}/{} : {}'),
+('mod-wow-fates',  54, 'deDE', 'Etappe {}/{}: {}'),
+('mod-wow-fates',  54, 'esES', 'Etapa {}/{}: {}'),
+('mod-wow-fates',  54, 'ruRU', 'Этап {}/{}: {}');

@@ -82,6 +82,12 @@ ones and rewards for those who take part.
     band and one more mechanic. The bar is the health he lost;
     `time_limit` out first, it fails. The game's own figure he stands for
     stays out of the area meanwhile.
+  - *Chain*: two to five Expeditions of the zone of its spawn point, drawn
+    at its start (never two of a type, never a chain), one after the other
+    near each other after a short pause (`Chain.*`); "Stage 2/4" on the
+    map and the tracker. Each stage gives its rewards; the chain done, its
+    last stage's rewards one draw more per stage beyond the first. A stage
+    failed or gone, the chain ends.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

@@ -1,4 +1,4 @@
--- mod-wow-fates — fifteen example Expeditions, with the rewards every
+-- mod-wow-fates — seventeen example Expeditions, with the rewards every
 -- Expedition gives by default. Ids 1 to 99 of the module's tables are the
 -- module's own: give yours 100 and up, an update writes these rows again.
 --
@@ -46,6 +46,9 @@
 --      Ravager (96103) and Captain Varrek Blackthorn (96104), made up, whose
 --      mechanics are drawn (wow_fates_08_warlords.sql); his band at 25, 50
 --      and 75 % of the bar; eight minutes
+--  16  Trials of Elwynn, chain: two to five of the Expeditions of Elwynn
+--      Forest above, one after the other, never two of a type
+--  17  Trials of Durotar, chain: the same in Durotar
 --  15  A Warlord in Durotar, Durotar, level 10, warlord: west of Drygulch
 --      Ravine, one chief drawn among Zalazane (96106) and Gazz'uz (96107),
 --      known, and Khan Ruuzak (96108) and Bloodtusk the Gorer (96109), made
@@ -94,7 +97,11 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
 (14, 'Warlord of the Forest''s Edge', 11, 12, 0, 1, 478, 3, 25, 45,   0, 0, 1, 1, 'Elwynn Forest: a warlord drawn among Hogger, Morgaine the Sly and two made up, his band about',
    '{} has seized the camp at the Forest''s Edge and gathers a warband there: bring the warlord down before the band scatters into the forest.', 'Defeat {}', '{} calls the warband!'),
 (15, 'A Warlord in Durotar', 10, 12, 0, 1, 3197, 3, 25, 45,   0, 0, 1, 1, 'Durotar: a warlord drawn among Zalazane, Gazz''uz and two made up, his band about',
-   '{} has raised a warband in the hills of Durotar: bring the warlord down before it marches on Razor Hill.', 'Defeat {}', '{} calls the warband!');
+   '{} has raised a warband in the hills of Durotar: bring the warlord down before it marches on Razor Hill.', 'Defeat {}', '{} calls the warband!'),
+(16, 'Trials of Elwynn', 9, 13, 0, 1, 0, 0, 10, 5,   0, 0, 1, 1, 'Elwynn Forest: two to five Expeditions of the forest one after the other',
+   'Trouble never comes alone in Elwynn Forest: answer each call in turn, the more you see through, the greater the reward.', 'Trials of Elwynn', ''),
+(17, 'Trials of Durotar', 9, 13, 0, 1, 0, 0, 10, 5,   0, 0, 1, 1, 'Durotar: two to five Expeditions of Durotar one after the other',
+   'Durotar is beset on every side: answer each call in turn, the more you see through, the greater the reward.', 'Trials of Durotar', '');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -115,7 +122,9 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 1200, 0,      0, '', '', 'Zalazane''s Captives: five captives, three cages out at a time; over when all are led out or dead, done if one was led out (rewards by the share), failed if all died; twenty minutes against a rescue left undone'),
 (13,    0, 70, 960003, 3, 5,      0,  60, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 0, 960004, '', '', 'Banners over Molsen Farm: three positions, a minute standing in one alone takes it, ten minutes from the first player; a squad every 45 s or so'),
 (14,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'Warlord of the Forest''s Edge: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes'),
-(15,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'A Warlord in Durotar: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes');
+(15,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'A Warlord in Durotar: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes'),
+(16,     0, 70,      0, 8, 5,      0, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 0,      0, '', '', 'Trials of Elwynn: a chain, its stages drawn among the forest''s Expeditions'),
+(17,     0, 70,      0, 8, 5,      0, 240, 40, 3, 1,      0, 1, 5, '25,50,75',   0, 0,      0, '', '', 'Trials of Durotar: a chain, its stages drawn among Durotar''s Expeditions');
 
 -- A made-up chief's mechanics beyond the four of his fight: one or two.
 UPDATE `mod_wow_fates_objective` SET `mechanics_min` = 1, `mechanics_max` = 2 WHERE `expedition` BETWEEN 1 AND 99;
@@ -271,7 +280,27 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
 (15, 'esMX', 'Un señor de la guerra en Durotar',
    '{} ha levantado una banda de guerra en las colinas de Durotar: derrota al señor de la guerra antes de que marche sobre Cerrotajo.', 'Derrota a {}', '¡{} llama a su banda!'),
 (15, 'ruRU', 'Военачальник в Дуротаре',
-   '{} собрал боевой отряд в холмах Дуротара: одолейте военачальника, пока он не двинулся на Колючий Холм.', 'Одолейте: {}', '{} зовёт свой отряд!');
+   '{} собрал боевой отряд в холмах Дуротара: одолейте военачальника, пока он не двинулся на Колючий Холм.', 'Одолейте: {}', '{} зовёт свой отряд!'),
+(16, 'frFR', 'Les épreuves d''Elwynn',
+   'Les ennuis n''arrivent jamais seuls dans la forêt d''Elwynn : répondez à chaque appel tour à tour, plus vous irez loin, plus grande sera la récompense.', 'Les épreuves d''Elwynn', ''),
+(16, 'deDE', 'Die Prüfungen von Elwynn',
+   'Im Wald von Elwynn kommt ein Unglück selten allein: Folgt jedem Ruf der Reihe nach, je weiter Ihr kommt, desto größer der Lohn.', 'Die Prüfungen von Elwynn', ''),
+(16, 'esES', 'Las pruebas de Elwynn',
+   'Los problemas nunca vienen solos en el Bosque de Elwynn: responde a cada llamada por turno, cuanto más lejos llegues, mayor será la recompensa.', 'Las pruebas de Elwynn', ''),
+(16, 'esMX', 'Las pruebas de Elwynn',
+   'Los problemas nunca vienen solos en el Bosque de Elwynn: responde a cada llamada por turno, cuanto más lejos llegues, mayor será la recompensa.', 'Las pruebas de Elwynn', ''),
+(16, 'ruRU', 'Испытания Элвинна',
+   'В Элвиннском лесу беда не приходит одна: откликайтесь на каждый зов по очереди — чем дальше вы пройдёте, тем щедрее награда.', 'Испытания Элвинна', ''),
+(17, 'frFR', 'Les épreuves de Durotar',
+   'Durotar est assailli de toutes parts : répondez à chaque appel tour à tour, plus vous irez loin, plus grande sera la récompense.', 'Les épreuves de Durotar', ''),
+(17, 'deDE', 'Die Prüfungen von Durotar',
+   'Durotar wird von allen Seiten bedrängt: Folgt jedem Ruf der Reihe nach, je weiter Ihr kommt, desto größer der Lohn.', 'Die Prüfungen von Durotar', ''),
+(17, 'esES', 'Las pruebas de Durotar',
+   'Durotar está asediado por todas partes: responde a cada llamada por turno, cuanto más lejos llegues, mayor será la recompensa.', 'Las pruebas de Durotar', ''),
+(17, 'esMX', 'Las pruebas de Durotar',
+   'Durotar está asediado por todas partes: responde a cada llamada por turno, cuanto más lejos llegues, mayor será la recompensa.', 'Las pruebas de Durotar', ''),
+(17, 'ruRU', 'Испытания Дуротара',
+   'Дуротар осаждён со всех сторон: откликайтесь на каждый зов по очереди — чем дальше вы пройдёте, тем щедрее награда.', 'Испытания Дуротара', '');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -304,7 +333,9 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
    '-1153.0,-5446.0,8.7'),
 (22, 13, 0, -9867.0,   -156.0,    32.0,    0, 'Elwynn Forest, Molsen Farm, the Defias Bandits south of Goldshire', ''),
 (23, 14, 0, -10107.2,   617.8,    38.1,    0, 'Elwynn Forest, Hogger''s camp at the Forest''s Edge', ''),
-(24, 15, 1,   641.3,  -4664.4,    22.1,    0, 'Durotar, west of Drygulch Ravine', '');
+(24, 15, 1,   641.3,  -4664.4,    22.1,    0, 'Durotar, west of Drygulch Ravine', ''),
+(25, 16, 0, -9175.0,     78.0,    77.7,    0, 'Elwynn Forest: the chain''s zone', ''),
+(26, 17, 1,   641.3,  -4664.4,    22.1,    0, 'Durotar: the chain''s zone', '');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES

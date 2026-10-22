@@ -57,7 +57,7 @@
     (state 0 the foe's, 1 being taken, 2 ours, 3 fought over: drawn on the maps in their colour);
     "end" with id and 1 or 0; "me" with id, kills and participation
     (0 none, 1 not enough yet, 2 enough); "boss" with id and the leader's name,
-    "defend" with id and the ally's name, "escort" with id and the ally's name, "rescue" with id and the captives' name, "capture" with id and the banners' name, "warlord" with id and its name, "invoke" with id and the altar's
+    "defend" with id and the ally's name, "escort" with id and the ally's name, "rescue" with id and the captives' name, "capture" with id and the banners' name, "warlord" with id and its name, "chain" with id and the next stage's words, "invoke" with id and the altar's
     name, "wave" with id, its number and the Expedition's words for it (a banner each); "sync" with level and percent kept.
     Positions are world coordinates. WowFatesBounds
     (WowFates_Bounds_Client.lua, from WorldMapArea.dbc) gives each map's edges
@@ -109,35 +109,35 @@ local TRACKER_TEXTS = {
         leaving = "You leave the Expedition", success = "Expedition complete", failed = "Expedition failed",
         part0 = "Participation: none", part1 = "Participation: light", part2 = "Participation: medium", part3 = "Participation: strong",
         expected = "Expected rewards:", noReward = "No reward", fullRewards = "Rewards:", bravo = "Well done!", earned = "You earned:", done = "Expedition complete", xp = "%d XP",
-        kills = "Your kills: %d", types = { "Extermination", "Assault and boss", "Gathering", "Defence", "Invocation", "Wave support", "Boss support", "Sabotage", "Escort", "Rescue", "Capture", "Warlord" }, boss = "%s appears!", invoke = "%s: channel!", defend = "Protect %s!", warlord = "Defeat %s!", capture = "Take: %s!", rescue = "Free: %s!", escort = "Escort %s!", wave = "Wave %d", synced = "Synced to level %d: you keep %d%% of your power.",
+        kills = "Your kills: %d", types = { "Extermination", "Assault and boss", "Gathering", "Defence", "Invocation", "Wave support", "Boss support", "Sabotage", "Escort", "Rescue", "Capture", "Warlord", "Chain" }, boss = "%s appears!", invoke = "%s: channel!", defend = "Protect %s!", warlord = "Defeat %s!", capture = "Take: %s!", rescue = "Free: %s!", escort = "Escort %s!", wave = "Wave %d", synced = "Synced to level %d: you keep %d%% of your power.",
     },
     frFR = {
         title = "%s - Niveau %d", banner = "Expédition : %s", bannerLevel = "Niveau %d",
         leaving = "Vous quittez l'Expédition", success = "Expédition accomplie", failed = "Expédition échouée",
         part0 = "Participation : aucune", part1 = "Participation : légère", part2 = "Participation : moyenne", part3 = "Participation : forte",
         expected = "Récompenses attendues :", noReward = "Aucune récompense", fullRewards = "Récompenses :", bravo = "Bravo !", earned = "Vous avez gagné :", done = "Expédition terminée", xp = "%d XP",
-        kills = "Vos victimes : %d", types = { "Extermination", "Assaut et chef", "Collecte", "Défense", "Invocation", "Soutien de vagues", "Soutien contre un chef", "Sabotage", "Escorte", "Sauvetage", "Capture de points", "Chef de guerre" }, boss = "%s apparaît !", invoke = "%s : canalisez !", defend = "Protégez %s !", warlord = "Abattez %s !", capture = "Prenez : %s !", rescue = "Libérez : %s !", escort = "Escortez %s !", wave = "Vague %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
+        kills = "Vos victimes : %d", types = { "Extermination", "Assaut et chef", "Collecte", "Défense", "Invocation", "Soutien de vagues", "Soutien contre un chef", "Sabotage", "Escorte", "Sauvetage", "Capture de points", "Chef de guerre", "Chaîne" }, boss = "%s apparaît !", invoke = "%s : canalisez !", defend = "Protégez %s !", warlord = "Abattez %s !", capture = "Prenez : %s !", rescue = "Libérez : %s !", escort = "Escortez %s !", wave = "Vague %d", synced = "Synchronisé au niveau %d : vous gardez %d %% de votre puissance.",
     },
     deDE = {
         title = "%s - Stufe %d", banner = "Expedition: %s", bannerLevel = "Stufe %d",
         leaving = "Ihr verlasst die Expedition", success = "Expedition abgeschlossen", failed = "Expedition gescheitert",
         part0 = "Teilnahme: keine", part1 = "Teilnahme: gering", part2 = "Teilnahme: mittel", part3 = "Teilnahme: stark",
         expected = "Erwartete Belohnungen:", noReward = "Keine Belohnung", fullRewards = "Belohnungen:", bravo = "Gut gemacht!", earned = "Ihr habt erhalten:", done = "Expedition abgeschlossen", xp = "%d EP",
-        kills = "Eure Siege: %d", types = { "Vernichtung", "Angriff und Anführer", "Sammeln", "Verteidigung", "Beschwörung", "Wellenabwehr", "Beistand gegen einen Anführer", "Sabotage", "Geleitschutz", "Befreiung", "Eroberung", "Kriegsherr" }, boss = "%s erscheint!", invoke = "%s: kanalisiert!", defend = "Beschützt %s!", warlord = "Bezwingt %s!", capture = "Erobert: %s!", rescue = "Befreit: %s!", escort = "Begleitet %s!", wave = "Welle %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
+        kills = "Eure Siege: %d", types = { "Vernichtung", "Angriff und Anführer", "Sammeln", "Verteidigung", "Beschwörung", "Wellenabwehr", "Beistand gegen einen Anführer", "Sabotage", "Geleitschutz", "Befreiung", "Eroberung", "Kriegsherr", "Kette" }, boss = "%s erscheint!", invoke = "%s: kanalisiert!", defend = "Beschützt %s!", warlord = "Bezwingt %s!", capture = "Erobert: %s!", rescue = "Befreit: %s!", escort = "Begleitet %s!", wave = "Welle %d", synced = "Auf Stufe %d synchronisiert: Ihr behaltet %d %% Eurer Macht.",
     },
     esES = {
         title = "%s - Nivel %d", banner = "Expedición: %s", bannerLevel = "Nivel %d",
         leaving = "Sales de la Expedición", success = "Expedición completada", failed = "Expedición fracasada",
         part0 = "Participación: ninguna", part1 = "Participación: leve", part2 = "Participación: media", part3 = "Participación: fuerte",
         expected = "Recompensas esperadas:", noReward = "Ninguna recompensa", fullRewards = "Recompensas:", bravo = "¡Bien hecho!", earned = "Has ganado:", done = "Expedición terminada", xp = "%d de experiencia",
-        kills = "Tus víctimas: %d", types = { "Exterminio", "Asalto y líder", "Recolección", "Defensa", "Invocación", "Apoyo contra oleadas", "Apoyo contra un líder", "Sabotaje", "Escolta", "Rescate", "Captura", "Señor de la guerra" }, boss = "¡%s aparece!", invoke = "%s: ¡canaliza!", defend = "¡Protege a %s!", warlord = "¡Derrota a %s!", capture = "¡Toma: %s!", rescue = "¡Libera: %s!", escort = "¡Escolta a %s!", wave = "Oleada %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
+        kills = "Tus víctimas: %d", types = { "Exterminio", "Asalto y líder", "Recolección", "Defensa", "Invocación", "Apoyo contra oleadas", "Apoyo contra un líder", "Sabotaje", "Escolta", "Rescate", "Captura", "Señor de la guerra", "Cadena" }, boss = "¡%s aparece!", invoke = "%s: ¡canaliza!", defend = "¡Protege a %s!", warlord = "¡Derrota a %s!", capture = "¡Toma: %s!", rescue = "¡Libera: %s!", escort = "¡Escolta a %s!", wave = "Oleada %d", synced = "Sincronizado al nivel %d: conservas el %d %% de tu poder.",
     },
     ruRU = {
         title = "%s - уровень %d", banner = "Экспедиция: %s", bannerLevel = "Уровень %d",
         leaving = "Вы покидаете экспедицию", success = "Экспедиция завершена", failed = "Экспедиция провалена",
         part0 = "Участие: нет", part1 = "Участие: слабое", part2 = "Участие: среднее", part3 = "Участие: сильное",
         expected = "Ожидаемые награды:", noReward = "Нет награды", fullRewards = "Награды:", bravo = "Отлично!", earned = "Вы получили:", done = "Экспедиция завершена", xp = "%d ед. опыта",
-        kills = "Ваши победы: %d", types = { "Истребление", "Штурм и главарь", "Сбор", "Оборона", "Призыв", "Отражение волн", "Поддержка против главаря", "Саботаж", "Сопровождение", "Спасение", "Захват", "Военачальник" }, boss = "Появляется %s!", invoke = "%s: поддерживайте ритуал!", defend = "Защитите: %s!", warlord = "Одолейте: %s!", capture = "Захватите: %s!", rescue = "Освободите: %s!", escort = "Сопроводите: %s!", wave = "Волна %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
+        kills = "Ваши победы: %d", types = { "Истребление", "Штурм и главарь", "Сбор", "Оборона", "Призыв", "Отражение волн", "Поддержка против главаря", "Саботаж", "Сопровождение", "Спасение", "Захват", "Военачальник", "Цепочка" }, boss = "Появляется %s!", invoke = "%s: поддерживайте ритуал!", defend = "Защитите: %s!", warlord = "Одолейте: %s!", capture = "Захватите: %s!", rescue = "Освободите: %s!", escort = "Сопроводите: %s!", wave = "Волна %d", synced = "Синхронизация с уровнем %d: у вас остается %d%% силы.",
     },
 }
 for locale, t in pairs(TRACKER_TEXTS) do
@@ -226,6 +226,9 @@ local function onMessage(message)
         track.alert(id, string.format(L.escort, f[3] or ""))
     elseif command == "invoke" and id then
         track.alert(id, string.format(L.invoke, f[3] or ""))
+    elseif command == "chain" and id then
+        -- a chain's next stage: its words ("Stage 2/4: name")
+        track.alert(id, f[3] or "", WAVE_SOUND)
     elseif command == "wave" and id then
         -- the Expedition's own words ("The Gnolls attack!"), else "Wave N"
         local words = f[4] and f[4] ~= "" and f[4] or string.format(L.wave, tonumber(f[3]) or 0)

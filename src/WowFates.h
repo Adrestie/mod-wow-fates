@@ -97,7 +97,8 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_SAY_CONTROL        = 50,  // before a charge, a fear, a knock back
     WOW_FATES_STR_SAY_AGGRO          = 51,  // before he turns on someone else
     WOW_FATES_STR_SAY_CAST           = 52,  // before a cast to interrupt
-    WOW_FATES_STR_SAY_BUFF           = 53,  // before he grows stronger  // the tracker's second line: an escort's leader's health, his caravan standing
+    WOW_FATES_STR_SAY_BUFF           = 53,  // before he grows stronger
+    WOW_FATES_STR_CHAIN_STAGE        = 54,  // a chain's stage: "Stage 2/4: name"  // the tracker's second line: an escort's leader's health, his caravan standing
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,
@@ -174,6 +175,10 @@ struct WowFatesConfig
     float scaleDamage = 0.4f;        // a monster's or a chief's damage: times the players to this power
     float scaleBoss = 1.11f;         // a boss's or a chief's health: x the players to this power (x60 for forty)
     float scaleAlly = 1.0f;          // an ally's health: x (1 + this x (players - 1))
+    uint32 chainMinStages = 2;       // a chain: its stages, drawn between these
+    uint32 chainMaxStages = 5;
+    uint32 chainPause = 15;          // s between a stage done and the next
+    float chainBonusPerStage = 1.0f; // a chain done: its last stage's rewards, one draw more per stage beyond the first, times this
     uint32 talkWarningGap = 30;      // s between two of a chief's warnings before his heaviest attack at least
     uint32 talkGap = 20;             // s between two lines of a creature at least, whatever they are (but its last words)
     uint32 talkGenericMin = 60;      // s, an ally's lines in the fight: one every Min to Max

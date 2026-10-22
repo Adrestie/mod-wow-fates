@@ -149,6 +149,10 @@ void WowFatesLoadConfig()
     c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.4f), 0.0f);
     c.scaleBoss = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Boss", 1.11f), 0.0f);
     c.scaleAlly = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Ally", 1.0f), 0.0f);
+    c.chainMinStages = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Chain.MinStages", 2), 2, 5);
+    c.chainMaxStages = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Chain.MaxStages", 5), c.chainMinStages, 5);
+    c.chainPause = sConfigMgr->GetOption<uint32>("WowFates.Chain.Pause", 15);
+    c.chainBonusPerStage = std::max(sConfigMgr->GetOption<float>("WowFates.Chain.BonusPerStage", 1.0f), 0.0f);
     c.talkWarningGap = sConfigMgr->GetOption<uint32>("WowFates.Talk.WarningGap", 30);
     c.talkGap = sConfigMgr->GetOption<uint32>("WowFates.Talk.Gap", 20);
     c.talkGenericMin = std::max<uint32>(sConfigMgr->GetOption<uint32>("WowFates.Talk.GenericMin", 60), 1);

@@ -643,6 +643,8 @@ bool WowFatesExpeditionMgr::Start(uint32 id, uint32 spawnId)
     if (spawn == _spawns.end() || spawn->second.expedition != id)
         return false;
 
+    if (def->second.objectiveType == WOW_FATES_OBJECTIVE_CHAIN)
+        return !_chains.count(id) && StartChain(&def->second, &spawn->second);
     StartLocked(&def->second, &spawn->second);
     return true;
 }
@@ -670,6 +672,20 @@ void WowFatesExpeditionMgr::StartLocked(WowFatesExpeditionDef const* def, WowFat
 bool WowFatesExpeditionMgr::Stop(uint32 id)
 {
     std::lock_guard<std::recursive_mutex> guard(_lock);
+
+    // a chain: its stage running, and the chain
+    if (_chains.count(id))
+    {
+        for (auto stage = _active.begin(); stage != _active.end(); ++stage)
+            if (stage->second.chain == id)
+            {
+                Finish(stage->second, false);
+                _active.erase(stage);
+                break;
+            }
+        _chains.erase(id);
+        return true;
+    }
 
     auto itr = _active.find(id);
     if (itr == _active.end())
@@ -702,6 +718,7 @@ void WowFatesExpeditionMgr::StopAll()
     for (auto& [id, active] : _active)
         Finish(active, false);
     _active.clear();
+    _chains.clear();
 }
 
 uint32 WowFatesExpeditionMgr::IdleExpire(WowFatesExpeditionDef const* def) const
@@ -713,6 +730,35 @@ void WowFatesExpeditionMgr::Finish(WowFatesActiveExpedition& active, bool succes
 {
     WowFatesConfig const& c = WowFatesConf();
     Map* map = sMapMgr->FindBaseNonInstanceMap(active.spawn.map);
+
+    // a stage of a chain: done, the next one after a pause (UpdateChains);
+    // the last one done, the chain is done, its bonus in this one's rewards;
+    // failed or gone, the chain ends, the rewards of the stages done kept
+    if (active.chain)
+    {
+        auto chain = _chains.find(active.chain);
+        if (chain != _chains.end())
+        {
+            for (ObjectGuid const& guid : active.inside)
+                chain->second.players.insert(guid);
+            for (auto const& [guid, contribution] : active.contributors)
+                chain->second.players.insert(guid);
+            chain->second.x = active.spawn.x;
+            chain->second.y = active.spawn.y;
+            if (success && active.chainStage + 1 < active.chainStages)
+            {
+                chain->second.pause = int64(c.chainPause) * IN_MILLISECONDS;
+                ++chain->second.index;
+            }
+            else
+            {
+                LOG_INFO("module", "mod-wow-fates: chain {} ends at stage {} of {}, {}.", active.chain, active.chainStage + 1,
+                    active.chainStages, success ? "done" : "failed");
+                _cooldowns[active.chain] = int64(chain->second.def->cooldown ? chain->second.def->cooldown : c.cooldown) * IN_MILLISECONDS;
+                _chains.erase(chain);
+            }
+        }
+    }
 
     LOG_INFO("module", "mod-wow-fates: Expedition {} ends, {} ({} %, {} kills, {} contributors).",
         active.def->id, success ? "complete" : (expired ? "gone for lack of activity" : "failed"),
@@ -882,8 +928,12 @@ std::string WowFatesExpeditionMgr::RewardLine(WowFatesActiveExpedition const& ac
 void WowFatesExpeditionMgr::Reward(WowFatesActiveExpedition const& active, Player* player, WowFatesParticipation part)
 {
     std::vector<WowFatesReward const*> const rows = RewardRows(active, player);
-    // a rescue done when its time ran out: by the share of captives led out
-    uint32 const pct = uint32(std::lround(double(PartPct(part)) * std::clamp(active.rewardShare, 0.0, 1.0)));
+    // a rescue: by the share of captives led out; the last stage of a chain
+    // done: one draw more per stage beyond the first (Chain.BonusPerStage)
+    double times = 1.0;
+    if (active.chain && active.chainStages && active.chainStage + 1 == active.chainStages && active.progressPct >= 100.0)
+        times += WowFatesConf().chainBonusPerStage * double(active.chainStages - 1);
+    uint32 const pct = uint32(std::lround(double(PartPct(part)) * std::clamp(active.rewardShare, 0.0, 1.0) * times));
 
     WorldSession* session = player->GetSession();
     std::string const name = Name(active.def, session);
@@ -975,7 +1025,9 @@ std::string WowFatesExpeditionMgr::MapLine(WowFatesActiveExpedition const& activ
         def->id, active.spawn.map, active.spawn.x, active.spawn.y, def->radius, uint32(def->level),
         std::min<uint32>(uint32(active.progressPct), 100), 100u,
         uint32(std::max<int64>(active.remaining, 0) / IN_MILLISECONDS),
-        Clean(Name(def, session)), Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
+        Clean(active.chainStages ? Acore::StringFormat(WowFatesText(session, WOW_FATES_STR_CHAIN_STAGE), active.chainStage + 1,
+            active.chainStages, Name(def, session)) : Name(def, session)),
+        Clean(Objective(active, session)), Clean(TrackerLabel(active, session)),
         IdleExpire(def), uint32(def->objectiveType), active.inProgress ? 1 : 0, Clean(TrackerGuard(active, session)));
 }
 
@@ -1376,6 +1428,9 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
         if (_populated.count(zone))
             StartInZone(zone, true);
     }
+    // the chains between two stages
+    UpdateChains(diff);
+
     // the zones left without one get another at once
     if (!ended.empty() || !expired.empty())
         Rotate(false);
@@ -1437,7 +1492,8 @@ bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
         std::vector<WowFatesExpeditionDef const*> candidates;
         uint64 totalWeight = 0;
         for (auto const& [id, def] : _defs)
-            if (def.weight && !_active.count(id) && (ignoreCooldown || !_cooldowns.count(id)) && !freePoints(def).empty())
+            if (def.weight && !_active.count(id) && !_chains.count(id) && !Reserved(id) && (ignoreCooldown || !_cooldowns.count(id))
+                && !freePoints(def).empty())
             {
                 candidates.push_back(&def);
                 totalWeight += def.weight;
@@ -1457,10 +1513,160 @@ bool WowFatesExpeditionMgr::StartInZone(uint32 zone, bool force)
             roll -= def->weight;
         }
 
-        StartLocked(chosen, Acore::Containers::SelectRandomContainerElement(freePoints(*chosen)));
+        WowFatesSpawnPoint const* point = Acore::Containers::SelectRandomContainerElement(freePoints(*chosen));
+        if (chosen->objectiveType == WOW_FATES_OBJECTIVE_CHAIN)
+            return StartChain(chosen, point);
+        StartLocked(chosen, point);
         return true;
     }
     return false;
+}
+
+// A chain: its stages drawn among the zone's Expeditions (two to five,
+// Chain.MinStages to MaxStages), each with a point in the zone it may use
+// (under the sky for a sabotage, its route walked...), out of cooldown, not
+// running, never two of a type, never a chain; fewer when the zone has
+// fewer. Then its first stage.
+bool WowFatesExpeditionMgr::StartChain(WowFatesExpeditionDef const* def, WowFatesSpawnPoint const* spawn)
+{
+    if (_chains.count(def->id))
+        return false;
+    WowFatesConfig const& c = WowFatesConf();
+    std::vector<WowFatesExpeditionDef const*> candidates;
+    for (auto const& [id, other] : _defs)
+    {
+        if (other.objectiveType == WOW_FATES_OBJECTIVE_CHAIN || !other.weight || _active.count(id) || _cooldowns.count(id) || Reserved(id))
+            continue;
+        bool const here = std::any_of(other.spawns.begin(), other.spawns.end(), [this, spawn, &other](uint32 spawnId)
+        {
+            WowFatesSpawnPoint const& point = _spawns[spawnId];
+            return point.zone == spawn->zone && point.map == spawn->map && !_broken.count(spawnId)
+                && !(_indoors.count(spawnId) && NeedsSky(&other));
+        });
+        if (here)
+            candidates.push_back(&other);
+    }
+    Acore::Containers::RandomShuffle(candidates);
+    uint32 const wanted = urand(c.chainMinStages, c.chainMaxStages);
+    Chain chain;
+    chain.def = def;
+    chain.zone = spawn->zone;
+    chain.map = spawn->map;
+    chain.x = spawn->x;
+    chain.y = spawn->y;
+    std::unordered_set<uint8> types;
+    for (WowFatesExpeditionDef const* other : candidates)
+        if (chain.stages.size() < wanted && types.insert(other->objectiveType).second)
+            chain.stages.push_back(other->id);
+    if (chain.stages.size() < 2)
+    {
+        LOG_DEBUG("module", "mod-wow-fates: chain {}: {} stage(s) in zone {}, two at least; not started.", def->id,
+            uint32(chain.stages.size()), spawn->zone);
+        return false;
+    }
+    std::string ids;
+    for (uint32 id : chain.stages)
+        ids += Acore::StringFormat("{}{}", ids.empty() ? "" : ", ", id);
+    LOG_INFO("module", "mod-wow-fates: chain {} ({}) starts in zone {}: {} stages ({}).", def->id, def->name, chain.zone,
+        uint32(chain.stages.size()), ids);
+    _cooldowns.erase(def->id);
+    _chains[def->id] = std::move(chain);
+    if (!StartStage(def->id))
+    {
+        _chains.erase(def->id);
+        return false;
+    }
+    return true;
+}
+
+// An Expedition a chain will run (one of its stages to come): the rotation
+// and the other chains leave it be.
+bool WowFatesExpeditionMgr::Reserved(uint32 id) const
+{
+    for (auto const& [chainId, chain] : _chains)
+        for (std::size_t i = chain.index; i < chain.stages.size(); ++i)
+            if (chain.stages[i] == id)
+                return true;
+    return false;
+}
+
+// A chain's stage: its Expedition at its point in the zone nearest the last
+// stage (the area of another not crossed, if it may); the players of the
+// chain hear of it (a banner).
+bool WowFatesExpeditionMgr::StartStage(uint32 chainId)
+{
+    auto itr = _chains.find(chainId);
+    if (itr == _chains.end())
+        return false;
+    Chain& chain = itr->second;
+    if (chain.index >= chain.stages.size())
+        return false;
+    auto def = _defs.find(chain.stages[chain.index]);
+    if (def == _defs.end() || _active.count(def->first))
+        return false;
+
+    WowFatesSpawnPoint const* best = nullptr;
+    bool bestFree = false;
+    float bestDist = 0.0f;
+    for (uint32 spawnId : def->second.spawns)
+    {
+        WowFatesSpawnPoint const& point = _spawns[spawnId];
+        if (point.zone != chain.zone || point.map != chain.map || _broken.count(spawnId)
+            || (_indoors.count(spawnId) && NeedsSky(&def->second)))
+            continue;
+        bool const free = std::none_of(_active.begin(), _active.end(), [&point, &def](auto const& pair)
+        {
+            WowFatesActiveExpedition const& other = pair.second;
+            return other.spawn.map == point.map
+                && std::hypot(other.spawn.x - point.x, other.spawn.y - point.y) < other.def->radius + def->second.radius;
+        });
+        float const dist = std::hypot(point.x - chain.x, point.y - chain.y);
+        if (!best || (free && !bestFree) || (free == bestFree && dist < bestDist))
+        {
+            best = &point;
+            bestFree = free;
+            bestDist = dist;
+        }
+    }
+    if (!best)
+        return false;
+
+    chain.pause = -1;
+    StartLocked(&def->second, best);
+    WowFatesActiveExpedition& active = _active[def->first];
+    active.chain = chainId;
+    active.chainStage = chain.index;
+    active.chainStages = uint32(chain.stages.size());
+    BroadcastSet(active); // its name with its stage
+    for (ObjectGuid const& guid : chain.players)
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            if (player->IsInWorld())
+                SendAddon(player, Acore::StringFormat("chain\t{}\t{}", def->first,
+                    Clean(Acore::StringFormat(WowFatesText(player->GetSession(), WOW_FATES_STR_CHAIN_STAGE), chain.index + 1,
+                        uint32(chain.stages.size()), Name(&def->second, player->GetSession())))));
+    return true;
+}
+
+// The chains between two stages: the next one when its pause is over; one
+// that cannot start (its Expedition taken meanwhile) ends the chain.
+void WowFatesExpeditionMgr::UpdateChains(uint32 diff)
+{
+    std::vector<uint32> ended;
+    for (auto& [id, chain] : _chains)
+    {
+        if (chain.pause < 0)
+            continue;
+        chain.pause -= diff;
+        if (chain.pause > 0)
+            continue;
+        if (!StartStage(id))
+        {
+            LOG_INFO("module", "mod-wow-fates: chain {}: its stage {} cannot start; it ends.", id, chain.index + 1);
+            ended.push_back(id);
+        }
+    }
+    for (uint32 id : ended)
+        _chains.erase(id);
 }
 
 void WowFatesExpeditionMgr::UpdateArea(WowFatesActiveExpedition& active, Map* map)
@@ -4701,6 +4907,14 @@ void WowFatesExpeditionMgr::Check(ChatHandler* handler, uint32 id)
                 continue;
             map->LoadGridsInRange(Position(spawn.x, spawn.y, spawn.z, 0.0f), def.radius + 30.0f);
 
+            if (def.objectiveType == WOW_FATES_OBJECTIVE_CHAIN)
+            {
+                ++checked;
+                std::string const line = Acore::StringFormat("Expedition {} point {}: a chain, its zone {} only; its stages are checked as themselves -- ok",
+                    defId, spawnId, spawn.zone);
+                handler->SendSysMessage(line);
+                continue;
+            }
             WowFatesActiveExpedition probe;
             probe.def = &def;
             probe.spawn = spawn;
@@ -4820,7 +5034,7 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
     std::vector<uint32> counts = players ? std::vector<uint32>{ players } : std::vector<uint32>{ 1, 5, 9, 10, 20, 40 };
     for (auto const& [defId, def] : _defs)
     {
-        if (id && defId != id)
+        if ((id && defId != id) || def.objectiveType == WOW_FATES_OBJECTIVE_CHAIN)
             continue;
         uint8 const type = def.objectiveType;
         bool const waves = HasWaves(type);

@@ -65,7 +65,11 @@
  *     own mechanics, made-up ones whose mechanics are drawn from another),
  *     with phases (its words, reinforcements, one more mechanic at each mark
  *     of boss_waves); the bar is the health it lost, the Expedition fails
- *     when time_limit runs out first.
+ *     when time_limit runs out first;
+ *  13 chain: two to five Expeditions of the zone drawn at its start, never
+ *     two of a type, one after the other near each other, each its own
+ *     rewards; done, the last one's rewards one draw more per stage beyond
+ *     the first; a stage failed or gone, the chain ends.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -114,9 +118,10 @@ enum WowFatesObjective : uint8
     WOW_FATES_OBJECTIVE_ESCORT  = 9,  // an ally led along a route, ambushed
     WOW_FATES_OBJECTIVE_RESCUE  = 10, // captives freed from cages and led out
     WOW_FATES_OBJECTIVE_CAPTURE = 11, // banners taken and held against the foe
-    WOW_FATES_OBJECTIVE_WARLORD = 12  // a unique elite, its phases and reinforcements
+    WOW_FATES_OBJECTIVE_WARLORD = 12, // a unique elite, its phases and reinforcements
+    WOW_FATES_OBJECTIVE_CHAIN   = 13  // Expeditions of the zone one after the other
 };
-constexpr uint8 WOW_FATES_OBJECTIVE_LAST = WOW_FATES_OBJECTIVE_WARLORD;
+constexpr uint8 WOW_FATES_OBJECTIVE_LAST = WOW_FATES_OBJECTIVE_CHAIN;
 
 // What walks the paths as a player would (never on the map): an object of the
 // module's, always there.
@@ -421,6 +426,11 @@ struct WowFatesActiveExpedition
     float cooldownScale = 1.0f; // each phase his mechanics come back sooner
     int64 lastWarning = -1000000; // elapsed, his last warning before a heavy attack
     WowFatesMechanic const* warning = nullptr; // his heaviest attack: the only one he warns of
+
+    // A stage of a chain: the chain (its Expedition's id), which stage, of how many
+    uint32 chain = 0;
+    uint32 chainStage = 0;
+    uint32 chainStages = 0;
     int64 leapAt = 0;           // elapsed when a leap lands, its spell then
     uint32 leapSpell = 0;
     uint32 summonEntry = 0;     // its monsters, when not summon_entry (a warlord's band)
@@ -494,6 +504,10 @@ private:
     WowFatesActiveExpedition* FindAt(Unit const* unit);
     bool Inside(WowFatesActiveExpedition const& active, Unit const* unit, float rangeFactor = 1.0f) const;
     void StartLocked(WowFatesExpeditionDef const* def, WowFatesSpawnPoint const* spawn);
+    bool StartChain(WowFatesExpeditionDef const* def, WowFatesSpawnPoint const* spawn);
+    bool StartStage(uint32 chainId);
+    void UpdateChains(uint32 diff);
+    bool Reserved(uint32 id) const;
     void Rotate(bool fill);
     bool StartInZone(uint32 zone, bool force);
     uint32 IdleExpire(WowFatesExpeditionDef const* def) const;
@@ -598,6 +612,21 @@ private:
 
     std::recursive_mutex _lock;
     std::map<uint32, WowFatesActiveExpedition> _active; // by Expedition id
+
+    // The chains running: their stages drawn, the one running, where the last
+    // was, its players; the next to come after its pause
+    struct Chain
+    {
+        WowFatesExpeditionDef const* def = nullptr;
+        uint32 zone = 0;
+        uint32 map = 0;
+        std::vector<uint32> stages;
+        uint32 index = 0;
+        float x = 0.0f, y = 0.0f;
+        std::unordered_set<ObjectGuid> players;
+        int64 pause = -1;       // ms before the next stage; -1 while one runs
+    };
+    std::map<uint32, Chain> _chains;    // by the chain's Expedition id
     std::unordered_map<uint32, int64> _cooldowns;        // ms left, by Expedition id
 
     struct SyncState
