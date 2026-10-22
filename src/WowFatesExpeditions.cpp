@@ -3482,7 +3482,7 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
         {
             captive->SetHomePosition(captive->GetPosition()); // back from a fight: here, not at his cage
             if (captive->GetMotionMaster()->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
-                captive->GetMotionMaster()->MovePoint(1, way);
+                captive->GetMotionMaster()->MovePoint(1, way, FORCED_MOVEMENT_WALK); // at a walk: the players keep up
         }
         ++itr;
     }
@@ -3493,7 +3493,7 @@ void WowFatesExpeditionMgr::UpdateRescue(WowFatesActiveExpedition& active, Map* 
 }
 
 // A cage opened (OnGather, its map's thread): its captive out, thankful,
-// running for the way out.
+// walking for the way out (at a walk: the players keep up with him).
 void WowFatesExpeditionMgr::FreeCaptive(WowFatesActiveExpedition& active, GameObject* cage)
 {
     Map* map = cage->GetMap();
@@ -3504,10 +3504,11 @@ void WowFatesExpeditionMgr::FreeCaptive(WowFatesActiveExpedition& active, GameOb
     captive->SetPvP(false); // faction 495: healing him would flag the healer
     captive->SetHomePosition(cage->GetPosition());
     captive->SetDefaultMovementType(IDLE_MOTION_TYPE);
+    captive->SetWalk(true);
     captive->GetMotionMaster()->Initialize();
     Say(captive, CAPTIVE_SAY_FREED);
     if (!active.route.empty())
-        captive->GetMotionMaster()->MovePoint(1, active.route.front());
+        captive->GetMotionMaster()->MovePoint(1, active.route.front(), FORCED_MOVEMENT_WALK);
     active.allies.push_back(captive->GetGUID());
     ++active.freed;
 }
