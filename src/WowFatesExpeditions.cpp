@@ -2240,7 +2240,7 @@ void WowFatesExpeditionMgr::UpdateBoss(WowFatesActiveExpedition& active, Map* ma
     }
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
-    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players, true);
     ScaleFoe(boss, players);
     // his mechanics, drawn when he first comes, at the area's tick
     if (!active.drawn)
@@ -2553,18 +2553,20 @@ void WowFatesExpeditionMgr::ScaleFoe(Creature* creature, uint32 players) const
     creature->UpdateDamagePhysical(RANGED_ATTACK);
 }
 
-// The health of a boss, a chief or an ally for the players in the area: x the
+// The health of a boss or a chief (foe) for the players in the area: x the
 // players to the power Scaling.Boss (1.11: x11.5 for nine, x60 for forty, a
-// raid's strength growing faster than its number); its maximum follows them
-// up and down, its
+// raid's strength growing faster than its number); an ally's: x (1 +
+// Scaling.Ally x (players - 1)). Its maximum follows them up and down, its
 // share of health stays (78 % with fifteen players more is still 78 %), never
 // a death or a full heal from the rounding.
-void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const
+void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players, bool foe) const
 {
     if (players == setFor || !creature->IsAlive() || !baseHealth)
         return;
     double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
-    uint32 const maxHealth = uint32(double(baseHealth) * std::pow(double(players), double(WowFatesConf().scaleBoss)));
+    WowFatesConfig const& c = WowFatesConf();
+    double const factor = foe ? std::pow(double(players), double(c.scaleBoss)) : 1.0 + double(c.scaleAlly) * double(players - 1);
+    uint32 const maxHealth = uint32(double(baseHealth) * factor);
     creature->SetCreateHealth(maxHealth);
     creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
     creature->UpdateMaxHealth();
@@ -3121,7 +3123,7 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         active.progressPct = 100.0;
         return;
     }
-    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players, true);
     ScaleFoe(boss, players);
     // his mechanics, drawn when he first comes; only with players to see them
     if (!active.drawn)
@@ -4373,7 +4375,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
         ResetWarlord(active, map, boss);
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
-    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players, true);
     ScaleFoe(boss, players);
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
     active.progressPct = std::max(active.progressPct, std::min(100.0 * lost, 99.0));
@@ -4801,9 +4803,9 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
                 line += Acore::StringFormat("wave 1: {} ({}-{}), wave 4: {} ({}-{}); ", wave(0, 1.0f), wave(0, c.wavePaceMin),
                     wave(0, c.wavePaceMax), wave(3, 1.0f), wave(3, c.wavePaceMin), wave(3, c.wavePaceMax));
             line += Acore::StringFormat("about {} (up to {}); at most {} alive; each x{:.2f} health at first (then by the kills' speed, "
-                "{:.0f} s each asked), x{:.2f} damage; a boss, a chief or an ally x{:.2f} health, x{:.2f} damage",
+                "{:.0f} s each asked), x{:.2f} damage; a boss or a chief x{:.2f} health, x{:.2f} damage; an ally x{:.2f} health",
                 about, aboutMax, alive, std::pow(float(n), c.scaleHealth), c.targetAddSeconds, std::pow(float(n), c.scaleDamage),
-                std::pow(float(n), c.scaleBoss), std::pow(float(n), c.scaleDamage));
+                std::pow(float(n), c.scaleBoss), std::pow(float(n), c.scaleDamage), 1.0f + c.scaleAlly * float(n - 1));
             handler->SendSysMessage(line);
         }
         // a chief's mechanics: a draw for each, as one at his coming (under the sky)

@@ -569,7 +569,7 @@ private:
     void DrawMechanics(WowFatesActiveExpedition& active, bool outdoors);
     void UseMechanic(WowFatesActiveExpedition& active, Map* map, Creature* boss, WowFatesMechanic const* mechanic);
     static uint32 Leader(WowFatesActiveExpedition const& active);
-    void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
+    void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players, bool foe = false) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;
     double Needed(WowFatesActiveExpedition const& active) const;

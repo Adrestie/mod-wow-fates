@@ -196,7 +196,8 @@ the monsters, and its waves are the Expedition's `summon_entry`. A gathering's g
 | `WowFates.Object.PathFactor` | 2.0 | objects reached on foot by a sensible walk |
 | `WowFates.Path.MaxSlope` | 1.0 | no path with a jump or a cliff |
 | `WowFates.Rescue.CaptiveSpeed` | 1.0 | the captives' walk, times a walk's; never faster |
-| `WowFates.Scaling.Count` / `Health` / `Damage` / `Boss` | 0.5 / 0.75 / 0.4 / 1.11 | monsters x n^Count; each one's health x n^Health when it comes, then by the kills' speed; damage x n^Damage; a boss's, a chief's or an ally's health x n^Boss (x60 for 40) |
+| `WowFates.Scaling.Count` / `Health` / `Damage` / `Boss` | 0.5 / 0.75 / 0.4 / 1.11 | monsters x n^Count; each one's health x n^Health when it comes, then by the kills' speed; damage x n^Damage; a boss's or a chief's health x n^Boss (x60 for 40) |
+| `WowFates.Scaling.Ally` | 1.0 | an ally's health x (1 + Ally x (n - 1)) |
 | `WowFates.Target.AddSeconds` / `AddStep` | 15 / 0.2 | the time a monster should take to kill: the health of those to come moves toward it, by a fifth at most |
 | `WowFates.Waves.NextAt` | 0.25 | a wave waits for the last one to be down to this share alive |
 | `WowFates.Waves.PaceMin` / `PaceMax` / `PaceStep` | 0.8 / 1.25 / 0.1 | the pace of the kills: a wave's size between these times |
