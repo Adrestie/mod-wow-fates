@@ -73,11 +73,14 @@ ones and rewards for those who take part.
     foe in it, it waits until all are dead; foes alone, it empties. Full,
     Stormwind's banner goes up. The bar is theirs together; squads of the
     foe come at them; `time_limit` out first, it fails.
-  - *Warlord*: a unique elite (always an elite, bigger) whose phases, at
-    the marks of `boss_waves`, bring his words, reinforcements and one
-    more of his blows (`boss_spells`). The bar is the health he lost;
+  - *Warlord*: a chief drawn at each start from `mod_wow_fates_chief`:
+    known figures of the zone with their own mechanics, or made-up ones
+    whose two to four mechanics are drawn from `mod_wow_fates_mechanic`
+    (by weight, level, sky or roof, one of each group). Always an elite,
+    bigger; his phases, at the marks of `boss_waves`, bring his words, his
+    band and one more mechanic. The bar is the health he lost;
     `time_limit` out first, it fails. The game's own figure he stands for
-    (`objective_entry`) stays out of the area meanwhile.
+    stays out of the area meanwhile.
   - *Sabotage*: enemy buildings or engines of worth to burn (war tents, huts,
     wagons, catapults), each with its guards, spread over the area and put
     back one at a time; a one second cast sets one alight, it goes up in

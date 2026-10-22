@@ -230,3 +230,51 @@ SET @wow_fates_sql := IF(@wow_fates_col = 0,
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
 DEALLOCATE PREPARE wow_fates_stmt;
+
+-- A warlord's pools: who may appear, the mechanics they use.
+CREATE TABLE IF NOT EXISTS `mod_wow_fates_mechanic` (
+  `id` INT UNSIGNED NOT NULL,
+  `name` VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'for the log',
+  `kind` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = a spell at its target; 1 = his band comes from around him (as a wave); 2 = a leap at the farthest player, the spell on landing',
+  `spell` INT UNSIGNED NOT NULL DEFAULT 0,
+  `target` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = his victim, 1 = a player within 40 yards, 2 = himself, 3 = the farthest player within 40 yards, 4 = the ground under a player',
+  `cooldown_min` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'seconds; 0 and 0: once, when its phase comes',
+  `cooldown_max` INT UNSIGNED NOT NULL DEFAULT 15,
+  `weight` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'its chance to be drawn for a made-up chief; 0 = never drawn, only fixed to a known figure',
+  `min_level` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'drawn only for an Expedition of this level or more',
+  `place` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = anywhere, 1 = under the sky only, 2 = under a roof only',
+  `group` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'one mechanic of each group at most (0 = none): two that do the same, or that do not go together',
+  `comment` VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='WowFates: the mechanics of the warlords, ready blocks, drawn or fixed';
+
+CREATE TABLE IF NOT EXISTS `mod_wow_fates_chief` (
+  `id` INT UNSIGNED NOT NULL,
+  `expedition` INT UNSIGNED NOT NULL COMMENT 'mod_wow_fates_expedition.id, a warlord (12)',
+  `creature` INT UNSIGNED NOT NULL COMMENT 'creature_template.entry: a known figure of the zone, or one made up; made an elite',
+  `adds_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'his band, the monsters about and his reinforcements; 0 = summon_entry',
+  `weight` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'his chance to be drawn at the start',
+  `mechanics` VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'mod_wow_fates_mechanic ids, his own in their order (the first from the start, one more at each phase); empty = drawn, mechanics_min to mechanics_max of them',
+  `hide_entry` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'the game''s own figure kept out of the area while he is out',
+  `comment` VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `expedition` (`expedition`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='WowFates: who may lead a warlord Expedition, one drawn at each start';
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'mechanics_min');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `mechanics_min` TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT ''warlord: mechanics drawn for a made-up chief, at least (1 to 4)'' AFTER `caravan`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'mechanics_max');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `mechanics_max` TINYINT UNSIGNED NOT NULL DEFAULT 4 COMMENT ''warlord: and at most'' AFTER `mechanics_min`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;

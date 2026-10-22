@@ -90,14 +90,18 @@
         "mod_wow_fates_expedition_locale",
         "mod_wow_fates_spawn",
         "mod_wow_fates_objective",
-        "mod_wow_fates_reward"
+        "mod_wow_fates_reward",
+        "mod_wow_fates_mechanic",
+        "mod_wow_fates_chief"
       ],
       "kept_on_update": [
         "mod_wow_fates_expedition",
         "mod_wow_fates_expedition_locale",
         "mod_wow_fates_spawn",
         "mod_wow_fates_objective",
-        "mod_wow_fates_reward"
+        "mod_wow_fates_reward",
+        "mod_wow_fates_mechanic",
+        "mod_wow_fates_chief"
       ]
     }
   },

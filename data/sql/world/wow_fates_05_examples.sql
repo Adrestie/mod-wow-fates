@@ -1,4 +1,4 @@
--- mod-wow-fates — fourteen example Expeditions, with the rewards every
+-- mod-wow-fates — fifteen example Expeditions, with the rewards every
 -- Expedition gives by default. Ids 1 to 99 of the module's tables are the
 -- module's own: give yours 100 and up, an update writes these rows again.
 --
@@ -39,10 +39,16 @@
 --      each, torches around (960005), taken by standing in them as the
 --      towers of Hellfire Peninsula, Stormwind's banner (960004) then;
 --      squads of Defias Bandits come to take them back; ten minutes
---  14  Hogger's Rampage, Elwynn Forest, level 11, warlord: Hogger (creature
---      96102) at his camp, the game's own Hogger kept away meanwhile; his
---      pack at 25, 50 and 75 % of the bar, a blow more each time; eight
---      minutes
+--  14  Warlord of the Forest's Edge, Elwynn Forest, level 11, warlord: at
+--      Hogger's camp, one chief drawn among Hogger (96102) and Morgaine the
+--      Sly (96105), known, with their own mechanics, and Grizzlefang the
+--      Ravager (96103) and Captain Varrek Blackthorn (96104), made up, whose
+--      mechanics are drawn (wow_fates_08_warlords.sql); his band at 25, 50
+--      and 75 % of the bar; eight minutes
+--  15  A Warlord in Durotar, Durotar, level 10, warlord: west of Drygulch
+--      Ravine, one chief drawn among Zalazane (96106) and Gazz'uz (96107),
+--      known, and Khan Ruuzak (96108) and Bloodtusk the Gorer (96109), made
+--      up; eight minutes
 --
 -- Each brings its own monsters, kept at a number alive, and counts every one
 -- of that kind killed in its area, those of the game included.
@@ -84,8 +90,10 @@ INSERT INTO `mod_wow_fates_expedition` (`id`, `name`, `level`, `objective_type`,
    'Zalazane''s Hexed Trolls keep Darkspear captives caged on the Echo Isles: open the cages and see the captives safely off the island.', 'Free the Darkspear captives', ''),
 (13, 'Banners over Molsen Farm', 9, 11, 0, 1,  116, 4, 25, 60,   0, 0, 1, 1, 'Elwynn Forest: the Defias Standards of Molsen Farm, Defias Bandits about',
    'The Defias have raised their standards over Molsen Farm: take each of their positions by standing your ground there until Stormwind''s banner flies over it, and clear the Defias out of them.', 'Take the farm''s positions', 'The Defias come to take back a standard!'),
-(14, 'Hogger''s Rampage', 11, 12, 448, 1, 478, 3, 25, 45,   0, 0, 1, 1, 'Elwynn Forest: Hogger, the gnoll warlord, at his camp, Riverpaw Outrunners about',
-   'Hogger has gathered the Riverpaw gnolls at his camp and leads them himself: bring the gnoll warlord down before he slips away into the forest.', 'Defeat Hogger', 'Hogger calls the Riverpaw!');
+(14, 'Warlord of the Forest''s Edge', 11, 12, 0, 1, 478, 3, 25, 45,   0, 0, 1, 1, 'Elwynn Forest: a warlord drawn among Hogger, Morgaine the Sly and two made up, his band about',
+   '{} has seized the camp at the Forest''s Edge and gathers a warband there: bring the warlord down before the band scatters into the forest.', 'Defeat {}', '{} calls the warband!'),
+(15, 'A Warlord in Durotar', 10, 12, 0, 1, 3197, 3, 25, 45,   0, 0, 1, 1, 'Durotar: a warlord drawn among Zalazane, Gazz''uz and two made up, his band about',
+   '{} has raised a warband in the hills of Durotar: bring the warlord down before it marches on Razor Hill.', 'Defeat {}', '{} calls the warband!');
 
 DELETE FROM `mod_wow_fates_objective` WHERE `expedition` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `gather_entry`, `gather_count`, `gather_respawn`,
@@ -105,7 +113,8 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '96205,96205,96206', 'Remy''s Wares: Remy and his caravan (two militiamen, his packhorse) walk the hill road; Defias Cutpurses ambush them at 25, 50 and 75 % of it'),
 (12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 600, 0,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out in ten minutes; one led out by then is enough (rewards by the share led out), all lost fails it'),
 (13,    0, 70, 960003, 3, 5,      0,  60, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 0, 960004, '', '', 'Banners over Molsen Farm: three positions, a minute standing in one alone takes it, ten minutes from the first player; a squad every 45 s or so'),
-(14, 96102, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '6730,6016,6268,8599', '', 'Hogger''s Rampage: Head Butt, then Pierce Armor, Rushing Charge and Enrage at 25, 50 and 75 % of the bar, the pack each time; eight minutes');
+(14,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'Warlord of the Forest''s Edge: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes'),
+(15,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'A Warlord in Durotar: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes');
 
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
@@ -239,16 +248,26 @@ INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objectiv
    'Los Defias han alzado sus estandartes sobre la granja Molsen: toma cada una de sus posiciones resistiendo en ella hasta que ondee el estandarte de Ventormenta, y expulsa de allí a los Defias.', 'Toma las posiciones de la granja', '¡Los Defias vienen a recuperar un estandarte!'),
 (13, 'ruRU', 'Знамёна над фермой Молсенов',
    'Братство Справедливости подняло свои штандарты над фермой Молсенов: займите каждую их позицию, удерживая её, пока над ней не взовьётся знамя Штормграда, и выбейте оттуда разбойников.', 'Займите позиции фермы', 'Братство идёт отбить штандарт!'),
-(14, 'frFR', 'Le saccage de Lardeur',
-   'Lardeur a rassemblé les gnolls Rivepatte dans son camp et les mène lui-même : abattez le chef de guerre gnoll avant qu''il ne disparaisse dans la forêt.', 'Abattez Lardeur', 'Lardeur appelle les Rivepatte !'),
-(14, 'deDE', 'Hoggers Raserei',
-   'Hogger hat die Gnolle der Flusspfoten in seinem Lager versammelt und führt sie selbst an: Bezwingt den Kriegsherrn der Gnolle, bevor er im Wald verschwindet.', 'Bezwingt Hogger', 'Hogger ruft die Flusspfoten!'),
-(14, 'esES', 'La furia de Hogger',
-   'Hogger ha reunido a los gnolls Zarparrío en su campamento y los dirige él mismo: derrota al señor de la guerra gnoll antes de que se esfume en el bosque.', 'Derrota a Hogger', '¡Hogger llama a los Zarparrío!'),
-(14, 'esMX', 'La furia de Hogger',
-   'Hogger ha reunido a los gnolls Zarparrío en su campamento y los dirige él mismo: derrota al señor de la guerra gnoll antes de que se esfume en el bosque.', 'Derrota a Hogger', '¡Hogger llama a los Zarparrío!'),
-(14, 'ruRU', 'Буйство Дробителя',
-   'Дробитель собрал гноллов Речной Лапы в своём лагере и сам ведёт их: одолейте вожака гноллов, пока он не скрылся в лесу.', 'Одолейте Дробителя', 'Дробитель зовёт Речную Лапу!');
+(14, 'frFR', 'Le chef de guerre de la lisière',
+   '{} s''est emparé du camp de la lisière de la forêt et y rassemble une bande de guerre : abattez ce chef de guerre avant que la bande ne se disperse dans la forêt.', 'Abattez {}', '{} appelle sa bande !'),
+(14, 'deDE', 'Der Kriegsherr am Waldrand',
+   '{} hat das Lager am Waldrand eingenommen und sammelt dort eine Kriegsbande: Bezwingt den Kriegsherrn, bevor sich die Bande in den Wald zerstreut.', 'Bezwingt {}', '{} ruft die Kriegsbande!'),
+(14, 'esES', 'El señor de la guerra del linde del bosque',
+   '{} se ha apoderado del campamento del linde del bosque y reúne allí una banda de guerra: derrota al señor de la guerra antes de que la banda se disperse por el bosque.', 'Derrota a {}', '¡{} llama a su banda!'),
+(14, 'esMX', 'El señor de la guerra del linde del bosque',
+   '{} se ha apoderado del campamento del linde del bosque y reúne allí una banda de guerra: derrota al señor de la guerra antes de que la banda se disperse por el bosque.', 'Derrota a {}', '¡{} llama a su banda!'),
+(14, 'ruRU', 'Военачальник у опушки',
+   '{} захватил лагерь у опушки леса и собирает там боевой отряд: одолейте военачальника, пока отряд не рассеялся по лесу.', 'Одолейте: {}', '{} зовёт свой отряд!'),
+(15, 'frFR', 'Un chef de guerre en Durotar',
+   '{} a levé une bande de guerre dans les collines de Durotar : abattez ce chef de guerre avant qu''il ne marche sur Razor Hill.', 'Abattez {}', '{} appelle sa bande !'),
+(15, 'deDE', 'Ein Kriegsherr in Durotar',
+   '{} hat in den Hügeln von Durotar eine Kriegsbande aufgestellt: Bezwingt den Kriegsherrn, bevor er gegen Klingenhügel marschiert.', 'Bezwingt {}', '{} ruft die Kriegsbande!'),
+(15, 'esES', 'Un señor de la guerra en Durotar',
+   '{} ha levantado una banda de guerra en las colinas de Durotar: derrota al señor de la guerra antes de que marche sobre Cerrotajo.', 'Derrota a {}', '¡{} llama a su banda!'),
+(15, 'esMX', 'Un señor de la guerra en Durotar',
+   '{} ha levantado una banda de guerra en las colinas de Durotar: derrota al señor de la guerra antes de que marche sobre Cerrotajo.', 'Derrota a {}', '¡{} llama a su banda!'),
+(15, 'ruRU', 'Военачальник в Дуротаре',
+   '{} собрал боевой отряд в холмах Дуротара: одолейте военачальника, пока он не двинулся на Колючий Холм.', 'Одолейте: {}', '{} зовёт свой отряд!');
 
 DELETE FROM `mod_wow_fates_spawn` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`, `comment`) VALUES
@@ -280,7 +299,8 @@ INSERT INTO `mod_wow_fates_spawn` (`id`, `expedition`, `map`, `x`, `y`, `z`, `o`
 (21, 12, 1, -1188.0,  -5512.0,     5.7,    0, 'Durotar, the Echo Isles, Zalazane''s trolls',
    '-1153.0,-5446.0,8.7'),
 (22, 13, 0, -9867.0,   -156.0,    32.0,    0, 'Elwynn Forest, Molsen Farm, the Defias Bandits south of Goldshire', ''),
-(23, 14, 0, -10107.2,   617.8,    38.1,    0, 'Elwynn Forest, Hogger''s camp at the Forest''s Edge', '');
+(23, 14, 0, -10107.2,   617.8,    38.1,    0, 'Elwynn Forest, Hogger''s camp at the Forest''s Edge', ''),
+(24, 15, 1,   641.3,  -4664.4,    22.1,    0, 'Durotar, west of Drygulch Ravine', '');
 
 DELETE FROM `mod_wow_fates_reward` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_reward` (`id`, `expedition`, `min_level`, `max_level`, `money`, `xp`, `item`, `item_count`, `hidden`, `comment`) VALUES

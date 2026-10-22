@@ -59,9 +59,11 @@
  *     no foe, its bar fills; a foe in it, it waits until all are dead; only
  *     foes, it empties. The bar is theirs together, the Expedition fails when
  *     time_limit runs out first;
- *  12 warlord: a unique elite with phases (its words, reinforcements, one
- *     more blow at each mark of boss_waves); the bar is the health it lost,
- *     the Expedition fails when time_limit runs out first.
+ *  12 warlord: a unique elite drawn from a pool (known figures with their
+ *     own mechanics, made-up ones whose mechanics are drawn from another),
+ *     with phases (its words, reinforcements, one more mechanic at each mark
+ *     of boss_waves); the bar is the health it lost, the Expedition fails
+ *     when time_limit runs out first.
  * The Expedition may bring its own monsters, kept at a number alive.
  *
  * Only active players are rewarded: a kill, or damage and healing in the area
@@ -134,6 +136,49 @@ constexpr float WOW_FATES_CHANNEL_RANGE = 6.0f; // yards from the altar
 // broken by moving or a blow), the spell of its lock (43, open kneeling).
 constexpr uint32 WOW_FATES_GATHER_SPELL = 6478;
 
+// A warlord's mechanic (mod_wow_fates_mechanic): a ready block, drawn at its
+// appearance or fixed to a known figure.
+enum WowFatesMechanicKind : uint8
+{
+    WOW_FATES_MECHANIC_SPELL = 0, // a spell, at its target
+    WOW_FATES_MECHANIC_ADDS  = 1, // his band comes, from around him
+    WOW_FATES_MECHANIC_LEAP  = 2  // a leap at a player, the spell on landing
+};
+
+enum WowFatesMechanicTarget : uint8
+{
+    WOW_FATES_TARGET_VICTIM   = 0,
+    WOW_FATES_TARGET_RANDOM   = 1, // a player of the area within 40 yards
+    WOW_FATES_TARGET_SELF     = 2,
+    WOW_FATES_TARGET_FARTHEST = 3, // the farthest player within 40 yards
+    WOW_FATES_TARGET_GROUND   = 4  // the ground under a random player
+};
+
+struct WowFatesMechanic
+{
+    uint32 id = 0;
+    std::string name;
+    uint8 kind = WOW_FATES_MECHANIC_SPELL;
+    uint32 spell = 0;
+    uint8 target = WOW_FATES_TARGET_VICTIM;
+    uint32 cooldownMin = 10, cooldownMax = 15; // s; 0: once, when its phase comes
+    uint32 weight = 10;                        // 0: never drawn, only fixed to a figure
+    uint8 minLevel = 1;
+    uint8 place = 0;                           // 0 anywhere, 1 under the sky only, 2 under a roof only
+    uint8 group = 0;                           // one of each group at most (0: none)
+};
+
+// A warlord who may appear (mod_wow_fates_chief): a known figure of the game
+// with his own mechanics, or one made up, whose mechanics are drawn.
+struct WowFatesChief
+{
+    uint32 creature = 0;
+    uint32 adds = 0;                           // his band (0: summon_entry)
+    uint32 weight = 1;
+    uint32 hide = 0;                           // the game's own figure kept out of the area
+    std::vector<uint32> mechanics;             // fixed; empty: drawn
+};
+
 struct WowFatesExpeditionDef
 {
     uint32 id = 0;
@@ -173,6 +218,8 @@ struct WowFatesExpeditionDef
     uint32 takenEntry = 0;                             // capture: the banner once taken (gameobject)
     std::vector<uint32> bossSpells;                    // warlord: its blows, one more with each phase
     std::vector<uint32> caravan;                       // escort: the others of the caravan, around its leader
+    std::vector<WowFatesChief> chiefs;                 // warlord: who may appear (else boss_entry, boss_spells)
+    uint8 mechanicsMin = 2, mechanicsMax = 4;          // warlord: mechanics drawn for one made up
     std::vector<uint32> spawns;                        // ids in mod_wow_fates_spawn
 };
 
@@ -341,6 +388,15 @@ struct WowFatesActiveExpedition
     // Warlord: its phase (the marks of boss_waves passed), the next blow
     uint32 phase = 0;
     int64 spellTimer = 0;
+    // who he is (drawn at the start), his band, the figure kept away; his
+    // mechanics, each with its phase and its cooldown
+    WowFatesChief chief;
+    struct Drawn { WowFatesMechanic const* mechanic = nullptr; uint32 phase = 0; int64 cooldown = 0; bool used = false; };
+    std::vector<Drawn> mechanics;
+    bool drawn = false;
+    int64 leapAt = 0;           // elapsed when a leap lands, its spell then
+    uint32 leapSpell = 0;
+    uint32 summonEntry = 0;     // its monsters, when not summon_entry (a warlord's band)
 };
 
 class WowFatesExpeditionMgr
@@ -458,6 +514,10 @@ private:
     std::string ZonesLine(WowFatesActiveExpedition const& active) const;
     void BroadcastZones(WowFatesActiveExpedition& active, bool force = false);
     void UpdateWarlord(WowFatesActiveExpedition& active, Map* map, uint32 diff);
+    void PickChief(WowFatesActiveExpedition& active);
+    void DrawMechanics(WowFatesActiveExpedition& active, bool outdoors);
+    void UseMechanic(WowFatesActiveExpedition& active, Map* map, Creature* boss, WowFatesMechanic const* mechanic);
+    static uint32 Leader(WowFatesActiveExpedition const& active);
     void ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const;
     std::string CreatureName(uint32 entry, WorldSession* session) const;
     std::string GameObjectName(uint32 entry, WorldSession* session) const;
@@ -481,6 +541,7 @@ private:
     std::map<uint32, WowFatesExpeditionDef> _defs;
     std::map<uint32, WowFatesSpawnPoint> _spawns;
     std::vector<WowFatesReward> _rewards;
+    std::map<uint32, WowFatesMechanic> _mechanics;
 
     std::recursive_mutex _lock;
     std::map<uint32, WowFatesActiveExpedition> _active; // by Expedition id
