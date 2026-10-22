@@ -32,8 +32,9 @@
 --      Goldshire, Defias Cutpurses ambushing him at 25, 50 and 75 % of it
 --  12  Zalazane's Captives, Durotar, level 9, rescue: Darkspear captives
 --      (creature 96204) in the Voodoo Cages (gameobject 960002) of Zalazane's
---      Hexed Trolls on the Echo Isles, five to lead out in ten minutes; one
---      led out by then is enough, all of them lost fails it
+--      Hexed Trolls on the Echo Isles, five to lead out; over when none is
+--      left, done if one was led out, failed if all died (twenty minutes at
+--      most, against a rescue left undone)
 --  13  Banners over Molsen Farm, Elwynn Forest, level 9, capture: three
 --      positions, a Defias Standard (gameobject 960003) in the middle of
 --      each, torches around (960005), taken by standing in them as the
@@ -111,7 +112,7 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
   `ally_entry`, `hold_time`, `wave_interval`, `wave_size`, `wave_growth`, `channel_entry`, `ally_count`, `wave_count`, `boss_waves`,
   `time_limit`, `max_losses`, `taken_entry`, `boss_spells`, `caravan`, `comment`) VALUES
 (11,    0, 70,      0, 8, 5, 96203, 240, 40, 2, 1,      0, 1, 5, '25,50,75',   0, 2,      0, '', '96205,96205,96206', 'Remy''s Wares: Remy and his caravan (two militiamen, his packhorse) walk the hill road; Defias Cutpurses ambush them at 25, 50 and 75 % of it'),
-(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 600, 0,      0, '', '', 'Zalazane''s Captives: three cages out, five captives to lead out in ten minutes; one led out by then is enough (rewards by the share led out), all lost fails it'),
+(12,    0, 70, 960002, 3, 20, 96204, 240, 40, 3, 1,      0, 1, 5, '25,50,75', 1200, 0,      0, '', '', 'Zalazane''s Captives: five captives, three cages out at a time; over when all are led out or dead, done if one was led out (rewards by the share), failed if all died; twenty minutes against a rescue left undone'),
 (13,    0, 70, 960003, 3, 5,      0,  60, 45, 2, 1,      0, 1, 5, '25,50,75', 600, 0, 960004, '', '', 'Banners over Molsen Farm: three positions, a minute standing in one alone takes it, ten minutes from the first player; a squad every 45 s or so'),
 (14,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'Warlord of the Forest''s Edge: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes'),
 (15,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'A Warlord in Durotar: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes');

@@ -62,10 +62,11 @@ ones and rewards for those who take part.
     spawn point's `path`, each leg walked as a player would.
   - *Rescue*: cages to open (a one second cast) spread over the area, each
     walked to the way out (the last point of the spawn point's `path`);
-    each captive runs for it. The bar is the captives led out. When
-    `time_limit` runs out, one led out is enough (the rewards by the share
-    led out); it fails only when none is led out (`max_losses` is no longer
-    read).
+    each captive runs for it. The bar is the captives led out. It ends when
+    no captive is left to free nor on the map: done when one was led out
+    at least (the rewards by the share led out), failed when all died.
+    `time_limit` (long) only ends a rescue left undone, the same way
+    (`max_losses` is no longer read).
   - *Capture*: two or three positions, far apart, each a circle shown on
     the maps and by torches on the ground, the foe's banner in its middle,
     taken as the towers of Hellfire Peninsula: players in it and no foe,

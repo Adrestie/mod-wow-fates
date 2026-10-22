@@ -51,9 +51,11 @@
  *     around him in a pack, ambushed at the bar's marks; the bar is the route
  *     behind him, the Expedition fails when he dies;
  *  10 rescue: cages to open, spread over the area as a gathering's objects;
- *     each captive runs for the way out, the bar is those led out; when
- *     time_limit runs out, one led out is enough (the rewards by the share
- *     led out); it fails only when none is led out and all are lost;
+ *     each captive runs for the way out, the bar is those led out; it ends
+ *     when no captive is left to free nor on the map (all led out or dead):
+ *     done when one was led out at least (the rewards by the share led
+ *     out), failed when all died; time_limit only against a rescue left
+ *     undone;
  *  11 capture: two or three positions, circles shown on the map and on the
  *     ground, taken as the towers of Hellfire Peninsula: players in one and
  *     no foe, its bar fills; a foe in it, it waits until all are dead; only
@@ -369,7 +371,9 @@ struct WowFatesActiveExpedition
     // Rescue: captives led out, captives lost (the way out in route)
     uint32 saved = 0;
     uint32 lost = 0;
-    double rewardShare = 1.0;   // of each reward: a rescue done when its time ran out, the share led out
+    double rewardShare = 1.0;   // of each reward: a rescue, the share led out
+    uint32 freed = 0;           // captives out of their cages
+    uint32 rescueTotal = 0;     // captives in all (objective_count, more with the players; never fewer)
 
     // Capture: its positions, each a circle with a banner in its middle and
     // torches around; its bar (0 the foe's, 100 ours), whose it is, what the
