@@ -117,6 +117,9 @@ INSERT INTO `mod_wow_fates_objective` (`expedition`, `boss_entry`, `boss_at`, `g
 (14,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'Warlord of the Forest''s Edge: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes'),
 (15,     0, 70,      0, 8, 5,      0, 240, 40, 2, 1,      0, 1, 5, '25,50,75', 480, 2,      0, '', '', 'A Warlord in Durotar: one of its four chiefs (mod_wow_fates_chief), his band at 25, 50 and 75 % of the bar; eight minutes');
 
+-- A made-up chief's mechanics beyond the four of his fight: one or two.
+UPDATE `mod_wow_fates_objective` SET `mechanics_min` = 1, `mechanics_max` = 2 WHERE `expedition` BETWEEN 1 AND 99;
+
 DELETE FROM `mod_wow_fates_expedition_locale` WHERE `id` BETWEEN 1 AND 99;
 INSERT INTO `mod_wow_fates_expedition_locale` (`id`, `locale`, `name`, `objective_text`, `tracker_text`, `wave_text`) VALUES
 (1, 'frFR', 'Soulèvement kobold',

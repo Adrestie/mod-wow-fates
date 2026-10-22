@@ -68,7 +68,13 @@ INSERT INTO `module_string` (`module`, `id`, `string`) VALUES
 ('mod-wow-fates',  44, 'Positions: {}'),
 ('mod-wow-fates',  45, 'Time left: {}:{:02}'),
 ('mod-wow-fates',  46, '{}: {}% health - caravan: {}/{}'),
-('mod-wow-fates',  47, 'Led out: {}/{} - lost: {} - {}:{:02} left');
+('mod-wow-fates',  47, 'Led out: {}/{} - lost: {} - {}:{:02} left'),
+('mod-wow-fates',  48, 'You first!'),
+('mod-wow-fates',  49, 'None of you will escape this!'),
+('mod-wow-fates',  50, 'Nowhere to run!'),
+('mod-wow-fates',  51, 'Who''s next? You!'),
+('mod-wow-fates',  52, 'Stop me if you can!'),
+('mod-wow-fates',  53, 'My strength grows!');
 
 DELETE FROM `module_string_locale` WHERE `module` = 'mod-wow-fates';
 INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
@@ -302,4 +308,28 @@ INSERT INTO `module_string_locale` (`module`, `id`, `locale`, `string`) VALUES
 ('mod-wow-fates',  47, 'frFR', 'Sortis : {}/{} — perdus : {} — reste {}:{:02}'),
 ('mod-wow-fates',  47, 'deDE', 'Hinausgebracht: {}/{} — verloren: {} — noch {}:{:02}'),
 ('mod-wow-fates',  47, 'esES', 'Rescatados: {}/{} — perdidos: {} — quedan {}:{:02}'),
-('mod-wow-fates',  47, 'ruRU', 'Выведено: {}/{} — потеряно: {} — осталось {}:{:02}');
+('mod-wow-fates',  47, 'ruRU', 'Выведено: {}/{} — потеряно: {} — осталось {}:{:02}'),
+('mod-wow-fates',  48, 'frFR', 'Toi d''abord !'),
+('mod-wow-fates',  49, 'frFR', 'Aucun de vous n''y échappera !'),
+('mod-wow-fates',  50, 'frFR', 'Nulle part où fuir !'),
+('mod-wow-fates',  51, 'frFR', 'À qui le tour ? Toi !'),
+('mod-wow-fates',  52, 'frFR', 'Arrêtez-moi si vous le pouvez !'),
+('mod-wow-fates',  53, 'frFR', 'Ma force grandit !'),
+('mod-wow-fates',  48, 'deDE', 'Du zuerst!'),
+('mod-wow-fates',  49, 'deDE', 'Keiner von euch entkommt dem!'),
+('mod-wow-fates',  50, 'deDE', 'Es gibt kein Entkommen!'),
+('mod-wow-fates',  51, 'deDE', 'Wer ist der Nächste? Du!'),
+('mod-wow-fates',  52, 'deDE', 'Haltet mich auf, wenn ihr könnt!'),
+('mod-wow-fates',  53, 'deDE', 'Meine Kraft wächst!'),
+('mod-wow-fates',  48, 'esES', '¡Tú primero!'),
+('mod-wow-fates',  49, 'esES', '¡Ninguno de vosotros escapará de esto!'),
+('mod-wow-fates',  50, 'esES', '¡No hay escapatoria!'),
+('mod-wow-fates',  51, 'esES', '¿Quién es el siguiente? ¡Tú!'),
+('mod-wow-fates',  52, 'esES', '¡Detenedme si podéis!'),
+('mod-wow-fates',  53, 'esES', '¡Mi fuerza crece!'),
+('mod-wow-fates',  48, 'ruRU', 'Ты первый!'),
+('mod-wow-fates',  49, 'ruRU', 'Никто из вас не уйдёт!'),
+('mod-wow-fates',  50, 'ruRU', 'Бежать некуда!'),
+('mod-wow-fates',  51, 'ruRU', 'Кто следующий? Ты!'),
+('mod-wow-fates',  52, 'ruRU', 'Остановите меня, если сможете!'),
+('mod-wow-fates',  53, 'ruRU', 'Моя сила растёт!');

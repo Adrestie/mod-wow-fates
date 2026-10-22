@@ -144,7 +144,23 @@ enum WowFatesMechanicKind : uint8
 {
     WOW_FATES_MECHANIC_SPELL = 0, // a spell, at its target
     WOW_FATES_MECHANIC_ADDS  = 1, // his band comes, from around him
-    WOW_FATES_MECHANIC_LEAP  = 2  // a leap at a player, the spell on landing
+    WOW_FATES_MECHANIC_LEAP  = 2, // a leap at a player, the spell on landing
+    WOW_FATES_MECHANIC_AGGRO = 3  // a change of his target (target: 0 all threat wiped, 1 a player, 2 the healer)
+};
+
+// What a mechanic is for in his fight: a chief has a strike, an area, a
+// control and a change of aggro at least, from the start.
+enum WowFatesMechanicRole : uint8
+{
+    WOW_FATES_ROLE_NONE    = 0,
+    WOW_FATES_ROLE_STRIKE  = 1, // a heavy blow on the tank
+    WOW_FATES_ROLE_AREA    = 2, // a wave around him, a zone on the ground
+    WOW_FATES_ROLE_CONTROL = 3, // a charge, a leap, a fear, a stun, a knock back
+    WOW_FATES_ROLE_BUFF    = 4, // an enrage, a shield, a heal
+    WOW_FATES_ROLE_AGGRO   = 5, // a change of target
+    WOW_FATES_ROLE_ADDS    = 6, // his band (one at most)
+    WOW_FATES_ROLE_CAST    = 7, // a cast to interrupt
+    WOW_FATES_ROLE_MAX     = 8
 };
 
 enum WowFatesMechanicTarget : uint8
@@ -168,6 +184,7 @@ struct WowFatesMechanic
     uint8 minLevel = 1;
     uint8 place = 0;                           // 0 anywhere, 1 under the sky only, 2 under a roof only
     uint8 group = 0;                           // one of each group at most (0: none)
+    uint8 role = WOW_FATES_ROLE_NONE;
 };
 
 // A warlord who may appear (mod_wow_fates_chief): a known figure of the game
@@ -400,15 +417,21 @@ struct WowFatesActiveExpedition
     struct Drawn { WowFatesMechanic const* mechanic = nullptr; uint32 phase = 0; int64 cooldown = 0; bool used = false; };
     std::vector<Drawn> mechanics;
     bool drawn = false;
+    uint32 mechanicPhase = 0;   // his health past 75, 50, 25 %: 0 to 3
+    float cooldownScale = 1.0f; // each phase his mechanics come back sooner
     int64 leapAt = 0;           // elapsed when a leap lands, its spell then
     uint32 leapSpell = 0;
     uint32 summonEntry = 0;     // its monsters, when not summon_entry (a warlord's band)
     bool bossFought = false;    // a warlord in a fight: out of it alive, he is reset
     bool phaseWave = false;     // a phase's band still to come (the last wave not down yet)
 
-    // Its monsters' health and damage for the players in the area: each one's
-    // health for one player, and the players it was set for
-    std::unordered_map<ObjectGuid, std::pair<uint32, uint32>> toughened;
+    // Its monsters' health: n^Scaling.Health times this, moved toward the time
+    // a monster should take to kill (Target.AddSeconds), for those to come;
+    // when each one was first fought, how long the last ones took
+    double addToughness = 1.0;
+    std::unordered_map<ObjectGuid, int64> addEngaged;
+    std::vector<int64> addKillTimes;
+    int64 adjustTimer = 0;
 };
 
 class WowFatesExpeditionMgr
@@ -514,6 +537,11 @@ private:
     static float Crowd(uint32 players);
     static bool HasWaves(uint8 type);
     void Toughen(WowFatesActiveExpedition& active, Creature* creature, uint32 players);
+    void AdjustAdds(WowFatesActiveExpedition& active);
+    void ScaleFoe(Creature* creature, uint32 players) const;
+    void RunMechanics(WowFatesActiveExpedition& active, Map* map, Creature* boss, uint32 diff);
+    static void Announce(Creature* speaker, uint32 text);
+    std::string Actions(WowFatesActiveExpedition const& active) const;
     void ResetWarlord(WowFatesActiveExpedition& active, Map* map, Creature* boss);
     bool EdgePoint(WowFatesActiveExpedition const& active, Map* map, float angle, Position& out) const;
     bool Start(WowFatesActiveExpedition& active, char const* banner, std::string (WowFatesExpeditionMgr::*name)(uint32, WorldSession*) const, uint32 entry);

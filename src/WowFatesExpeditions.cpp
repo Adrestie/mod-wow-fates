@@ -205,7 +205,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
             itr->second.takenEntry = f[17].Get<uint32>();
             if (itr->second.objectiveType == WOW_FATES_OBJECTIVE_CAPTURE)
                 itr->second.gatherCount = std::clamp<uint32>(itr->second.gatherCount, 2, 5); // a position alone is no capture
-            itr->second.mechanicsMin = std::clamp<uint8>(f[20].Get<uint8>(), 1, 4);
+            itr->second.mechanicsMin = std::clamp<uint8>(f[20].Get<uint8>(), 0, 4);
             itr->second.mechanicsMax = std::clamp<uint8>(f[21].Get<uint8>(), itr->second.mechanicsMin, 4);
             // "96205,96205,96206": an escort's caravan, around its leader
             itr->second.caravan.clear();
@@ -234,7 +234,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
 
     // The warlords' mechanics, then who may appear in each.
     if (QueryResult result = WorldDatabase.Query(
-        "SELECT `id`, `name`, `kind`, `spell`, `target`, `cooldown_min`, `cooldown_max`, `weight`, `min_level`, `place`, `group` "
+        "SELECT `id`, `name`, `kind`, `spell`, `target`, `cooldown_min`, `cooldown_max`, `weight`, `min_level`, `place`, `group`, `role` "
         "FROM `mod_wow_fates_mechanic`"))
     {
         do
@@ -257,13 +257,14 @@ void WowFatesExpeditionMgr::LoadFromDB()
             mechanic.minLevel = f[8].Get<uint8>();
             mechanic.place = f[9].Get<uint8>();
             mechanic.group = f[10].Get<uint8>();
-            if (mechanic.kind > WOW_FATES_MECHANIC_LEAP || mechanic.target > WOW_FATES_TARGET_GROUND)
+            mechanic.role = f[11].Get<uint8>();
+            if (mechanic.kind > WOW_FATES_MECHANIC_AGGRO || mechanic.target > WOW_FATES_TARGET_GROUND || mechanic.role >= WOW_FATES_ROLE_MAX)
             {
                 LOG_ERROR("module", "mod-wow-fates: mechanic {} ({}) has kind {} or target {}, not handled; skipped.",
                     mechanic.id, mechanic.name, mechanic.kind, mechanic.target);
                 continue;
             }
-            if (mechanic.kind != WOW_FATES_MECHANIC_ADDS && !sSpellMgr->GetSpellInfo(mechanic.spell))
+            if ((mechanic.kind == WOW_FATES_MECHANIC_SPELL || mechanic.kind == WOW_FATES_MECHANIC_LEAP) && !sSpellMgr->GetSpellInfo(mechanic.spell))
             {
                 LOG_ERROR("module", "mod-wow-fates: mechanic {} ({}) casts spell {}, which does not exist; skipped.",
                     mechanic.id, mechanic.name, mechanic.spell);
@@ -324,6 +325,7 @@ void WowFatesExpeditionMgr::LoadFromDB()
                 SpellInfo const* info = sSpellMgr->GetSpellInfo(mechanic.spell);
                 bool const self = info && info->IsPositive();
                 mechanic.target = self ? WOW_FATES_TARGET_SELF : WOW_FATES_TARGET_VICTIM;
+                mechanic.role = self ? WOW_FATES_ROLE_BUFF : WOW_FATES_ROLE_STRIKE;
                 mechanic.cooldownMin = self ? 0 : 8;
                 mechanic.cooldownMax = self ? 0 : 14;
                 mechanic.weight = 0;
@@ -1279,14 +1281,22 @@ void WowFatesExpeditionMgr::Update(uint32 diff)
             UpdateSummons(active, map, diff);
             UpdateWaiting(active, map);
 
-            // its monsters' health and damage for the players there now
+            // when each of its monsters was first fought, for the kills' speed;
+            // where no wave comes, their health follows it every thirty seconds
             if (map)
             {
-                uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
-                std::erase_if(active.toughened, [map](auto const& pair) { return !map->GetCreature(pair.first); });
+                std::erase_if(active.addEngaged, [map](auto const& pair) { return !map->GetCreature(pair.first); });
                 for (ObjectGuid const& guid : active.summons)
                     if (Creature* creature = map->GetCreature(guid))
-                        Toughen(active, creature, players);
+                        if (creature->IsAlive() && creature->IsInCombat())
+                            active.addEngaged.try_emplace(guid, active.elapsed);
+                active.adjustTimer -= c.areaInterval;
+                if (active.adjustTimer <= 0)
+                {
+                    active.adjustTimer = 30 * IN_MILLISECONDS;
+                    if (!HasWaves(active.def->objectiveType))
+                        AdjustAdds(active);
+                }
             }
 
             // its point, once its ground is loaded: under a roof, it is never used again
@@ -2229,7 +2239,13 @@ void WowFatesExpeditionMgr::UpdateBoss(WowFatesActiveExpedition& active, Map* ma
         return;
     }
 
-    ScaleHealth(boss, active.bossHealth, active.bossPlayers, uint32(std::max<std::size_t>(active.inside.size(), 1)));
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+    ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleFoe(boss, players);
+    // his mechanics, drawn when he first comes, at the area's tick
+    if (!active.drawn)
+        DrawMechanics(active, Outdoors(map, boss->GetPositionX(), boss->GetPositionY(), boss->GetPositionZ() + 1.0f));
+    RunMechanics(active, map, boss, WowFatesConf().areaInterval);
 
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
     double const pct = double(def->bossAt) + (100.0 - double(def->bossAt)) * lost;
@@ -2485,43 +2501,68 @@ float WowFatesExpeditionMgr::Crowd(uint32 players)
     return std::pow(float(std::max<uint32>(players, 1)), WowFatesConf().scaleCount);
 }
 
-// A monster of an Expedition for the players in its area: its health times
-// the players to the power WowFates.Scaling.Health, its damage to the power
-// WowFates.Scaling.Damage; its share of health kept as they come and go.
+// A monster of an Expedition as it comes, for the players in its area: its
+// health times the players to the power Scaling.Health, times what the kills'
+// speed made of it (addToughness, AdjustAdds); its damage times the players
+// to the power Scaling.Damage. Once out, it keeps them.
 void WowFatesExpeditionMgr::Toughen(WowFatesActiveExpedition& active, Creature* creature, uint32 players)
 {
     if (!creature->IsAlive())
         return;
     players = std::max<uint32>(players, 1);
-    auto [itr, fresh] = active.toughened.try_emplace(creature->GetGUID(), creature->GetMaxHealth(), 1);
-    if (!fresh && itr->second.second == players)
-        return;
     WowFatesConfig const& c = WowFatesConf();
-    double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
-    uint32 const maxHealth = std::max<uint32>(1, uint32(double(itr->second.first) * std::pow(double(players), double(c.scaleHealth))));
+    double const factor = std::pow(double(players), double(c.scaleHealth)) * active.addToughness;
+    uint32 const maxHealth = std::max<uint32>(1, uint32(double(creature->GetMaxHealth()) * factor));
     creature->SetCreateHealth(maxHealth);
     creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
     creature->UpdateMaxHealth();
-    uint32 const max = creature->GetMaxHealth();
-    creature->SetHealth(std::clamp<uint32>(uint32(std::lround(double(max) * share)), 1, max));
-    float const hit = std::pow(float(players), c.scaleDamage);
+    creature->SetFullHealth();
+    ScaleFoe(creature, players);
+}
+
+// The kills' speed: how long the monsters of the Expedition took to kill
+// since they were first fought, against Target.AddSeconds; their health, for
+// those to come, moved toward it by Target.AddStep at most (three kills at
+// least). At each wave, else every thirty seconds.
+void WowFatesExpeditionMgr::AdjustAdds(WowFatesActiveExpedition& active)
+{
+    if (active.addKillTimes.size() < 3)
+        return;
+    WowFatesConfig const& c = WowFatesConf();
+    double total = 0.0;
+    for (int64 ms : active.addKillTimes)
+        total += double(ms);
+    double const seconds = std::max(total / double(active.addKillTimes.size()) / IN_MILLISECONDS, 0.5);
+    double const ratio = std::clamp(double(c.targetAddSeconds) / seconds, 1.0 - double(c.targetAddStep), 1.0 + double(c.targetAddStep));
+    active.addToughness *= ratio;
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: its monsters died in {:.1f} s, {:.0f} s asked: their health x{:.2f} now.",
+        active.def->id, seconds, c.targetAddSeconds, active.addToughness);
+    active.addKillTimes.clear();
+}
+
+// A boss's, a chief's damage for the players in the area: times them to the
+// power Scaling.Damage (his health follows ScaleHealth).
+void WowFatesExpeditionMgr::ScaleFoe(Creature* creature, uint32 players) const
+{
+    float const hit = std::pow(float(std::max<uint32>(players, 1)), WowFatesConf().scaleDamage);
+    if (std::fabs(creature->GetPctModifierValue(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT) - hit) < 0.001f)
+        return;
     creature->SetStatPctModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, hit);
     creature->SetStatPctModifier(UNIT_MOD_DAMAGE_RANGED, TOTAL_PCT, hit);
     creature->UpdateDamagePhysical(BASE_ATTACK);
     creature->UpdateDamagePhysical(RANGED_ATTACK);
-    itr->second.second = players;
 }
 
-// The health of a creature for the players in the area, as the objective:
-// its maximum follows them up and down, its share of health stays (78 % with
-// fifteen players more is still 78 %), never a death or a full heal from the
-// rounding.
+// The health of a boss, a chief or an ally for the players in the area: x
+// (1 + Scaling.Boss x (players - 1)); its maximum follows them up and down, its
+// share of health stays (78 % with fifteen players more is still 78 %), never
+// a death or a full heal from the rounding.
 void WowFatesExpeditionMgr::ScaleHealth(Creature* creature, uint32 baseHealth, uint32& setFor, uint32 players) const
 {
     if (players == setFor || !creature->IsAlive() || !baseHealth)
         return;
     double const share = double(creature->GetHealth()) / double(std::max<uint32>(creature->GetMaxHealth(), 1));
-    uint32 const maxHealth = uint32(float(baseHealth) * (1.0f + WowFatesConf().participantScaling * float(players - 1)));
+    uint32 const maxHealth = uint32(float(baseHealth) * (1.0f + WowFatesConf().scaleBoss * float(players - 1)));
     creature->SetCreateHealth(maxHealth);
     creature->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(maxHealth));
     creature->UpdateMaxHealth();
@@ -2691,6 +2732,9 @@ bool WowFatesExpeditionMgr::SendWave(WowFatesActiveExpedition& active, Map* map,
         active.pace = fast ? std::min(c.wavePaceMax, active.pace + c.wavePaceStep)
             : std::max(c.wavePaceMin, active.pace - c.wavePaceStep);
     }
+
+    // their health for the kills' speed so far
+    AdjustAdds(active);
 
     // wave_size for one player, times the square root of the players
     // (Crowd: their health takes the rest), the pace of the kills a little
@@ -3076,6 +3120,12 @@ void WowFatesExpeditionMgr::UpdateBossSupport(WowFatesActiveExpedition& active, 
         return;
     }
     ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleFoe(boss, players);
+    // his mechanics, drawn when he first comes; only with players to see them
+    if (!active.drawn)
+        DrawMechanics(active, Outdoors(map, boss->GetPositionX(), boss->GetPositionY(), boss->GetPositionZ() + 1.0f));
+    if (!active.inside.empty())
+        RunMechanics(active, map, boss, diff);
 
     // their words, only with players to hear them: the elite's when the true
     // fight begins and at 75, 50, 25 and 10 % of its health, once each
@@ -3886,92 +3936,205 @@ void WowFatesExpeditionMgr::PickChief(WowFatesActiveExpedition& active)
     active.summonEntry = active.chief.adds;
 }
 
-// His mechanics, once, when he first comes: a known figure's own, in their
-// order; a made-up one's drawn from the pool, mechanics_min to mechanics_max
-// of them, by weight, none twice, one of each group at most, none above the
-// Expedition's level, none for the open sky under a roof nor the other way.
-// The first from the start, then one more at each phase (75, 50, 25 % of his
-// health), the last ones together.
+// His mechanics, once, when he first comes. A known figure's own first, in
+// their order; then, from the pool by weight (none twice, one of each group,
+// none above the Expedition's level, none for the open sky under a roof nor
+// the other way), what he lacks of a strike, an area, a control and a change
+// of aggro; a made-up one draws mechanics_min to mechanics_max more among a
+// buff, a cast to interrupt and his band (one at most). The first of each of
+// a strike, an area, a control, a change of aggro and a cast are his from the
+// start; the others come with his phases (75, 50, 25 % of his health), one
+// each, the last ones together.
 void WowFatesExpeditionMgr::DrawMechanics(WowFatesActiveExpedition& active, bool outdoors)
 {
     active.drawn = true;
     active.mechanics.clear();
     WowFatesExpeditionDef const* def = active.def;
     std::vector<WowFatesMechanic const*> chosen;
-    if (!active.chief.mechanics.empty())
+    uint32 roles[WOW_FATES_ROLE_MAX] = {};
+    std::unordered_set<uint8> groups;
+    auto take = [&](WowFatesMechanic const* mechanic)
     {
-        for (uint32 id : active.chief.mechanics)
-            if (auto itr = _mechanics.find(id); itr != _mechanics.end())
-                chosen.push_back(&itr->second);
-    }
-    else
+        chosen.push_back(mechanic);
+        ++roles[mechanic->role];
+        if (mechanic->group)
+            groups.insert(mechanic->group);
+    };
+    for (uint32 id : active.chief.mechanics)
+        if (auto itr = _mechanics.find(id); itr != _mechanics.end())
+            take(&itr->second);
+    auto draw = [&](uint8 role)
     {
         std::vector<WowFatesMechanic const*> pool;
+        uint32 total = 0;
         for (auto const& [id, mechanic] : _mechanics)
-            if (mechanic.weight && mechanic.minLevel <= def->level
-                && (mechanic.place == 0 || (mechanic.place == 1) == outdoors))
+            if (mechanic.role == role && mechanic.weight && mechanic.minLevel <= def->level
+                && (mechanic.place == 0 || (mechanic.place == 1) == outdoors)
+                && (!mechanic.group || !groups.count(mechanic.group))
+                && std::find(chosen.begin(), chosen.end(), &mechanic) == chosen.end())
+            {
                 pool.push_back(&mechanic);
-        uint32 const wanted = urand(def->mechanicsMin, def->mechanicsMax);
-        while (chosen.size() < wanted && !pool.empty())
-        {
-            uint32 total = 0;
-            for (WowFatesMechanic const* mechanic : pool)
-                total += mechanic->weight;
-            uint32 roll = urand(0, total - 1);
-            auto pick = pool.begin();
-            for (; pick != pool.end(); ++pick)
-            {
-                if (roll < (*pick)->weight)
-                    break;
-                roll -= (*pick)->weight;
+                total += mechanic.weight;
             }
-            if (pick == pool.end())
-                --pick;
-            WowFatesMechanic const* mechanic = *pick;
-            chosen.push_back(mechanic);
-            std::erase_if(pool, [mechanic](WowFatesMechanic const* other)
+        if (pool.empty())
+            return;
+        uint32 roll = urand(0, total - 1);
+        for (WowFatesMechanic const* mechanic : pool)
+        {
+            if (roll < mechanic->weight)
             {
-                return other == mechanic || (mechanic->group && other->group == mechanic->group);
-            });
+                take(mechanic);
+                return;
+            }
+            roll -= mechanic->weight;
+        }
+        take(pool.back());
+    };
+    for (uint8 role : { WOW_FATES_ROLE_STRIKE, WOW_FATES_ROLE_AREA, WOW_FATES_ROLE_CONTROL, WOW_FATES_ROLE_AGGRO })
+        if (!roles[role])
+            draw(role);
+    if (active.chief.mechanics.empty())
+    {
+        uint32 const extras = urand(def->mechanicsMin, def->mechanicsMax);
+        for (uint32 i = 0; i < extras; ++i)
+        {
+            std::vector<uint8> left = { WOW_FATES_ROLE_BUFF, WOW_FATES_ROLE_CAST };
+            if (!roles[WOW_FATES_ROLE_ADDS])
+                left.push_back(WOW_FATES_ROLE_ADDS);
+            draw(Acore::Containers::SelectRandomContainerElement(left));
         }
     }
-    std::string names;
-    for (std::size_t i = 0; i < chosen.size(); ++i)
+
+    // from the start, the first of each role of the fight; then one at each phase
+    bool seen[WOW_FATES_ROLE_MAX] = {};
+    uint32 later = 0;
+    for (WowFatesMechanic const* mechanic : chosen)
     {
         WowFatesActiveExpedition::Drawn drawn;
-        drawn.mechanic = chosen[i];
-        drawn.phase = uint32(std::min<std::size_t>(i, std::min<std::size_t>(def->bossWaves.size(), 3)));
-        drawn.cooldown = int64(urand(chosen[i]->cooldownMin, chosen[i]->cooldownMax)) * IN_MILLISECONDS / 2;
+        drawn.mechanic = mechanic;
+        bool const fight = mechanic->role == WOW_FATES_ROLE_STRIKE || mechanic->role == WOW_FATES_ROLE_AREA
+            || mechanic->role == WOW_FATES_ROLE_CONTROL || mechanic->role == WOW_FATES_ROLE_AGGRO || mechanic->role == WOW_FATES_ROLE_CAST;
+        if (fight && !seen[mechanic->role])
+        {
+            seen[mechanic->role] = true;
+            drawn.phase = 0;
+        }
+        else
+            drawn.phase = std::min<uint32>(++later, 3);
+        drawn.cooldown = int64(urand(mechanic->cooldownMin, mechanic->cooldownMax)) * IN_MILLISECONDS / 2;
         active.mechanics.push_back(drawn);
-        names += (names.empty() ? "" : ", ") + chosen[i]->name;
     }
-    LOG_INFO("module", "mod-wow-fates: Expedition {}: its warlord, creature {}, {}: {}.", def->id, Leader(active),
-        active.chief.mechanics.empty() ? "drawn" : "his own", names.empty() ? "nothing" : names);
+    LOG_INFO("module", "mod-wow-fates: Expedition {}: its chief, creature {}: {}.", def->id, Leader(active), Actions(active));
 }
 
-// A mechanic used: a spell at its target, his band from around him, or a
-// leap at a player, its spell when he lands.
+// His mechanics as words: "Mortal Strike (strike), Thunderclap (area, 50 %)...".
+std::string WowFatesExpeditionMgr::Actions(WowFatesActiveExpedition const& active) const
+{
+    static char const* const names[WOW_FATES_ROLE_MAX] = { "-", "strike", "area", "control", "buff", "aggro", "band", "cast" };
+    static char const* const phases[4] = { "", ", from 75 %", ", from 50 %", ", from 25 %" };
+    std::string out;
+    for (WowFatesActiveExpedition::Drawn const& drawn : active.mechanics)
+        out += Acore::StringFormat("{}{} ({}{})", out.empty() ? "" : ", ", drawn.mechanic->name, names[drawn.mechanic->role],
+            phases[std::min<uint32>(drawn.phase, 3)]);
+    return out.empty() ? "nothing" : out;
+}
+
+// A line said by a chief before a heavy attack, in each player's language,
+// a bubble over his head (a monster's say, no system message).
+void WowFatesExpeditionMgr::Announce(Creature* speaker, uint32 text)
+{
+    Map* map = speaker->GetMap();
+    for (auto const& ref : map->GetPlayers())
+    {
+        Player* player = ref.GetSource();
+        if (!player || !player->IsInWorld() || !player->IsWithinDist(speaker, 60.0f))
+            continue;
+        WorldPacket data;
+        ChatHandler::BuildChatPacket(data, CHAT_MSG_MONSTER_SAY, LANG_UNIVERSAL, speaker, player,
+            WowFatesText(player->GetSession(), text));
+        player->SendDirectMessage(&data);
+    }
+}
+
+// A mechanic used. A spell at its target, its damage times the players to the
+// power Scaling.Damage; one at a player falls on more of them as they are more
+// (the cube root of the players: 1, 2 for 8, 3 for 27); his band from around
+// him; a leap at the farthest player, its spell when he lands; a change of
+// his target. His words before the heavy ones.
 void WowFatesExpeditionMgr::UseMechanic(WowFatesActiveExpedition& active, Map* map, Creature* boss, WowFatesMechanic const* mechanic)
 {
-    // the players of the area within forty yards: a random one, the farthest
+    // the players of the area within forty yards
     std::vector<Player*> around;
     for (ObjectGuid const& guid : active.inside)
         if (Player* player = ObjectAccessor::FindPlayer(guid))
             if (player->IsInWorld() && player->IsAlive() && player->GetMap() == map && player->IsWithinDist(boss, 40.0f))
                 around.push_back(player);
     Unit* victim = boss->GetVictim();
-    Player* random = around.empty() ? nullptr : Acore::Containers::SelectRandomContainerElement(around);
     Player* farthest = nullptr;
     for (Player* player : around)
         if (!farthest || boss->GetExactDist2d(player) > boss->GetExactDist2d(farthest))
             farthest = player;
+    uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
+
+    // his words before it
+    switch (mechanic->role)
+    {
+        case WOW_FATES_ROLE_STRIKE:  if (urand(0, 1)) Announce(boss, WOW_FATES_STR_SAY_STRIKE); break;
+        case WOW_FATES_ROLE_AREA:    Announce(boss, WOW_FATES_STR_SAY_AREA); break;
+        case WOW_FATES_ROLE_CONTROL: if (urand(0, 1)) Announce(boss, WOW_FATES_STR_SAY_CONTROL); break;
+        case WOW_FATES_ROLE_AGGRO:   Announce(boss, WOW_FATES_STR_SAY_AGGRO); break;
+        case WOW_FATES_ROLE_CAST:    Announce(boss, WOW_FATES_STR_SAY_CAST); break;
+        case WOW_FATES_ROLE_BUFF:    Announce(boss, WOW_FATES_STR_SAY_BUFF); break;
+        default: break;
+    }
+
+    // a spell's damage for the players: its damaging effects' points
+    auto cast = [&](Unit* at, bool triggered)
+    {
+        SpellInfo const* info = sSpellMgr->GetSpellInfo(mechanic->spell);
+        if (!info || !at)
+            return;
+        float const hit = std::pow(float(players), WowFatesConf().scaleDamage);
+        CustomSpellValues values;
+        static SpellValueMod const mods[3] = { SPELLVALUE_BASE_POINT0, SPELLVALUE_BASE_POINT1, SPELLVALUE_BASE_POINT2 };
+        for (uint8 i = 0; i < 3; ++i)
+        {
+            SpellEffectInfo const& effect = info->Effects[i];
+            bool const damage = effect.Effect == SPELL_EFFECT_SCHOOL_DAMAGE || effect.Effect == SPELL_EFFECT_WEAPON_DAMAGE
+                || effect.Effect == SPELL_EFFECT_NORMALIZED_WEAPON_DMG || effect.Effect == SPELL_EFFECT_WEAPON_DAMAGE_NOSCHOOL
+                || (effect.Effect == SPELL_EFFECT_APPLY_AURA && effect.ApplyAuraName == SPELL_AURA_PERIODIC_DAMAGE);
+            if (damage)
+                values.AddSpellMod(mods[i], int32(float(effect.CalcValue(boss)) * hit));
+        }
+        // no mana, no reagent, no cooldown of the spell's own: the pool's
+        // cooldowns are his; a cast to interrupt keeps its cast time
+        TriggerCastFlags const flags = triggered ? TRIGGERED_FULL_MASK
+            : TriggerCastFlags(TRIGGERED_IGNORE_POWER_AND_REAGENT_COST | TRIGGERED_IGNORE_GCD | TRIGGERED_IGNORE_SPELL_AND_CATEGORY_CD);
+        boss->CastCustomSpell(mechanic->spell, values, at, flags);
+    };
+    // more of them as the players are more
+    auto several = [&]()
+    {
+        std::vector<Unit*> targets;
+        std::vector<Player*> pool(around);
+        uint32 const count = std::max<uint32>(1, uint32(std::lround(std::cbrt(double(players)))));
+        while (targets.size() < count && !pool.empty())
+        {
+            auto pick = pool.begin() + urand(0, uint32(pool.size()) - 1);
+            targets.push_back(*pick);
+            pool.erase(pick);
+        }
+        if (targets.empty() && victim)
+            targets.push_back(victim);
+        return targets;
+    };
 
     switch (mechanic->kind)
     {
         case WOW_FATES_MECHANIC_ADDS:
         {
             Position const from = boss->GetPosition();
-            SendWave(active, map, random ? static_cast<Unit*>(random) : victim, &from);
+            SendWave(active, map, around.empty() ? victim : Acore::Containers::SelectRandomContainerElement(around), &from);
             break;
         }
         case WOW_FATES_MECHANIC_LEAP:
@@ -3988,30 +4151,115 @@ void WowFatesExpeditionMgr::UseMechanic(WowFatesActiveExpedition& active, Map* m
             active.leapSpell = mechanic->spell;
             break;
         }
+        case WOW_FATES_MECHANIC_AGGRO:
+        {
+            ThreatManager& threat = boss->GetThreatMgr();
+            if (mechanic->target == 0 || around.empty())
+            {
+                threat.ResetAllThreat(); // all wiped: whoever hits him next
+                break;
+            }
+            Player* chosen = nullptr;
+            if (mechanic->target == 2)
+            {
+                // the one who healed most in the Expedition
+                uint64 best = 0;
+                for (Player* player : around)
+                    if (auto itr = active.contributors.find(player->GetGUID()); itr != active.contributors.end() && itr->second.healing > best)
+                    {
+                        best = itr->second.healing;
+                        chosen = player;
+                    }
+            }
+            if (!chosen)
+            {
+                std::vector<Player*> others;
+                for (Player* player : around)
+                    if (player != victim)
+                        others.push_back(player);
+                chosen = Acore::Containers::SelectRandomContainerElement(others.empty() ? around : others);
+            }
+            threat.MatchUnitThreatToHighestThreat(chosen);
+            threat.AddThreat(chosen, float(chosen->GetMaxHealth()), nullptr, true, true);
+            break;
+        }
         default:
             switch (mechanic->target)
             {
                 case WOW_FATES_TARGET_SELF:
-                    boss->CastSpell(boss, mechanic->spell, true);
+                    cast(boss, true);
                     break;
                 case WOW_FATES_TARGET_RANDOM:
-                    if (Unit* at = random ? static_cast<Unit*>(random) : victim)
-                        boss->CastSpell(at, mechanic->spell, false);
+                    for (Unit* at : several())
+                        cast(at, false);
                     break;
                 case WOW_FATES_TARGET_FARTHEST:
-                    if (Unit* at = farthest ? static_cast<Unit*>(farthest) : victim)
-                        boss->CastSpell(at, mechanic->spell, false);
+                    cast(farthest ? static_cast<Unit*>(farthest) : victim, false);
                     break;
                 case WOW_FATES_TARGET_GROUND:
-                    if (Unit* at = random ? static_cast<Unit*>(random) : victim)
-                        boss->CastSpell(at->GetPositionX(), at->GetPositionY(), at->GetPositionZ(), mechanic->spell, false);
+                    for (Unit* at : several())
+                        boss->CastSpell(at->GetPositionX(), at->GetPositionY(), at->GetPositionZ(), mechanic->spell, true);
                     break;
                 default:
-                    if (victim)
-                        boss->CastSpell(victim, mechanic->spell, false);
+                    cast(victim, mechanic->role != WOW_FATES_ROLE_CAST); // a cast to interrupt is not triggered
                     break;
             }
             break;
+    }
+}
+
+// A chief's, a boss's mechanics in his fight. His phases by his health (75,
+// 50, 25 %): each one makes his mechanics come back sooner (x0.85) and brings
+// those of the phase (one used once, at once). Each mechanic at its cooldown,
+// one at a time, two and a half seconds apart at least.
+void WowFatesExpeditionMgr::RunMechanics(WowFatesActiveExpedition& active, Map* map, Creature* boss, uint32 diff)
+{
+    if (active.mechanics.empty() || !boss->IsAlive())
+        return;
+    float const health = boss->GetHealthPct();
+    uint32 const phase = (health <= 75.0f) + (health <= 50.0f) + (health <= 25.0f);
+    while (active.mechanicPhase < phase)
+    {
+        ++active.mechanicPhase;
+        active.cooldownScale *= 0.85f;
+        for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
+            if (drawn.phase == active.mechanicPhase && !drawn.mechanic->cooldownMax && !drawn.used && boss->IsInCombat())
+            {
+                UseMechanic(active, map, boss, drawn.mechanic);
+                drawn.used = true;
+            }
+    }
+
+    // a leap that lands
+    if (active.leapAt && active.elapsed >= active.leapAt)
+    {
+        active.leapAt = 0;
+        if (active.leapSpell)
+            boss->CastSpell(boss, active.leapSpell, true);
+    }
+
+    if (!boss->IsInCombat() || !boss->GetVictim())
+        return;
+    active.spellTimer -= diff;
+    for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
+    {
+        if (drawn.phase > active.mechanicPhase)
+            continue;
+        if (!drawn.mechanic->cooldownMax)
+        {
+            if (drawn.used || active.spellTimer > 0 || boss->HasUnitState(UNIT_STATE_CASTING) || active.leapAt)
+                continue;
+            UseMechanic(active, map, boss, drawn.mechanic);
+            drawn.used = true;
+            active.spellTimer = 2500;
+            continue;
+        }
+        drawn.cooldown -= diff;
+        if (drawn.cooldown > 0 || active.spellTimer > 0 || boss->HasUnitState(UNIT_STATE_CASTING) || active.leapAt)
+            continue;
+        UseMechanic(active, map, boss, drawn.mechanic);
+        drawn.cooldown = int64(float(urand(drawn.mechanic->cooldownMin, drawn.mechanic->cooldownMax)) * active.cooldownScale * IN_MILLISECONDS);
+        active.spellTimer = 2500;
     }
 }
 
@@ -4037,6 +4285,8 @@ void WowFatesExpeditionMgr::ResetWarlord(WowFatesActiveExpedition& active, Map* 
     active.bossSaid = 0;
     active.leapAt = 0;
     active.filled = false;
+    active.mechanicPhase = 0;
+    active.cooldownScale = 1.0f;
     for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
     {
         drawn.used = false;
@@ -4122,6 +4372,7 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
 
     uint32 const players = uint32(std::max<std::size_t>(active.inside.size(), 1));
     ScaleHealth(boss, active.bossHealth, active.bossPlayers, players);
+    ScaleFoe(boss, players);
     double const lost = 1.0 - double(boss->GetHealth()) / double(std::max<uint32>(boss->GetMaxHealth(), 1));
     active.progressPct = std::max(active.progressPct, std::min(100.0 * lost, 99.0));
 
@@ -4150,14 +4401,6 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
         return;
     }
 
-    // a leap that lands
-    if (active.leapAt && active.elapsed >= active.leapAt)
-    {
-        active.leapAt = 0;
-        if (active.leapSpell)
-            boss->CastSpell(boss, active.leapSpell, true);
-    }
-
     // his phases, at the bar's marks
     for (std::size_t i = 0; i < def->bossWaves.size() && i < 32; ++i)
     {
@@ -4167,12 +4410,6 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
         active.bossWavesSent |= bit;
         active.phase = uint32(i + 1);
         Say(boss, uint8(BOSS_SAY_75 + std::min<std::size_t>(i, 3)));
-        for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
-            if (drawn.phase == active.phase && !drawn.mechanic->cooldownMax && !drawn.used)
-            {
-                UseMechanic(active, map, boss, drawn.mechanic);
-                drawn.used = true;
-            }
         active.phaseWave = true;
         break;
     }
@@ -4189,31 +4426,8 @@ void WowFatesExpeditionMgr::UpdateWarlord(WowFatesActiveExpedition& active, Map*
             active.phaseWave = false;
     }
 
-    // his mechanics of the phases passed, each at its cooldown, one at a time
-    if (!boss->IsInCombat() || !boss->GetVictim())
-        return;
-    active.spellTimer -= diff;
-    for (WowFatesActiveExpedition::Drawn& drawn : active.mechanics)
-    {
-        if (drawn.phase > active.phase)
-            continue;
-        // one used once, not yet: as soon as he may
-        if (!drawn.mechanic->cooldownMax)
-        {
-            if (drawn.used || active.spellTimer > 0 || boss->HasUnitState(UNIT_STATE_CASTING) || active.leapAt)
-                continue;
-            UseMechanic(active, map, boss, drawn.mechanic);
-            drawn.used = true;
-            active.spellTimer = 2500;
-            continue;
-        }
-        drawn.cooldown -= diff;
-        if (drawn.cooldown > 0 || active.spellTimer > 0 || boss->HasUnitState(UNIT_STATE_CASTING) || active.leapAt)
-            continue;
-        UseMechanic(active, map, boss, drawn.mechanic);
-        drawn.cooldown = int64(urand(drawn.mechanic->cooldownMin, drawn.mechanic->cooldownMax)) * IN_MILLISECONDS;
-        active.spellTimer = 2500;
-    }
+    // his mechanics, as his health goes
+    RunMechanics(active, map, boss, diff);
 }
 
 // ---------------------------------------------------------------------------
@@ -4304,6 +4518,13 @@ void WowFatesExpeditionMgr::OnDeath(Unit* victim, Unit* killer)
         return;
     WowFatesExpeditionDef const* def = active->def;
     Active(*active);
+
+    // one of its monsters: how long it took to kill, since it was first fought
+    if (auto engaged = active->addEngaged.find(creature->GetGUID()); engaged != active->addEngaged.end())
+    {
+        active->addKillTimes.push_back(active->elapsed - engaged->second);
+        active->addEngaged.erase(engaged);
+    }
 
     // The leader of an assault: the end of the bar.
     if ((def->objectiveType == WOW_FATES_OBJECTIVE_ASSAULT || def->objectiveType == WOW_FATES_OBJECTIVE_BOSS_SUPPORT
@@ -4577,10 +4798,28 @@ void WowFatesExpeditionMgr::Simulate(ChatHandler* handler, uint32 id, uint32 pla
             if (waves)
                 line += Acore::StringFormat("wave 1: {} ({}-{}), wave 4: {} ({}-{}); ", wave(0, 1.0f), wave(0, c.wavePaceMin),
                     wave(0, c.wavePaceMax), wave(3, 1.0f), wave(3, c.wavePaceMin), wave(3, c.wavePaceMax));
-            line += Acore::StringFormat("about {} (up to {}); at most {} alive; each x{:.2f} health, x{:.2f} damage; a boss or an ally x{:.2f} health",
-                about, aboutMax, alive, std::pow(float(n), c.scaleHealth), std::pow(float(n), c.scaleDamage),
-                1.0f + c.participantScaling * float(n - 1));
+            line += Acore::StringFormat("about {} (up to {}); at most {} alive; each x{:.2f} health at first (then by the kills' speed, "
+                "{:.0f} s each asked), x{:.2f} damage; a boss, a chief or an ally x{:.2f} health, x{:.2f} damage",
+                about, aboutMax, alive, std::pow(float(n), c.scaleHealth), c.targetAddSeconds, std::pow(float(n), c.scaleDamage),
+                1.0f + c.scaleBoss * float(n - 1), std::pow(float(n), c.scaleDamage));
             handler->SendSysMessage(line);
+        }
+        // a chief's mechanics: a draw for each, as one at his coming (under the sky)
+        WowFatesActiveExpedition probe;
+        probe.def = &def;
+        std::vector<WowFatesChief> chiefs = def.chiefs;
+        if (chiefs.empty() && (type == WOW_FATES_OBJECTIVE_ASSAULT || type == WOW_FATES_OBJECTIVE_BOSS_SUPPORT))
+        {
+            WowFatesChief boss;
+            boss.creature = def.bossEntry;
+            chiefs.push_back(boss);
+        }
+        for (WowFatesChief const& chief : chiefs)
+        {
+            probe.chief = chief;
+            DrawMechanics(probe, true);
+            handler->SendSysMessage(Acore::StringFormat("  {} ({}): {}", CreatureName(chief.creature, handler->GetSession()),
+                chief.mechanics.empty() ? "drawn" : "his own, completed", Actions(probe)));
         }
     }
 }

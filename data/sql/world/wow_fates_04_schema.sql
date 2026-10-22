@@ -235,7 +235,7 @@ DEALLOCATE PREPARE wow_fates_stmt;
 CREATE TABLE IF NOT EXISTS `mod_wow_fates_mechanic` (
   `id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'for the log',
-  `kind` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = a spell at its target; 1 = his band comes from around him (as a wave); 2 = a leap at the farthest player, the spell on landing',
+  `kind` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = a spell at its target; 1 = his band comes from around him (as a wave); 2 = a leap at the farthest player, the spell on landing; 3 = a change of aggro (target 0 all threat wiped, 1 a player, 2 the healer)',
   `spell` INT UNSIGNED NOT NULL DEFAULT 0,
   `target` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = his victim, 1 = a player within 40 yards, 2 = himself, 3 = the farthest player within 40 yards, 4 = the ground under a player',
   `cooldown_min` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'seconds; 0 and 0: once, when its phase comes',
@@ -265,7 +265,7 @@ CREATE TABLE IF NOT EXISTS `mod_wow_fates_chief` (
 SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'mechanics_min');
 SET @wow_fates_sql := IF(@wow_fates_col = 0,
-  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `mechanics_min` TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT ''warlord: mechanics drawn for a made-up chief, at least (1 to 4)'' AFTER `caravan`',
+  'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `mechanics_min` TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT ''a chief (warlord, assault, boss support): mechanics drawn beyond the four of his fight, for a made-up one, at least (0 to 4)'' AFTER `caravan`',
   'DO 0');
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;
@@ -274,6 +274,14 @@ SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_objective' AND COLUMN_NAME = 'mechanics_max');
 SET @wow_fates_sql := IF(@wow_fates_col = 0,
   'ALTER TABLE `mod_wow_fates_objective` ADD COLUMN `mechanics_max` TINYINT UNSIGNED NOT NULL DEFAULT 4 COMMENT ''warlord: and at most'' AFTER `mechanics_min`',
+  'DO 0');
+PREPARE wow_fates_stmt FROM @wow_fates_sql;
+EXECUTE wow_fates_stmt;
+DEALLOCATE PREPARE wow_fates_stmt;
+SET @wow_fates_col := (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_wow_fates_mechanic' AND COLUMN_NAME = 'role');
+SET @wow_fates_sql := IF(@wow_fates_col = 0,
+  'ALTER TABLE `mod_wow_fates_mechanic` ADD COLUMN `role` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT ''1 = a heavy blow on the tank, 2 = an area, 3 = a control (charge, leap, fear, stun, knock back), 4 = a buff, 5 = a change of aggro, 6 = his band, 7 = a cast to interrupt; a chief has 1, 2, 3 and 5 from the start'' AFTER `group`',
   'DO 0');
 PREPARE wow_fates_stmt FROM @wow_fates_sql;
 EXECUTE wow_fates_stmt;

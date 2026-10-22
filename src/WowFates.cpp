@@ -145,8 +145,11 @@ void WowFatesLoadConfig()
     c.wavePaceMax = std::max(sConfigMgr->GetOption<float>("WowFates.Waves.PaceMax", 1.25f), 1.0f);
     c.wavePaceMin = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.PaceMin", 0.8f), 0.1f, 1.0f);
     c.scaleCount = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Count", 0.5f), 0.0f);
-    c.scaleHealth = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Health", 0.5f), 0.0f);
-    c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.15f), 0.0f);
+    c.scaleHealth = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Health", 0.75f), 0.0f);
+    c.scaleDamage = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Damage", 0.4f), 0.0f);
+    c.scaleBoss = std::max(sConfigMgr->GetOption<float>("WowFates.Scaling.Boss", 1.0f), 0.0f);
+    c.targetAddSeconds = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddSeconds", 15.0f), 1.0f);
+    c.targetAddStep = std::max(sConfigMgr->GetOption<float>("WowFates.Target.AddStep", 0.2f), 0.0f);
     c.waveNextAt = std::clamp(sConfigMgr->GetOption<float>("WowFates.Waves.NextAt", 0.25f), 0.0f, 1.0f);
     c.participantScaling = Positive("WowFates.Expedition.ParticipantScaling", 0.6f);
     c.adaptiveSpawn = sConfigMgr->GetOption<bool>("WowFates.Expedition.AdaptiveSpawn", true);

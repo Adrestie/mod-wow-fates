@@ -91,7 +91,13 @@ enum WowFatesStrings : uint32
     WOW_FATES_STR_HELD               = 44,  // the same, with no time limit
     WOW_FATES_STR_TIME_LEFT          = 45,  // the tracker's second line: a warlord's time left
     WOW_FATES_STR_CARAVAN            = 46,
-    WOW_FATES_STR_RESCUED_TIME       = 47,  // the tracker's second line: led out, lost, time left  // the tracker's second line: an escort's leader's health, his caravan standing
+    WOW_FATES_STR_RESCUED_TIME       = 47,  // the tracker's second line: led out, lost, time left
+    WOW_FATES_STR_SAY_STRIKE         = 48,  // a chief's words before a heavy blow
+    WOW_FATES_STR_SAY_AREA           = 49,  // before an attack around him
+    WOW_FATES_STR_SAY_CONTROL        = 50,  // before a charge, a fear, a knock back
+    WOW_FATES_STR_SAY_AGGRO          = 51,  // before he turns on someone else
+    WOW_FATES_STR_SAY_CAST           = 52,  // before a cast to interrupt
+    WOW_FATES_STR_SAY_BUFF           = 53,  // before he grows stronger  // the tracker's second line: an escort's leader's health, his caravan standing
 
     WOW_FATES_STR_CMD_LIST          = 101,
     WOW_FATES_STR_CMD_LIST_LINE     = 102,
@@ -164,8 +170,11 @@ struct WowFatesConfig
     float bossScale = 1.44f;         // a boss support's ally (its boss), times its template's size
     float wavePerCharacter = 1.0f;   // times wave_size: a wave for one player
     float scaleCount = 0.5f;         // the monsters of a wave or about: times the players to this power (square root)
-    float scaleHealth = 0.5f;        // each one's health: times the players to this power (count x health ~ the players)
-    float scaleDamage = 0.15f;       // each one's damage: times the players to this power
+    float scaleHealth = 0.75f;       // a monster's health, when it comes: times the players to this power, then by the kills' speed
+    float scaleDamage = 0.4f;        // a monster's or a chief's damage: times the players to this power
+    float scaleBoss = 1.0f;          // a boss's, a chief's or an ally's health: x (1 + this x (players - 1))
+    float targetAddSeconds = 15.0f;  // the time a monster should take to kill: their health follows it, wave after wave
+    float targetAddStep = 0.2f;      // how far their health moves toward it at once (0.2: by a fifth)
     float waveNextAt = 0.25f;        // a wave comes once the last one is down to this share alive: they follow, never pile up
     float wavePaceMin = 0.8f;        // the pace of the kills: a wave's size between these times
     float wavePaceFast = 0.5f;       // a wave killed within this share of the interval is fast

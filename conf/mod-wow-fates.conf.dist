@@ -229,12 +229,23 @@ WowFates.Expedition.AreaInterval        = 1000
 #    WowFates.Scaling.Count
 #    WowFates.Scaling.Health
 #    WowFates.Scaling.Damage
-#        The scaling with the players in an Expedition's area: its monsters
-#        (each wave, those about) times the players to the power Count (0.5:
-#        the square root, 1 3 4.5 6.3 for 1 9 20 40 players), each one's
-#        health times them to the power Health (0.5: what the number does not
-#        give: count x health follows the players), its damage to the power
-#        Damage. Its health keeps its share as players come and go. No cap.
+#    WowFates.Scaling.Boss
+#        The scaling with the players in an Expedition's area (n). Its
+#        monsters (each wave, those about): n to the power Count (0.5, the
+#        square root: 1 3 4.5 6.3 for 1 9 20 40 players). Each one's health
+#        when it comes: n to the power Health (0.75), then by the kills' speed
+#        (Target.*); it keeps it once out. Its damage, and a chief's, his
+#        mechanics' too: n to the power Damage (0.4). A boss's, a chief's or
+#        an ally's health: x (1 + Boss x (n - 1)), 1 = x n, its share kept as
+#        players come and go. No cap.
+#
+#    WowFates.Target.AddSeconds
+#    WowFates.Target.AddStep
+#        The kills' speed: the time a monster of an Expedition should take to
+#        kill, since it was first fought (15 s). At each wave (every thirty
+#        seconds where none comes), the last ones' time against it moves the
+#        health of those to come, by AddStep at most (0.2: a fifth); never the
+#        health of one already out, never a boss's or an ally's.
 #
 #    WowFates.Waves.NextAt
 #        The waves follow each other, never pile up: a wave comes once the
@@ -272,8 +283,11 @@ WowFates.Rescue.CaptiveSpeed            = 1.0
 WowFates.Boss.Scale                     = 1.44
 WowFates.Waves.PerCharacter             = 1.0
 WowFates.Scaling.Count                  = 0.5
-WowFates.Scaling.Health                 = 0.5
-WowFates.Scaling.Damage                 = 0.15
+WowFates.Scaling.Health                 = 0.75
+WowFates.Scaling.Damage                 = 0.4
+WowFates.Scaling.Boss                   = 1.0
+WowFates.Target.AddSeconds              = 15
+WowFates.Target.AddStep                 = 0.2
 WowFates.Waves.NextAt                   = 0.25
 WowFates.Waves.PaceMin                  = 0.8
 WowFates.Waves.PaceFast                 = 0.5
